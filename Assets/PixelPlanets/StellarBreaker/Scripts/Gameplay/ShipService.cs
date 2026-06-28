@@ -76,11 +76,23 @@ namespace StellarBreaker.Gameplay
             for (int i = 0; i < _levels.Length; i++) { _levels[i] = 0; _timers[i] = 0; }
         }
 
+        /// <summary>Restore per-ship levels from a save (extra/short entries ignored).</summary>
+        public void RestoreLevels(int[] levels)
+        {
+            if (levels == null) return;
+            int n = System.Math.Min(levels.Length, _levels.Length);
+            for (int i = 0; i < n; i++) { _levels[i] = levels[i] < 0 ? 0 : levels[i]; _timers[i] = 0; }
+        }
+
         /// <summary>
         /// Advance all ship cooldowns by deltaSeconds; each ship that completes a cooldown
         /// deals one HitDamage to the active planet. Returns total damage dealt this tick.
         /// </summary>
         public BigNumber Tick(double deltaSeconds, EnemyController enemy)
+            => Tick(deltaSeconds, enemy, BigNumber.One);
+
+        /// <summary>Idle damage with a DPS multiplier (e.g. an active skill buff).</summary>
+        public BigNumber Tick(double deltaSeconds, EnemyController enemy, BigNumber dpsMultiplier)
         {
             if (enemy == null || deltaSeconds <= 0) return BigNumber.Zero;
 
@@ -96,7 +108,7 @@ namespace StellarBreaker.Gameplay
                 while (_timers[i] >= cd && hits < MaxHitsPerShipPerTick)
                 {
                     _timers[i] -= cd;
-                    var hit = HitDamage(i);
+                    var hit = HitDamage(i) * dpsMultiplier;
                     if (enemy.Current != null) enemy.ApplyDamage(hit);
                     OnShipHit?.Invoke(i, hit);
                     total = total + hit;

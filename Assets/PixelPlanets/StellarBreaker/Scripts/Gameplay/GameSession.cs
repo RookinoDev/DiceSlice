@@ -7,21 +7,25 @@ using StellarBreaker.Economy;
 namespace StellarBreaker.Gameplay
 {
     /// <summary>
-    /// Headless composition root for the core loop: enemy + wallet + tap-damage
-    /// upgrade + tap controller, wired together (kill → award Stardust). Fully
-    /// drivable from tests with a fake IPlanetProvider.
+    /// Headless composition root for the core loop. StageManager is the single
+    /// progression authority; skills buff tap/idle; prestige resets the run for Relics.
     /// </summary>
     public class GameSession
     {
         readonly BalanceConfig _cfg;
 
+        public StageManager     Stage      { get; }
         public EnemyController  Enemy      { get; }
         public CurrencyService  Wallet     { get; }
         public TapDamageUpgrade TapUpgrade { get; }
-        public TapController     Taps      { get; }
-        public ShipService       Ships     { get; }
+        public TapController    Taps       { get; }
+        public ShipService      Ships      { get; }
+        public SkillService     Skills     { get; }
+        public PrestigeService  Prestige   { get; }
 
-        /// <summary>Fired when a planet dies and Stardust is awarded (planet, gold).</summary>
+        /// <summary>The active skills exposed to the UI (in display order).</summary>
+        public IReadOnlyList<SkillType> SkillSlots { get; }
+
         public event Action<Planet, BigNumber> OnReward;
 
         public GameSession(IPlanetProvider provider, BalanceConfig cfg, int startStage = 1,
@@ -30,32 +34,67 @@ namespace StellarBreaker.Gameplay
             _cfg       = cfg ?? throw new ArgumentNullException(nameof(cfg));
             Wallet     = new CurrencyService();
             TapUpgrade = new TapDamageUpgrade(cfg);
-            Enemy      = new EnemyController(provider, cfg, startStage);
-            Taps       = new TapController(Enemy, TapUpgrade);
+            Stage      = new StageManager(cfg, startStage);
+            Enemy      = new EnemyController(provider, Stage);
             Ships      = new ShipService(ships ?? Array.Empty<ShipDefinition>(), cfg);
+            Skills     = new SkillService(SkillCatalog.BuildPrototype(cfg), () => TapUpgrade.Level);
+            Prestige   = new PrestigeService(cfg);
+            SkillSlots = new[] { SkillType.Overdrive, SkillType.BattleCry, SkillType.MeteorStrike };
+
+            // Taps are multiplied by the active tap-damage skill buff.
+            Taps = new TapController(Enemy, TapUpgrade, () => Skills.TapDamageMultiplier());
 
             Enemy.OnPlanetKilled += HandleKill;
+            Stage.OnBossFailed   += HandleBossFailed;
         }
 
         public void Begin() => Enemy.Begin();
+        public void Tap()   => Taps.Tap();
 
-        /// <summary>Apply one tap of damage to the active planet.</summary>
-        public void Tap() => Taps.Tap();
+        /// <summary>Advance boss timer, skill timers, and idle damage (DPS skill-buffed).</summary>
+        public BigNumber Tick(double deltaSeconds)
+        {
+            Stage.Tick(deltaSeconds);
+            Skills.Tick(deltaSeconds);
+            return Ships.Tick(deltaSeconds, Enemy, Skills.DpsMultiplier());
+        }
 
-        /// <summary>Advance idle/auto damage by elapsed seconds. Returns damage dealt.</summary>
-        public BigNumber Tick(double deltaSeconds) => Ships.Tick(deltaSeconds, Enemy);
-
-        /// <summary>Buy the next tap-damage level. False if unaffordable.</summary>
         public bool UpgradeTapDamage() => TapUpgrade.TryUpgrade(Wallet);
+        public bool BuyShip(int i)     => Ships.BuyOrUpgrade(i, Wallet);
 
-        /// <summary>Buy/upgrade ship i. False if unaffordable.</summary>
-        public bool BuyShip(int i) => Ships.BuyOrUpgrade(i, Wallet);
+        /// <summary>Activate a skill: timed buffs start, Meteor deals instant damage.</summary>
+        public bool ActivateSkill(SkillType t)
+        {
+            if (!Skills.CanActivate(t)) return false;
+            BigNumber instant = Skills.Activate(t, TapUpgrade.CurrentDamage);
+            if (instant > BigNumber.Zero) Enemy.ApplyDamage(instant);
+            return true;
+        }
+
+        // ── Prestige ────────────────────────────────────────────────
+        public bool      CanPrestige()   => Stage.HighestStage >= _cfg.prestigeUnlockStage;
+        public BigNumber PreviewRelics() => Prestige.RelicsForStage(Stage.HighestStage);
+
+        /// <summary>Reset the run for Relics. Returns Relics gained (0 if not unlocked).</summary>
+        public BigNumber DoPrestige()
+        {
+            if (!CanPrestige()) return BigNumber.Zero;
+            BigNumber gained = Prestige.Prestige(Stage.HighestStage, Wallet, TapUpgrade, Ships, Stage);
+            Stage.Begin();   // re-enter stage 1 → spawns a fresh planet
+            return gained;
+        }
 
         void HandleKill(Planet planet)
         {
-            BigNumber gold = GoldReward.ForPlanet(planet, _cfg);
+            BigNumber gold = Stage.GoldFor(planet.Stage);
             Wallet.Add(gold);
             OnReward?.Invoke(planet, gold);
+        }
+
+        void HandleBossFailed(int stage)
+        {
+            Enemy.Respawn();
+            Stage.RetryBoss();
         }
     }
 }

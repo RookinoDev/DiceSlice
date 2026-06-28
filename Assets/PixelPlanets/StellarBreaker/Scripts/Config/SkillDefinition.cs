@@ -41,6 +41,17 @@ namespace StellarBreaker.Config
     /// <summary>Builds the 6 skills from BalanceConfig coefficients + unlock levels.</summary>
     public static class SkillCatalog
     {
+        /// <summary>3 prototype skills with low, tap-level-based unlocks (Tap+, DPS+, Meteor).</summary>
+        public static List<SkillDefinition> BuildPrototype(BalanceConfig c)
+        {
+            return new List<SkillDefinition>
+            {
+                SkillDefinition.Create(SkillType.Overdrive,    "Tap+",   3, 10f, 30f, false, c.overdriveTapPerLvl, c.overdriveTapBase),
+                SkillDefinition.Create(SkillType.BattleCry,    "DPS+",   5, 10f, 40f, false, c.battleCryDpsPerLvl, c.battleCryDpsBase),
+                SkillDefinition.Create(SkillType.MeteorStrike, "Meteor", 2, 0f,  20f, true,  c.meteorPerLevel,     0),
+            };
+        }
+
         public static List<SkillDefinition> BuildDefault(BalanceConfig c)
         {
             int[] u = c.skillUnlockLevels;     // {50,100,200,300,400,500}

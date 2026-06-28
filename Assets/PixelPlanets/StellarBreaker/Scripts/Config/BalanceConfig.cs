@@ -69,6 +69,9 @@ namespace StellarBreaker.Config
         [Header("Skills")]
         public float skillDefaultCooldown = 120f;
 
+        [Header("Prestige unlock")]
+        public int prestigeUnlockStage = 10;   // prestige available once HighestStage ≥ this
+
         // ── Phase 7: prestige & artifacts ────────────────────────────
         [Header("Prestige / Relics")]
         public int    relicStartStage = 5;     // no relics before this stage

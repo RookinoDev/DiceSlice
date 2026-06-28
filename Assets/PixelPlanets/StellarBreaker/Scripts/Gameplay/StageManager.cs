@@ -127,5 +127,23 @@ namespace StellarBreaker.Gameplay
             BossActive   = false;
             BossTimeLeft = 0;
         }
+
+        /// <summary>Full reset for prestige: back to stage 1 and clear HighestStage (run-based).</summary>
+        public void ResetForPrestige()
+        {
+            CurrentStage = 1;
+            HighestStage = 1;
+            BossActive   = false;
+            BossTimeLeft = 0;
+        }
+
+        /// <summary>Restore progress from a save (call before Begin). Boss restarts cleanly.</summary>
+        public void RestoreProgress(int current, int highest)
+        {
+            CurrentStage = Math.Max(1, current);
+            HighestStage = Math.Max(CurrentStage, Math.Max(1, highest));
+            BossActive   = false;
+            BossTimeLeft = 0;
+        }
     }
 }

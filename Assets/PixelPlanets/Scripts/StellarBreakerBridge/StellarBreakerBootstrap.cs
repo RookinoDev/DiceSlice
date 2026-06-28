@@ -1,8 +1,11 @@
+using System;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using StellarBreaker.Core;
 using StellarBreaker.Config;
 using StellarBreaker.Gameplay;
+using StellarBreaker.Economy;
+using StellarBreaker.Persistence;
 
 /// <summary>
 /// One-drop integration for the clicker game on top of the existing PixelPlanetGenerator.
@@ -24,7 +27,7 @@ public class StellarBreakerBootstrap : MonoBehaviour
     [Header("Setup")]
     [SerializeField] private bool removeDevUI  = true;
     [SerializeField] private bool tapAnywhere  = true;
-    [SerializeField] private bool showDebugHud = true;
+    [SerializeField] private bool showDebugHud = false;   // real Canvas HUD is default now
     [SerializeField] private int  startStage   = 1;
 
     [Header("Debug / testing (runtime-only; does NOT touch the asset)")]
@@ -33,20 +36,26 @@ public class StellarBreakerBootstrap : MonoBehaviour
     [Tooltip("Divides the per-stage HP INCREASE (1.57 → 1 + 0.57/divisor). 1 = off.")]
     [SerializeField] private float testGrowthDivisor = 3f;
 
+    [Header("Saving")]
+    [SerializeField] private float autosaveSeconds = 15f;
+
     private PixelPlanetGenerator   _generator;
     private PlanetGeneratorAdapter _adapter;
     private GameSession            _session;
     private BalanceConfig          _cfg;
+    private ClickerHud             _hud;
+    private SaveService            _save;
+    private float                  _saveAccum;
     private bool _cleaned;
 
     void Awake()
     {
         _generator = GetComponent<PixelPlanetGenerator>();
 
+        // Prefer the assigned asset, else the one in Resources, else code defaults.
+        var src = balanceConfig != null ? balanceConfig : Resources.Load<BalanceConfig>("BalanceConfig");
         // Use a runtime COPY so the debug overrides never mutate the source asset.
-        _cfg = balanceConfig != null
-            ? Instantiate(balanceConfig)
-            : ScriptableObject.CreateInstance<BalanceConfig>();
+        _cfg = src != null ? Instantiate(src) : ScriptableObject.CreateInstance<BalanceConfig>();
         ApplyDebugScaling(_cfg);
 
         _adapter = _generator.GetComponent<PlanetGeneratorAdapter>();
@@ -60,8 +69,51 @@ public class StellarBreakerBootstrap : MonoBehaviour
         var fleet = ShipCatalog.BuildDefault();   // TODO: real datasheet base costs
         _session = new GameSession(_adapter, _cfg, startStage, fleet);
         GameContext.Register(_session);
+
+        // ── Load saved progress + offline earnings (before gameplay begins) ──
+        _save = new SaveService(new FileSaveStore());
+        BigNumber offline = BigNumber.Zero;
+        if (_save.TryLoad(out var state))
+        {
+            SaveBinder.Apply(_session, state);          // currency, tap level, ships, stage
+            offline = ComputeOffline(state);
+            if (offline > BigNumber.Zero) _session.Wallet.Add(offline);
+        }
+
         _session.Begin();
+
+        _hud = GetComponent<ClickerHud>();
+        if (_hud == null) _hud = gameObject.AddComponent<ClickerHud>();
+        _hud.Bind(_session);
+
+        if (offline > BigNumber.Zero)
+        {
+            string msg = "Offline earnings  +" + offline.ToShortString();
+            _hud.ShowBanner(msg);
+            Debug.Log("[StellarBreaker] " + msg);
+        }
     }
+
+    // currency/sec from idle DPS at the current stage, capped by config.
+    BigNumber ComputeOffline(SaveState state)
+    {
+        long now  = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+        long last = state.lastSaveUnixSeconds;
+        if (last <= 0 || last > now) return BigNumber.Zero;   // basic timestamp sanity
+
+        int stage = _session.Stage.CurrentStage;
+        var income = OfflineIncome.PerSecond(
+            _session.Ships.FleetDps(), _session.Stage.HpFor(stage), _session.Stage.GoldFor(stage));
+        return OfflineEarnings.FromConfig(last, now, income, _cfg);
+    }
+
+    void SaveNow()
+    {
+        if (_session != null && _save != null) _save.Save(SaveBinder.Capture(_session));
+    }
+
+    void OnApplicationPause(bool paused) { if (paused) SaveNow(); }
+    void OnApplicationQuit()             { SaveNow(); }
 
     void LateUpdate()
     {
@@ -83,6 +135,13 @@ public class StellarBreakerBootstrap : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.U))   // quick keyboard upgrade
             _session.UpgradeTapDamage();
+
+        // periodic autosave
+        if (autosaveSeconds > 0f)
+        {
+            _saveAccum += Time.deltaTime;
+            if (_saveAccum >= autosaveSeconds) { _saveAccum = 0f; SaveNow(); }
+        }
     }
 
     // Test-only difficulty scaling on the runtime config copy.

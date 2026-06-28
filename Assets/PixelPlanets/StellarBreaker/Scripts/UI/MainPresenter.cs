@@ -1,3 +1,4 @@
+using System;
 using StellarBreaker.Gameplay;
 
 namespace StellarBreaker.UI
@@ -7,13 +8,36 @@ namespace StellarBreaker.UI
     {
         public string stageLabel;
         public bool   isBoss;
+        public bool   bossActive;
+        public int    bossSecondsLeft;
+
         public string hpText;
         public float  hpFraction;        // 0..1
+
         public string stardustText;
         public string tapDamageText;
         public string fleetDpsText;
+
         public string tapUpgradeCostText;
         public bool   canUpgradeTap;
+
+        public bool   hasShip;
+        public string shipButtonText;
+        public bool   canBuyShip;
+
+        public SkillVm[] skills;
+        public bool      canPrestige;
+        public string    prestigeText;
+    }
+
+    /// <summary>One skill button's display state.</summary>
+    public struct SkillVm
+    {
+        public string label;
+        public bool   unlocked;
+        public bool   ready;
+        public bool   active;
+        public int    secondsLeft;   // active time left, or cooldown left
     }
 
     /// <summary>
@@ -28,7 +52,7 @@ namespace StellarBreaker.UI
 
         public MainViewModel Build()
         {
-            var p = _s.Enemy.Current;
+            var p  = _s.Enemy.Current;
             var vm = new MainViewModel
             {
                 stardustText       = _s.Wallet.Stardust.ToShortString(),
@@ -36,6 +60,8 @@ namespace StellarBreaker.UI
                 fleetDpsText       = _s.Ships.FleetDps().ToShortString(),
                 tapUpgradeCostText = _s.TapUpgrade.NextCost.ToShortString(),
                 canUpgradeTap      = _s.Wallet.CanAfford(_s.TapUpgrade.NextCost),
+                bossActive         = _s.Stage.BossActive,
+                bossSecondsLeft    = (int)Math.Ceiling(_s.Stage.BossTimeLeft),
             };
 
             if (p != null)
@@ -51,6 +77,41 @@ namespace StellarBreaker.UI
                 vm.hpText     = "";
                 vm.hpFraction = 0f;
             }
+
+            var ships = _s.Ships;
+            if (ships.Count > 0)
+            {
+                vm.hasShip = true;
+                string state = ships.IsOwned(0) ? "Lv " + ships.LevelOf(0) : "Buy";
+                vm.shipButtonText = ships.Def(0).shipName + "  " + state + "  (" + ships.NextCost(0).ToShortString() + ")";
+                vm.canBuyShip = _s.Wallet.CanAfford(ships.NextCost(0));
+            }
+            else
+            {
+                vm.hasShip = false;
+                vm.shipButtonText = "—";
+                vm.canBuyShip = false;
+            }
+
+            var slots = _s.SkillSlots;
+            var sk = new SkillVm[slots.Count];
+            for (int i = 0; i < slots.Count; i++)
+            {
+                var t = slots[i];
+                bool active = _s.Skills.IsActive(t);
+                double secs = active ? _s.Skills.ActiveTimeLeft(t) : _s.Skills.Cooldown(t);
+                sk[i] = new SkillVm
+                {
+                    label       = _s.Skills.Name(t),
+                    unlocked    = _s.Skills.IsUnlocked(t),
+                    ready       = _s.Skills.CanActivate(t),
+                    active      = active,
+                    secondsLeft = (int)Math.Ceiling(secs),
+                };
+            }
+            vm.skills       = sk;
+            vm.canPrestige  = _s.CanPrestige();
+            vm.prestigeText = "PRESTIGE  +" + _s.PreviewRelics().ToShortString();
             return vm;
         }
     }

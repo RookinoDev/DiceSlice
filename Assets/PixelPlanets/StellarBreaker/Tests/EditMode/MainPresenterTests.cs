@@ -45,6 +45,28 @@ namespace StellarBreaker.Tests
         }
 
         [Test]
+        public void Boss_Stage_Sets_Boss_View_Fields()
+        {
+            var s = new GameSession(_provider, _cfg, 5);   // stage 5 = boss
+            s.Begin();
+            var vm = new MainPresenter(s).Build();
+            Assert.IsTrue(vm.isBoss);
+            Assert.IsTrue(vm.bossActive);
+            Assert.AreEqual(30, vm.bossSecondsLeft);
+            StringAssert.Contains("5", vm.stageLabel);
+        }
+
+        [Test]
+        public void No_Fleet_Disables_Ship_Button()
+        {
+            var s = new GameSession(_provider, _cfg, 1);   // no ships passed
+            s.Begin();
+            var vm = new MainPresenter(s).Build();
+            Assert.IsFalse(vm.hasShip);
+            Assert.IsFalse(vm.canBuyShip);
+        }
+
+        [Test]
         public void HpFraction_Drops_After_Tap()
         {
             var s = new GameSession(_provider, _cfg, 1);

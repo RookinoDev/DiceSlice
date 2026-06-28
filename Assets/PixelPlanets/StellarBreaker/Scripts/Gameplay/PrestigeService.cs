@@ -45,7 +45,7 @@ namespace StellarBreaker.Gameplay
             stardust?.Set(BigNumber.Zero);
             tap?.Reset();
             ships?.ResetLevels();
-            stage?.ResetToStart();
+            stage?.ResetForPrestige();
 
             OnPrestiged?.Invoke(gained);
             return gained;

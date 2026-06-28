@@ -1,0 +1,93 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cf1d088cf50a29e4e912f54b1b228440, type: 3}
+  m_Name: BalanceConfig
+  m_EditorClassIdentifier:
+  enemyHpBase: 29
+  enemyHpGrowth: 1.57
+  bossMultipliers:
+  - 2
+  - 4
+  - 6
+  - 7
+  - 10
+  tapDamageBase: 1.05
+  tapGrowthStart: 2.1
+  tapGrowthEnd: 1.15
+  tapGrowthDecay: 0.92
+  goldBase: 5
+  goldGrowth: 1.15
+  bossGoldMultiplier: 3
+  shipBaseCost: 50
+  shipCostPerLevel: 1.075
+  shipBaseCostGrowthMin: 3.5
+  shipBaseCostGrowthMax: 8.9
+  shipCount: 19
+  shipBaseDpsFirst: 5
+  shipDamagePerLevel: 1.27
+  shipArchetypeCooldowns:
+  - 0.5
+  - 1
+  - 2
+  shipCooldownBreakpoints:
+  - 100
+  - 200
+  - 300
+  - 400
+  - 500
+  shipCooldownFactor: 0.85
+  shipCooldownMin: 0.2
+  shipMilestoneLevels:
+  - 25
+  - 50
+  - 100
+  - 200
+  - 400
+  shipMilestoneMultipliers:
+  - 2
+  - 2
+  - 3
+  - 3
+  - 5
+  dpsTapShare: 0
+  bossStageInterval: 5
+  bossTimerSeconds: 30
+  skillDefaultCooldown: 120
+  prestigeUnlockStage: 10
+  relicStartStage: 5
+  relicScale: 1
+  relicPower: 1
+  artifactBaseCost: 10
+  artifactCostGrowth: 1.5
+  artifactBonusPerLevel: 0.05
+  offlineRate: 0.5
+  offlineCapHours: 8
+  dailyResetHourUtc: 0
+  skillUnlockLevels:
+  - 50
+  - 100
+  - 200
+  - 300
+  - 400
+  - 500
+  skillDurationSeconds: 30
+  meteorPerLevel: 70
+  droneTapsPerLevel: 3
+  droneTapsBase: 4
+  targetingCritPerLvl: 3
+  targetingCritBase: 41
+  battleCryDpsPerLvl: 50
+  battleCryDpsBase: 100
+  overdriveTapPerLvl: 30
+  overdriveTapBase: 40
+  midasGoldPerLvl: 5
+  midasGoldBase: 10
