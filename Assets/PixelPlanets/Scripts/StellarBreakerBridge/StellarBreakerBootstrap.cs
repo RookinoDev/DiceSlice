@@ -31,10 +31,10 @@ public class StellarBreakerBootstrap : MonoBehaviour
     [SerializeField] private int  startStage   = 1;
 
     [Header("Debug / testing (runtime-only; does NOT touch the asset)")]
-    [Tooltip("Divides enemy HP base (29 → 29/divisor). 1 = off.")]
-    [SerializeField] private float testHpDivisor = 3f;
-    [Tooltip("Divides the per-stage HP INCREASE (1.57 → 1 + 0.57/divisor). 1 = off.")]
-    [SerializeField] private float testGrowthDivisor = 3f;
+    [Tooltip("Divides enemy HP base (29 → 29/divisor). 1 = off (real curve).")]
+    [SerializeField] private float testHpDivisor = 1f;
+    [Tooltip("Divides the per-stage HP INCREASE (1.57 → 1 + 0.57/divisor). 1 = off (real curve).")]
+    [SerializeField] private float testGrowthDivisor = 1f;
 
     [Header("Saving")]
     [SerializeField] private float autosaveSeconds = 15f;
@@ -43,7 +43,7 @@ public class StellarBreakerBootstrap : MonoBehaviour
     private PlanetGeneratorAdapter _adapter;
     private GameSession            _session;
     private BalanceConfig          _cfg;
-    private ClickerHud             _hud;
+    private StellarBreaker.Hud.HudView _hud;
     private SaveService            _save;
     private float                  _saveAccum;
     private bool _cleaned;
@@ -61,6 +61,8 @@ public class StellarBreakerBootstrap : MonoBehaviour
         _adapter = _generator.GetComponent<PlanetGeneratorAdapter>();
         if (_adapter == null) _adapter = gameObject.AddComponent<PlanetGeneratorAdapter>();
 
+        if (AudioManager.Instance == null) gameObject.AddComponent<AudioManager>();
+
         GameContext.Register(_cfg);
     }
 
@@ -73,25 +75,35 @@ public class StellarBreakerBootstrap : MonoBehaviour
         // ── Load saved progress + offline earnings (before gameplay begins) ──
         _save = new SaveService(new FileSaveStore());
         BigNumber offline = BigNumber.Zero;
+        double offlineSeconds = 0;
         if (_save.TryLoad(out var state))
         {
             SaveBinder.Apply(_session, state);          // currency, tap level, ships, stage
-            offline = ComputeOffline(state);
-            if (offline > BigNumber.Zero) _session.Wallet.Add(offline);
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            long last = state.lastSaveUnixSeconds;
+            if (last > 0 && last <= now)
+            {
+                offlineSeconds = Math.Min(now - last, _cfg.offlineCapHours * 3600.0);
+                offline = ComputeOffline(state);
+                if (offline > BigNumber.Zero) _session.Wallet.Add(offline);
+            }
         }
 
         _session.Begin();
 
-        _hud = GetComponent<ClickerHud>();
-        if (_hud == null) _hud = gameObject.AddComponent<ClickerHud>();
-        _hud.Bind(_session);
+        _hud = GetComponent<StellarBreaker.Hud.HudView>();
+        if (_hud == null) _hud = gameObject.AddComponent<StellarBreaker.Hud.HudView>();
+
+        Action onResetSave = () =>
+        {
+            _save.Delete();
+            var idx = UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex;
+            UnityEngine.SceneManagement.SceneManager.LoadScene(idx);
+        };
+        _hud.Bind(_session, _adapter, onResetSave, offlineSeconds, offline);
 
         if (offline > BigNumber.Zero)
-        {
-            string msg = "Offline earnings  +" + offline.ToShortString();
-            _hud.ShowBanner(msg);
-            Debug.Log("[StellarBreaker] " + msg);
-        }
+            Debug.Log("[StellarBreaker] Offline +" + offline.ToShortString());
     }
 
     // currency/sec from idle DPS at the current stage, capped by config.
@@ -120,7 +132,7 @@ public class StellarBreakerBootstrap : MonoBehaviour
         if (!_cleaned)
         {
             _cleaned = true;
-            if (removeDevUI) RemoveDevUI();
+            if (removeDevUI) PixelPlanetDevUiCleanup.Strip(_generator);
         }
     }
 
@@ -165,20 +177,6 @@ public class StellarBreakerBootstrap : MonoBehaviour
 
     static bool PointerOverUI()
         => EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
-
-    // ── Remove dev-only UI created by the generator ──────────────────
-    void RemoveDevUI()
-    {
-        var tweaker = _generator.GetComponent<PlanetTweakerUI>();
-        if (tweaker != null) Destroy(tweaker);
-
-        var ui = GameObject.Find("PlanetUI");
-        if (ui != null)
-        {
-            var btn = ui.transform.Find("RerollButton");
-            if (btn != null) Destroy(btn.gameObject);
-        }
-    }
 
     // ── Temporary dev HUD (replace in the UI phase) ──────────────────
     void OnGUI()

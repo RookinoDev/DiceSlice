@@ -22,11 +22,14 @@ namespace StellarBreaker.Gameplay
         public ShipService      Ships      { get; }
         public SkillService     Skills     { get; }
         public PrestigeService  Prestige   { get; }
+        public ArtifactService  Artifacts  { get; }
 
         /// <summary>The active skills exposed to the UI (in display order).</summary>
         public IReadOnlyList<SkillType> SkillSlots { get; }
 
         public event Action<Planet, BigNumber> OnReward;
+        /// <summary>Short player-facing notices (e.g. boss failed).</summary>
+        public event Action<string> OnMessage;
 
         public GameSession(IPlanetProvider provider, BalanceConfig cfg, int startStage = 1,
                            IReadOnlyList<ShipDefinition> ships = null)
@@ -39,10 +42,13 @@ namespace StellarBreaker.Gameplay
             Ships      = new ShipService(ships ?? Array.Empty<ShipDefinition>(), cfg);
             Skills     = new SkillService(SkillCatalog.BuildPrototype(cfg), () => TapUpgrade.Level);
             Prestige   = new PrestigeService(cfg);
-            SkillSlots = new[] { SkillType.Overdrive, SkillType.BattleCry, SkillType.MeteorStrike };
+            Artifacts  = new ArtifactService(ArtifactCatalog.BuildDefault(cfg), Prestige.Relics);
+            SkillSlots = new[] { SkillType.Overdrive, SkillType.BattleCry, SkillType.MeteorStrike,
+                                 SkillType.DroneSwarm, SkillType.MidasBeam };
 
-            // Taps are multiplied by the active tap-damage skill buff.
-            Taps = new TapController(Enemy, TapUpgrade, () => Skills.TapDamageMultiplier());
+            // Taps are multiplied by the active tap-damage skill buff × permanent tap artifact.
+            Taps = new TapController(Enemy, TapUpgrade,
+                                     () => Skills.TapDamageMultiplier() * Artifacts.TapDamageMultiplier());
 
             Enemy.OnPlanetKilled += HandleKill;
             Stage.OnBossFailed   += HandleBossFailed;
@@ -56,11 +62,25 @@ namespace StellarBreaker.Gameplay
         {
             Stage.Tick(deltaSeconds);
             Skills.Tick(deltaSeconds);
-            return Ships.Tick(deltaSeconds, Enemy, Skills.DpsMultiplier());
+
+            // Drone Swarm: auto-taps/sec while active → continuous tap damage.
+            double taps = Skills.DroneTapsPerSecond();
+            if (taps > 0 && Enemy.Current != null)
+            {
+                BigNumber droneDmg = TapUpgrade.CurrentDamage
+                                   * Skills.TapDamageMultiplier() * Artifacts.TapDamageMultiplier()
+                                   * new BigNumber(taps * deltaSeconds);
+                Enemy.ApplyDamage(droneDmg);
+            }
+
+            return Ships.Tick(deltaSeconds, Enemy, Skills.DpsMultiplier() * Artifacts.DpsMultiplier());
         }
 
         public bool UpgradeTapDamage() => TapUpgrade.TryUpgrade(Wallet);
         public bool BuyShip(int i)     => Ships.BuyOrUpgrade(i, Wallet);
+
+        /// <summary>Buy/upgrade a permanent artifact with Relics. False if unaffordable.</summary>
+        public bool BuyArtifact(int i) => Artifacts.BuyOrUpgrade(i);
 
         /// <summary>Activate a skill: timed buffs start, Meteor deals instant damage.</summary>
         public bool ActivateSkill(SkillType t)
@@ -86,15 +106,17 @@ namespace StellarBreaker.Gameplay
 
         void HandleKill(Planet planet)
         {
-            BigNumber gold = Stage.GoldFor(planet.Stage);
+            BigNumber gold = Stage.GoldFor(planet.Stage) * Artifacts.GoldMultiplier() * Skills.GoldMultiplier();
             Wallet.Add(gold);
             OnReward?.Invoke(planet, gold);
         }
 
+        // Boss-fail fallback: drop to the previous normal stage to farm power, then
+        // re-advance into the boss again. Avoids the no-income soft-lock.
         void HandleBossFailed(int stage)
         {
-            Enemy.Respawn();
-            Stage.RetryBoss();
+            Stage.GoToStage(stage - 1);
+            OnMessage?.Invoke("Boss failed — farm power and try again");
         }
     }
 }

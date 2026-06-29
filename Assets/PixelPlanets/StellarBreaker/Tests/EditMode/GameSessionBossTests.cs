@@ -61,21 +61,25 @@ namespace StellarBreaker.Tests
         }
 
         [Test]
-        public void Boss_Timer_Fail_Stays_On_Stage_And_Retries_At_Full_Hp()
+        public void Boss_Timer_Fail_Drops_To_Farm_Stage_Then_Retries()
         {
             var s = new GameSession(_provider, _cfg, startStage: 5);
+            string msg = null;
+            s.OnMessage += m => msg = m;
             s.Begin();
+            Assert.IsTrue(s.Stage.BossActive);
 
-            s.Tap();                 // chip a little damage
-            Assert.Less(s.Enemy.Current.CurrentHP.ToDouble(), s.Enemy.Current.MaxHP.ToDouble());
+            s.Tick(31.0);            // exceed window → fail → drop to farm stage
 
-            s.Tick(31.0);            // exceed the 30s window → fail → auto-retry
+            Assert.AreEqual(4, s.Stage.CurrentStage);     // previous normal stage
+            Assert.IsFalse(s.Stage.BossActive);
+            Assert.IsFalse(s.Enemy.Current.IsBoss);       // normal farm enemy
+            Assert.IsNotNull(msg);                        // player notified
 
-            Assert.AreEqual(5, s.Stage.CurrentStage);     // stayed on the boss stage
-            Assert.IsTrue(s.Stage.BossActive);            // re-armed
-            Assert.That(s.Stage.BossTimeLeft, Is.EqualTo(30.0).Within(1e-6));
-            // fresh boss at full HP
-            Assert.That(s.Enemy.Current.CurrentHP.IsClose(s.Enemy.Current.MaxHP, 1e-4));
+            // clearing the farm stage re-advances into the boss (no soft-lock)
+            s.Enemy.ApplyDamage(new BigNumber(1.0, 12));
+            Assert.AreEqual(5, s.Stage.CurrentStage);
+            Assert.IsTrue(s.Stage.BossActive);
         }
 
         [Test]

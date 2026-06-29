@@ -29,6 +29,14 @@ namespace StellarBreaker.Gameplay
         public int LevelOf(int i) => _levels[i];
         public ArtifactDefinition Def(int i) => _defs[i];
 
+        /// <summary>Restore artifact levels from a save (extra/short entries ignored).</summary>
+        public void RestoreLevels(int[] levels)
+        {
+            if (levels == null) return;
+            int n = System.Math.Min(levels.Length, _levels.Length);
+            for (int i = 0; i < n; i++) _levels[i] = levels[i] < 0 ? 0 : levels[i];
+        }
+
         public BigNumber NextCost(int i)
             => UpgradeCost.Exponential(_levels[i] + 1, _defs[i].baseCost, _defs[i].costGrowth);
 

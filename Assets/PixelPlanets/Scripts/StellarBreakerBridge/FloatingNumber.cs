@@ -1,7 +1,8 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Tiny self-destructing floating damage number (rises + fades). Placeholder feedback.</summary>
+/// <summary>Poolable floating damage/reward number (rises + fades). Returns itself when done.</summary>
 public class FloatingNumber : MonoBehaviour
 {
     const float Life = 0.7f, Rise = 170f;
@@ -11,11 +12,24 @@ public class FloatingNumber : MonoBehaviour
     RectTransform _rt;
     Vector2 _start;
 
+    /// <summary>Invoked when the animation finishes so the owner can recycle this instance.</summary>
+    public Action<FloatingNumber> OnDone;
+
     void Awake()
     {
-        _text  = GetComponent<Text>();
-        _rt    = (RectTransform)transform;
-        _start = _rt.anchoredPosition;
+        _text = GetComponent<Text>();
+        _rt   = (RectTransform)transform;
+    }
+
+    /// <summary>(Re)start the animation from a pooled/active state.</summary>
+    public void Play(Vector2 start, string text, Color color)
+    {
+        _t = 0f;
+        _start = start;
+        _rt.anchoredPosition = start;
+        _rt.localScale = Vector3.one;
+        if (_text != null) { _text.text = text; color.a = 1f; _text.color = color; }
+        gameObject.SetActive(true);
     }
 
     void Update()
@@ -25,14 +39,12 @@ public class FloatingNumber : MonoBehaviour
 
         _rt.anchoredPosition = _start + Vector2.up * (Rise * k);
         _rt.localScale = Vector3.one * (1f + 0.25f * Mathf.Clamp01(1f - k * 3f));
+        if (_text != null) { var c = _text.color; c.a = Mathf.Clamp01(1f - k); _text.color = c; }
 
-        if (_text != null)
+        if (_t >= Life)
         {
-            var c = _text.color;
-            c.a = Mathf.Clamp01(1f - k);
-            _text.color = c;
+            gameObject.SetActive(false);   // recycle instead of Destroy
+            OnDone?.Invoke(this);
         }
-
-        if (_t >= Life) Destroy(gameObject);
     }
 }

@@ -41,7 +41,11 @@ namespace StellarBreaker.Config
     /// <summary>Builds the 6 skills from BalanceConfig coefficients + unlock levels.</summary>
     public static class SkillCatalog
     {
-        /// <summary>3 prototype skills with low, tap-level-based unlocks (Tap+, DPS+, Meteor).</summary>
+        /// <summary>
+        /// Prototype skills (all wired to real effects), low tap-level unlocks.
+        /// Crit/Targeting is intentionally excluded (RNG would destabilise the deterministic
+        /// damage pipeline) — it stays in the full catalog for later.
+        /// </summary>
         public static List<SkillDefinition> BuildPrototype(BalanceConfig c)
         {
             return new List<SkillDefinition>
@@ -49,6 +53,8 @@ namespace StellarBreaker.Config
                 SkillDefinition.Create(SkillType.Overdrive,    "Tap+",   3, 10f, 30f, false, c.overdriveTapPerLvl, c.overdriveTapBase),
                 SkillDefinition.Create(SkillType.BattleCry,    "DPS+",   5, 10f, 40f, false, c.battleCryDpsPerLvl, c.battleCryDpsBase),
                 SkillDefinition.Create(SkillType.MeteorStrike, "Meteor", 2, 0f,  20f, true,  c.meteorPerLevel,     0),
+                SkillDefinition.Create(SkillType.DroneSwarm,   "Drone",  4, 10f, 35f, false, c.droneTapsPerLevel,  c.droneTapsBase),
+                SkillDefinition.Create(SkillType.MidasBeam,    "Gold+",  6, 12f, 45f, false, c.midasGoldPerLvl,    c.midasGoldBase),
             };
         }
 

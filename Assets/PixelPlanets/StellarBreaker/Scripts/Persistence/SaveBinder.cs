@@ -16,6 +16,7 @@ namespace StellarBreaker.Persistence
                 relics       = BigNumberData.From(s.Prestige.Relics.Stardust),
                 tapLevel     = s.TapUpgrade.Level,
                 shipLevels   = CaptureShipLevels(s.Ships),
+                artifactLevels = CaptureArtifactLevels(s.Artifacts),
                 currentStage = s.Stage.CurrentStage,
                 highestStage = s.Stage.HighestStage,
             };
@@ -30,12 +31,20 @@ namespace StellarBreaker.Persistence
             s.Prestige.Relics.Set(st.relics.To());
             s.TapUpgrade.Reset(Math.Max(1, st.tapLevel));
             s.Ships.RestoreLevels(st.shipLevels);
+            s.Artifacts.RestoreLevels(st.artifactLevels);
         }
 
         static int[] CaptureShipLevels(ShipService ships)
         {
             var arr = new int[ships.Count];
             for (int i = 0; i < ships.Count; i++) arr[i] = ships.LevelOf(i);
+            return arr;
+        }
+
+        static int[] CaptureArtifactLevels(ArtifactService arts)
+        {
+            var arr = new int[arts.Count];
+            for (int i = 0; i < arts.Count; i++) arr[i] = arts.LevelOf(i);
             return arr;
         }
     }

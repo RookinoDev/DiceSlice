@@ -15,11 +15,12 @@ using StellarBreaker.Gameplay;
 /// The generator does NOT take a stage today, so 'stage' is not consumed yet.
 /// </summary>
 [RequireComponent(typeof(PixelPlanetGenerator))]
-public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider
+public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider, IEnemyView
 {
     [SerializeField] private PixelPlanetGenerator generator;
 
     private GameObject _current;
+    private float      _punch;   // hit-reaction (decays to 0)
 
     public event Action<GameObject> OnPlanetDestroyed;
 
@@ -27,6 +28,15 @@ public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider
     {
         if (generator == null) generator = GetComponent<PixelPlanetGenerator>();
         if (generator == null) generator = FindObjectOfType<PixelPlanetGenerator>();
+    }
+
+    // ── IEnemyView: hit reaction lives here, on the object that owns the planet root ──
+    public void Punch() => _punch = 1f;
+
+    void Update()
+    {
+        _punch = Mathf.MoveTowards(_punch, 0f, Time.deltaTime / 0.12f);
+        if (_current != null) _current.transform.localScale = Vector3.one * (1f + 0.12f * _punch);
     }
 
     public GameObject SpawnPlanet(int stage)

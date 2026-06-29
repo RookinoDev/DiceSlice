@@ -109,6 +109,9 @@ namespace StellarBreaker.Gameplay
             }
         }
 
+        /// <summary>Move to a specific stage and (re)spawn it. Used by the boss-fail farm fallback.</summary>
+        public void GoToStage(int stage) => EnterStage(Math.Max(1, stage));
+
         /// <summary>Re-arm the boss timer after a failure to attempt again.</summary>
         public void RetryBoss()
         {

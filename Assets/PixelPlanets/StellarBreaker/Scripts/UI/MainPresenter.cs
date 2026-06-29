@@ -1,4 +1,5 @@
 using System;
+using StellarBreaker.Config;
 using StellarBreaker.Gameplay;
 
 namespace StellarBreaker.UI
@@ -28,6 +29,9 @@ namespace StellarBreaker.UI
         public SkillVm[] skills;
         public bool      canPrestige;
         public string    prestigeText;
+
+        public string      relicsText;
+        public ArtifactVm[] artifacts;
     }
 
     /// <summary>One skill button's display state.</summary>
@@ -38,6 +42,15 @@ namespace StellarBreaker.UI
         public bool   ready;
         public bool   active;
         public int    secondsLeft;   // active time left, or cooldown left
+    }
+
+    /// <summary>One artifact button's display state.</summary>
+    public struct ArtifactVm
+    {
+        public string label;
+        public string levelText;     // e.g. "Lv 3  +15%"
+        public string costText;
+        public bool   canBuy;
     }
 
     /// <summary>
@@ -112,6 +125,24 @@ namespace StellarBreaker.UI
             vm.skills       = sk;
             vm.canPrestige  = _s.CanPrestige();
             vm.prestigeText = "PRESTIGE  +" + _s.PreviewRelics().ToShortString();
+
+            vm.relicsText = _s.Prestige.Relics.Stardust.ToShortString();
+            var arts = _s.Artifacts;
+            var av = new ArtifactVm[arts.Count];
+            for (int i = 0; i < arts.Count; i++)
+            {
+                ArtifactDefinition d = arts.Def(i);
+                int lvl = arts.LevelOf(i);
+                int pct = (int)Math.Round(lvl * d.bonusPerLevel * 100.0);
+                av[i] = new ArtifactVm
+                {
+                    label     = d.displayName,
+                    levelText = "Lv " + lvl + "  +" + pct + "%",
+                    costText  = arts.NextCost(i).ToShortString(),
+                    canBuy    = _s.Prestige.Relics.CanAfford(arts.NextCost(i)),
+                };
+            }
+            vm.artifacts = av;
             return vm;
         }
     }
