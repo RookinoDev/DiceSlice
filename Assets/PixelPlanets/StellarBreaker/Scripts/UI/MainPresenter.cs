@@ -8,6 +8,7 @@ namespace StellarBreaker.UI
     public struct MainViewModel
     {
         public string stageLabel;
+        public string zoneLabel;          // sector/biome name, e.g. "OUTER ORBIT"
         public bool   isBoss;
         public bool   bossActive;
         public int    bossSecondsLeft;
@@ -17,6 +18,7 @@ namespace StellarBreaker.UI
 
         public string stardustText;
         public string tapDamageText;
+        public int    tapLevel;
         public string fleetDpsText;
 
         public string tapUpgradeCostText;
@@ -38,6 +40,7 @@ namespace StellarBreaker.UI
     public struct SkillVm
     {
         public string label;
+        public string description;
         public bool   unlocked;
         public bool   ready;
         public bool   active;
@@ -70,6 +73,7 @@ namespace StellarBreaker.UI
             {
                 stardustText       = _s.Wallet.Stardust.ToShortString(),
                 tapDamageText      = _s.TapUpgrade.CurrentDamage.ToShortString(),
+                tapLevel           = _s.TapUpgrade.Level,
                 fleetDpsText       = _s.Ships.FleetDps().ToShortString(),
                 tapUpgradeCostText = _s.TapUpgrade.NextCost.ToShortString(),
                 canUpgradeTap      = _s.Wallet.CanAfford(_s.TapUpgrade.NextCost),
@@ -79,7 +83,8 @@ namespace StellarBreaker.UI
 
             if (p != null)
             {
-                vm.stageLabel = "Stage " + p.Stage;
+                vm.stageLabel = "Sector " + p.Stage;
+                vm.zoneLabel  = ZoneName(p.Stage);
                 vm.isBoss     = p.IsBoss;
                 vm.hpText     = p.CurrentHP.ToShortString() + " / " + p.MaxHP.ToShortString();
                 vm.hpFraction = (float)p.HpFraction01();
@@ -87,6 +92,7 @@ namespace StellarBreaker.UI
             else
             {
                 vm.stageLabel = "—";
+                vm.zoneLabel  = "";
                 vm.hpText     = "";
                 vm.hpFraction = 0f;
             }
@@ -116,6 +122,7 @@ namespace StellarBreaker.UI
                 sk[i] = new SkillVm
                 {
                     label       = _s.Skills.Name(t),
+                    description = _s.Skills.Description(t),
                     unlocked    = _s.Skills.IsUnlocked(t),
                     ready       = _s.Skills.CanActivate(t),
                     active      = active,
@@ -124,7 +131,7 @@ namespace StellarBreaker.UI
             }
             vm.skills       = sk;
             vm.canPrestige  = _s.CanPrestige();
-            vm.prestigeText = "PRESTIGE  +" + _s.PreviewRelics().ToShortString();
+            vm.prestigeText = "ASCEND  +" + _s.PreviewRelics().ToShortString();
 
             vm.relicsText = _s.Prestige.Relics.Stardust.ToShortString();
             var arts = _s.Artifacts;
@@ -144,6 +151,16 @@ namespace StellarBreaker.UI
             }
             vm.artifacts = av;
             return vm;
+        }
+
+        /// <summary>Display-only zone/biome name for a stage (mirrors the planet-variant bands).</summary>
+        public static string ZoneName(int stage)
+        {
+            if (stage < 10)  return "OUTER ORBIT";
+            if (stage < 25)  return "RED BELT";
+            if (stage < 50)  return "BROKEN MOONS";
+            if (stage < 100) return "VOID FRONTIER";
+            return "STELLAR CORE";
         }
     }
 }

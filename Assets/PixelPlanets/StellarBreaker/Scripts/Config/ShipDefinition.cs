@@ -12,6 +12,7 @@ namespace StellarBreaker.Config
     public class ShipDefinition : ScriptableObject
     {
         public string        shipName     = "Ship";
+        public string        className    = "";             // display-only fleet tier (Scout … Starbreaker)
         public Sprite        icon;
         public double        baseCost     = 50.0;            // level-1 buy cost
         public ShipArchetype archetype    = ShipArchetype.Fast;
@@ -20,10 +21,12 @@ namespace StellarBreaker.Config
         public double        baseHitDamage = 2.5;          // = baseDps × baseCooldown
 
         public static ShipDefinition Create(string name, double baseCost,
-                                            ShipArchetype archetype, double baseCooldown, double baseDps)
+                                            ShipArchetype archetype, double baseCooldown, double baseDps,
+                                            string className = "")
         {
             var s = CreateInstance<ShipDefinition>();
             s.shipName      = name;
+            s.className     = className;
             s.baseCost      = baseCost;
             s.archetype     = archetype;
             s.baseCooldown  = baseCooldown;

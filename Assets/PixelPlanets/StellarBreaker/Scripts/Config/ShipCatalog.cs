@@ -27,6 +27,22 @@ namespace StellarBreaker.Config
         static readonly double ChainFactor = Math.Pow(DamagePerLevel, ChainLevels); // ≈10.92
         static readonly double[] Cooldowns = { 0.5, 1.0, 2.0 };    // Fast, Medium, Heavy
 
+        // Display-only flavour (parallel to BaseCosts). Pure space/fleet identity — no logic.
+        static readonly string[] ShipNames =
+        {
+            "Recon Skiff", "Pathfinder", "Talon", "Razorwing", "Nighthawk",
+            "Tempest", "Ironside", "Bulwark", "Devastator", "Annihilator",
+            "Vanguard", "Sovereign", "Leviathan", "Ark Carrier", "Goliath",
+            "Behemoth", "Colossus", "Worldbreaker", "Starbreaker Prime",
+        };
+        static readonly string[] ShipClasses =
+        {
+            "Scout", "Scout", "Fighter", "Fighter", "Interceptor",
+            "Interceptor", "Frigate", "Frigate", "Destroyer", "Destroyer",
+            "Cruiser", "Cruiser", "Carrier", "Carrier", "Dreadnought",
+            "Dreadnought", "Titan", "Titan", "Starbreaker Class",
+        };
+
         public static List<ShipDefinition> BuildDefault()
         {
             var list = new List<ShipDefinition>(BaseCosts.Length);
@@ -35,7 +51,9 @@ namespace StellarBreaker.Config
             {
                 var archetype = (ShipArchetype)(k % 3);
                 double cd     = Cooldowns[k % 3];
-                list.Add(ShipDefinition.Create($"Ship {k + 1}", BaseCosts[k], archetype, cd, dps));
+                string name   = k < ShipNames.Length   ? ShipNames[k]   : $"Ship {k + 1}";
+                string cls    = k < ShipClasses.Length ? ShipClasses[k] : "Frigate";
+                list.Add(ShipDefinition.Create(name, BaseCosts[k], archetype, cd, dps, cls));
                 dps *= ChainFactor;
             }
             return list;

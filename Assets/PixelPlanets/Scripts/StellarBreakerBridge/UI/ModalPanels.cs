@@ -43,12 +43,14 @@ namespace StellarBreaker.Hud
     public sealed class FleetPanel : ModalBase
     {
         readonly GameSession _s;
+        readonly Func<bool> _buyMax;
         Button[] _rowBtns; Text[] _rowLabels; Text _page, _total;
         int _pageIdx; const int Size = 6;
 
-        public FleetPanel(Transform canvas, GameSession s)
+        public FleetPanel(Transform canvas, GameSession s, Func<bool> buyMax = null)
         {
             _s = s;
+            _buyMax = buyMax ?? (() => false);
             BuildShell(canvas, "FleetPanel", new Vector2(980, 1520), "FLEET");
             _total = UiKit.Label(Window, "Total", new Vector2(0.5f, 1f), new Vector2(0, -132), new Vector2(900, 50), 32, TextAnchor.MiddleCenter, UiTheme.SubText);
 
@@ -62,7 +64,7 @@ namespace StellarBreaker.Hud
                 {
                     AudioManager.Instance?.Click();
                     int idx = _pageIdx * Size + row;
-                    if (idx < _s.Ships.Count) _s.BuyShip(idx);
+                    if (idx < _s.Ships.Count) { if (_buyMax()) _s.BuyShipMax(idx); else _s.BuyShip(idx); }
                 });
             }
             var prev = UiKit.Button(Window, "Prev", new Vector2(0.5f, 0f), new Vector2(-285, 72), new Vector2(240, 100), out var pl, 30); pl.text = "◀";
@@ -80,7 +82,7 @@ namespace StellarBreaker.Hud
             if (!IsOpen) return;
             Clamp();
             var ships = _s.Ships;
-            _total.text = "Total Idle DPS:  " + ships.FleetDps().ToShortString();
+            _total.text = "Total Fleet DPS:  " + ships.FleetDps().ToShortString();
             for (int r = 0; r < Size; r++)
             {
                 int idx = _pageIdx * Size + r;
@@ -88,7 +90,9 @@ namespace StellarBreaker.Hud
                 {
                     _rowBtns[r].gameObject.SetActive(true);
                     string st = ships.IsOwned(idx) ? "Lv " + ships.LevelOf(idx) : "BUY";
-                    _rowLabels[r].text = "   " + ships.Def(idx).shipName + "   [" + st + "]" +
+                    var def = ships.Def(idx);
+                    string cls = string.IsNullOrEmpty(def.className) ? "" : "  ·  " + def.className;
+                    _rowLabels[r].text = "   " + def.shipName + cls + "   [" + st + "]" +
                                          "\n   DPS " + ships.ShipDps(idx).ToShortString() + "      Cost " + ships.NextCost(idx).ToShortString();
                     _rowBtns[r].interactable = _s.Wallet.CanAfford(ships.NextCost(idx));
                 }
@@ -102,11 +106,13 @@ namespace StellarBreaker.Hud
     public sealed class ArtifactPanel : ModalBase
     {
         readonly GameSession _s;
+        readonly Func<bool> _buyMax;
         Button[] _btns; Text[] _labels; Text _relics;
 
-        public ArtifactPanel(Transform canvas, GameSession s)
+        public ArtifactPanel(Transform canvas, GameSession s, Func<bool> buyMax = null)
         {
             _s = s;
+            _buyMax = buyMax ?? (() => false);
             BuildShell(canvas, "ArtifactPanel", new Vector2(980, 1100), "ARTIFACTS");
             _relics = UiKit.Label(Window, "Relics", new Vector2(0.5f, 1f), new Vector2(0, -132), new Vector2(900, 56), 36, TextAnchor.MiddleCenter, UiTheme.Relic);
 
@@ -120,7 +126,7 @@ namespace StellarBreaker.Hud
                 _btns[i].onClick.AddListener(() =>
                 {
                     AudioManager.Instance?.Click();
-                    if (idx < _s.Artifacts.Count) _s.BuyArtifact(idx);
+                    if (idx < _s.Artifacts.Count) { if (_buyMax()) _s.BuyArtifactMax(idx); else _s.BuyArtifact(idx); }
                 });
             }
         }
@@ -135,7 +141,8 @@ namespace StellarBreaker.Hud
                 var d = a.Def(i);
                 int lvl = a.LevelOf(i);
                 int pct = (int)System.Math.Round(lvl * d.bonusPerLevel * 100.0);
-                _labels[i].text = "   " + d.displayName + "   Lv " + lvl +
+                string desc = string.IsNullOrEmpty(d.description) ? "" : "\n   " + d.description;
+                _labels[i].text = "   " + d.displayName + "   Lv " + lvl + desc +
                                   "\n   +" + pct + "%      Cost " + a.NextCost(i).ToShortString() + " relics";
                 _btns[i].interactable = _s.Prestige.Relics.CanAfford(a.NextCost(i));
             }
@@ -152,11 +159,11 @@ namespace StellarBreaker.Hud
         public PrestigePanel(Transform canvas, GameSession s)
         {
             _s = s;
-            BuildShell(canvas, "PrestigePanel", new Vector2(960, 1150), "PRESTIGE");
+            BuildShell(canvas, "PrestigePanel", new Vector2(960, 1150), "STELLAR ASCENSION");
             _info = UiKit.Label(Window, "Info", new Vector2(0.5f, 1f), new Vector2(0, -420), new Vector2(860, 720), 32, TextAnchor.UpperLeft);
 
             _confirm = UiKit.Button(Window, "Confirm", new Vector2(0.5f, 0f), new Vector2(-240, 90), new Vector2(420, 120), out _confirmLbl, 34, UiTheme.Primary);
-            _confirmLbl.text = "PRESTIGE";
+            _confirmLbl.text = "ASCEND";
             _confirm.onClick.AddListener(() =>
             {
                 var g = _s.DoPrestige();
@@ -173,12 +180,12 @@ namespace StellarBreaker.Hud
             if (!IsOpen) return;
             bool can = _s.CanPrestige();
             _info.text =
-                "Reset your run to earn Relics.\n\n" +
-                "Highest stage:  " + _s.Stage.HighestStage + "\n" +
+                "Ascend to a new stellar cycle and earn Relics.\n\n" +
+                "Highest sector:  " + _s.Stage.HighestStage + "\n" +
                 "Relics gained:  +" + _s.PreviewRelics().ToShortString() + "\n\n" +
-                "RESETS:  stage, gold, tap level, ships\n" +
+                "RESETS:  sector, Stardust, tap level, fleet\n" +
                 "KEEPS:  relics, artifacts\n\n" +
-                (can ? "Spend Relics on permanent artifacts." : "Reach a higher stage to prestige.");
+                (can ? "Spend Relics on permanent artifacts." : "Reach a higher sector to ascend.");
             _confirm.interactable = can;
         }
     }
@@ -191,7 +198,7 @@ namespace StellarBreaker.Hud
         public OfflinePanel(Transform canvas)
         {
             BuildShell(canvas, "OfflinePanel", new Vector2(900, 760), "WELCOME BACK");
-            _body = UiKit.Label(Window, "Body", new Vector2(0.5f, 1f), new Vector2(0, -300), new Vector2(800, 360), 40, TextAnchor.MiddleCenter);
+            _body = UiKit.Label(Window, "Body", new Vector2(0.5f, 1f), new Vector2(0, -320), new Vector2(840, 420), 32, TextAnchor.MiddleCenter);
             var claim = UiKit.Button(Window, "Claim", new Vector2(0.5f, 0f), new Vector2(0, 110), new Vector2(560, 130), out var lbl, 40, UiTheme.Primary);
             lbl.text = "CLAIM";
             claim.onClick.AddListener(() => { AudioManager.Instance?.Click(); Close(); });
@@ -200,7 +207,7 @@ namespace StellarBreaker.Hud
         public void Show(double seconds, BigNumber gold)
         {
             int h = (int)(seconds / 3600), m = (int)((seconds % 3600) / 60);
-            _body.text = "Away for " + (h > 0 ? h + "h " : "") + m + "m\n\nEarned\n<color=#FFD966>+" + gold.ToShortString() + "</color> gold";
+            _body.text = "Your fleet kept working while you were away.\n\nAway for " + (h > 0 ? h + "h " : "") + m + "m\n\nEarned\n<color=#FFD966>+" + gold.ToShortString() + "</color> Stardust";
             _body.supportRichText = true;
             Open();
         }

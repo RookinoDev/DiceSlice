@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cf1d088cf50a29e4e912f54b1b228440, type: 3}
   m_Name: BalanceConfig
   m_EditorClassIdentifier:
-  enemyHpBase: 29
+  enemyHpBase: 18
   enemyHpGrowth: 1.57
   bossMultipliers:
   - 2
@@ -27,6 +27,8 @@ MonoBehaviour:
   goldBase: 5
   goldGrowth: 1.15
   bossGoldMultiplier: 3
+  tapUpgradeBaseCost: 10
+  tapUpgradeCostGrowth: 1.16
   shipBaseCost: 50
   shipCostPerLevel: 1.075
   shipBaseCostGrowthMin: 3.5
@@ -60,7 +62,7 @@ MonoBehaviour:
   - 5
   dpsTapShare: 0
   bossStageInterval: 5
-  bossTimerSeconds: 30
+  bossTimerSeconds: 35
   skillDefaultCooldown: 120
   prestigeUnlockStage: 10
   relicStartStage: 5
@@ -69,7 +71,7 @@ MonoBehaviour:
   artifactBaseCost: 10
   artifactCostGrowth: 1.5
   artifactBonusPerLevel: 0.05
-  offlineRate: 0.5
+  offlineRate: 0.6
   offlineCapHours: 8
   dailyResetHourUtc: 0
   skillUnlockLevels:

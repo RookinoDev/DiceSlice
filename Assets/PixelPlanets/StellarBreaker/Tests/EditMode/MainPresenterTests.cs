@@ -34,7 +34,7 @@ namespace StellarBreaker.Tests
             s.Begin();
             var vm = new MainPresenter(s).Build();
 
-            Assert.AreEqual("Stage 1", vm.stageLabel);
+            Assert.AreEqual("Sector 1", vm.stageLabel);
             Assert.IsFalse(vm.isBoss);
             Assert.That(vm.hpFraction, Is.EqualTo(1f).Within(1e-4));
             Assert.AreEqual("0", vm.stardustText);

@@ -49,12 +49,29 @@ public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider, IEnemyView
             OnPlanetDestroyed?.Invoke(old);
         }
 
-        // TODO: wire `stage` into the generator (difficulty / type bias) once the
-        // generator exposes such an input. For now Reroll() picks a random planet.
-        if (generator != null) generator.Reroll();
+        // Sector-linked target variety: force the biome by stage band, then reroll so
+        // colour/rarity still vary within the band. Uses only the generator's public API.
+        if (generator != null)
+        {
+            generator.useRandomType    = false;
+            generator.forcedPlanetType = TypeForStage(stage);
+            generator.Reroll();
+        }
 
         _current = FindSpawnedRoot();
         return _current;
+    }
+
+    // Display-only biome bands (mirror MainPresenter.ZoneName):
+    //   <10 Outer Orbit (rocky) · <25 Red Belt (lava) · <50 Broken Moons (ice)
+    //   <100 Void Frontier (chaotic/dark) · 100+ Stellar Core (gas giant)
+    static PlanetType TypeForStage(int stage)
+    {
+        if (stage < 10)  return PlanetType.NoAtmosphere;
+        if (stage < 25)  return PlanetType.LavaWorld;
+        if (stage < 50)  return PlanetType.IceWorld;
+        if (stage < 100) return PlanetType.Chaotic;
+        return PlanetType.GasGiant;
     }
 
     // The generator parents its planet under itself as "Planet_*"; the newest child wins.

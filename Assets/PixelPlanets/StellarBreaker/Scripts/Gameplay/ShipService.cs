@@ -70,6 +70,16 @@ namespace StellarBreaker.Gameplay
             return true;
         }
 
+        /// <summary>Buy/upgrade ship i as many times as the wallet allows (real cost each step →
+        /// cannot overspend). Returns levels bought. Capped for safety.</summary>
+        public int BuyOrUpgradeMax(int i, CurrencyService wallet, int cap = 100000)
+        {
+            if (wallet == null) throw new ArgumentNullException(nameof(wallet));
+            int n = 0;
+            while (n < cap && BuyOrUpgrade(i, wallet)) n++;
+            return n;
+        }
+
         /// <summary>Reset every ship to unowned (used by prestige).</summary>
         public void ResetLevels()
         {

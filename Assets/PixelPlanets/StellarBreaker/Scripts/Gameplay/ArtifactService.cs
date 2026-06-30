@@ -48,6 +48,15 @@ namespace StellarBreaker.Gameplay
             return true;
         }
 
+        /// <summary>Upgrade artifact i as many times as Relics allow (real cost each step →
+        /// cannot overspend). Returns levels bought. Capped for safety.</summary>
+        public int BuyOrUpgradeMax(int i, int cap = 100000)
+        {
+            int n = 0;
+            while (n < cap && BuyOrUpgrade(i)) n++;
+            return n;
+        }
+
         /// <summary>Aggregate multiplier for a stat = ∏ (1 + level × bonusPerLevel).</summary>
         public BigNumber Multiplier(ArtifactEffect effect)
         {

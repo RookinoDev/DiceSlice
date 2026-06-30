@@ -52,6 +52,8 @@ namespace StellarBreaker.Persistence
     public class SaveService
     {
         public const string Key = "save";
+        /// <summary>Current save schema version (bump when SaveState changes shape).</summary>
+        public const int CurrentVersion = 1;
 
         readonly ISaveStore _store;
         readonly ICloudSync _cloud;   // optional
@@ -64,19 +66,34 @@ namespace StellarBreaker.Persistence
 
         public void Save(SaveState state)
         {
+            state.version             = CurrentVersion;
             state.lastSaveUnixSeconds = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
             string json = JsonUtility.ToJson(state);
             _store.Write(Key, json);
             if (_cloud != null && _cloud.Available) _cloud.Push(json);
         }
 
+        /// <summary>
+        /// Load the save. Returns false (and leaves the file intact) on a missing, empty,
+        /// or MALFORMED save rather than throwing — a corrupt file must not crash startup.
+        /// Missing fields fall back to SaveState defaults; newer versions load best-effort.
+        /// </summary>
         public bool TryLoad(out SaveState state)
         {
             state = null;
             if (!_store.Exists(Key)) return false;
             string json = _store.Read(Key);
             if (string.IsNullOrEmpty(json)) return false;
-            state = JsonUtility.FromJson<SaveState>(json);
+            try
+            {
+                state = JsonUtility.FromJson<SaveState>(json);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("[SaveService] Ignoring corrupt save: " + e.Message);
+                state = null;
+                return false;
+            }
             return state != null;
         }
 

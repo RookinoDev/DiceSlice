@@ -33,7 +33,8 @@ namespace StellarBreaker.Gameplay
             }
         }
 
-        public string Name(SkillType t)     => _defs[t].displayName;
+        public string Name(SkillType t)        => _defs[t].displayName;
+        public string Description(SkillType t) => _defs[t].description;
         public int  Level(SkillType t)      => _state[t].level;
         public void SetLevel(SkillType t, int level) => _state[t].level = Math.Max(1, level);
         public bool IsUnlocked(SkillType t) => _playerLevel() >= _defs[t].unlockLevel;

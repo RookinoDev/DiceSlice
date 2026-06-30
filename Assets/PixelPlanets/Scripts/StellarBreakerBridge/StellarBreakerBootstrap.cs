@@ -102,6 +102,9 @@ public class StellarBreakerBootstrap : MonoBehaviour
         };
         _hud.Bind(_session, _adapter, onResetSave, offlineSeconds, offline);
 
+        // Visual-only: place colored placeholder boxes on the ShipPlaceMent slots.
+        if (GetComponent<FleetVisualPlacer>() == null) gameObject.AddComponent<FleetVisualPlacer>();
+
         if (offline > BigNumber.Zero)
             Debug.Log("[StellarBreaker] Offline +" + offline.ToShortString());
     }

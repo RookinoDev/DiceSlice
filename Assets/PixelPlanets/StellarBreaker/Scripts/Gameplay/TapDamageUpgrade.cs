@@ -36,6 +36,16 @@ namespace StellarBreaker.Gameplay
             return true;
         }
 
+        /// <summary>Buy as many levels as the wallet allows (uses the real cost each step,
+        /// so it can never overspend). Returns how many levels were bought. Capped for safety.</summary>
+        public int UpgradeMax(CurrencyService wallet, int cap = 100000)
+        {
+            if (wallet == null) throw new ArgumentNullException(nameof(wallet));
+            int n = 0;
+            while (n < cap && TryUpgrade(wallet)) n++;
+            return n;
+        }
+
         /// <summary>Reset to a level (used by prestige).</summary>
         public void Reset(int level = 1)
         {

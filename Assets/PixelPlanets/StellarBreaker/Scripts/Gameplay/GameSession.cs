@@ -82,6 +82,11 @@ namespace StellarBreaker.Gameplay
         /// <summary>Buy/upgrade a permanent artifact with Relics. False if unaffordable.</summary>
         public bool BuyArtifact(int i) => Artifacts.BuyOrUpgrade(i);
 
+        // ── Buy Max (spend everything affordable; never overspends) ──
+        public int UpgradeTapDamageMax() => TapUpgrade.UpgradeMax(Wallet);
+        public int BuyShipMax(int i)     => Ships.BuyOrUpgradeMax(i, Wallet);
+        public int BuyArtifactMax(int i) => Artifacts.BuyOrUpgradeMax(i);
+
         /// <summary>Activate a skill: timed buffs start, Meteor deals instant damage.</summary>
         public bool ActivateSkill(SkillType t)
         {
