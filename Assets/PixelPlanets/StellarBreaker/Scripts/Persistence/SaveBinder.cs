@@ -1,6 +1,7 @@
 using System;
 using StellarBreaker.Core;
 using StellarBreaker.Gameplay;
+using StellarBreaker.Monetization;
 
 namespace StellarBreaker.Persistence
 {
@@ -19,6 +20,9 @@ namespace StellarBreaker.Persistence
                 artifactLevels = CaptureArtifactLevels(s.Artifacts),
                 currentStage = s.Stage.CurrentStage,
                 highestStage = s.Stage.HighestStage,
+                lastDailyClaimUnixSeconds = s.Daily.LastClaimDay == long.MinValue
+                    ? 0 : s.Daily.LastClaimDay * DailyRewardService.SecondsPerDay,
+                dailyStreak  = s.Daily.Streak,
             };
             return st;
         }
@@ -32,6 +36,8 @@ namespace StellarBreaker.Persistence
             s.TapUpgrade.Reset(Math.Max(1, st.tapLevel));
             s.Ships.RestoreLevels(st.shipLevels);
             s.Artifacts.RestoreLevels(st.artifactLevels);
+            if (st.lastDailyClaimUnixSeconds > 0)
+                s.Daily.Restore(st.lastDailyClaimUnixSeconds / DailyRewardService.SecondsPerDay, st.dailyStreak);
         }
 
         static int[] CaptureShipLevels(ShipService ships)

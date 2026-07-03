@@ -55,10 +55,20 @@ namespace StellarBreaker.Gameplay
             return hp;
         }
 
+        /// <summary>
+        /// Gold multiplier for a boss kill, scaled by that boss's own HP multiplier so a
+        /// harder boss (up to ×10 HP) pays out more than an easy one (×2 HP) instead of the
+        /// same flat bonus. Square-root scaling keeps it sub-linear — bounded by the HP cycle's
+        /// max value (×10 → √10 ≈ 3.16), so it can never run away regardless of stage/prestige
+        /// count. Returns 1.0 (no bonus) for non-boss stages.
+        /// </summary>
+        public double BossRewardMultiplier(int stage)
+            => IsBossStage(stage) ? _cfg.bossGoldMultiplier * Math.Sqrt(BossMultiplier(stage)) : 1.0;
+
         public BigNumber GoldFor(int stage)
         {
             var g = GoldReward.ForStage(stage, _cfg.goldBase, _cfg.goldGrowth);
-            if (IsBossStage(stage)) g = g * new BigNumber(_cfg.bossGoldMultiplier);
+            if (IsBossStage(stage)) g = g * new BigNumber(BossRewardMultiplier(stage));
             return g;
         }
 

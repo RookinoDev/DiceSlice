@@ -73,14 +73,18 @@ namespace StellarBreaker.Config
         public int prestigeUnlockStage = 10;   // prestige available once HighestStage ≥ this
 
         // ── Phase 7: prestige & artifacts ────────────────────────────
-        [Header("Prestige / Relics")]
+        [Header("Prestige / Relics — super-linear so the first Ascension is a real power jump")]
         public int    relicStartStage = 5;     // no relics before this stage
-        public double relicScale      = 1.0;
-        public double relicPower       = 1.0;  // relics = floor(scale × max(0,stage-start)^power)
-        [Header("Artifacts")]
-        public double artifactBaseCost      = 10.0;   // in Relics
-        public double artifactCostGrowth    = 1.5;
-        public double artifactBonusPerLevel = 0.05;   // +5% (additive into a ×multiplier) per level
+        [Tooltip("relics = floor(scale × max(0,stage-start)^power). power 1.6-1.9 = super-linear.")]
+        public double relicScale = 1.6;
+        public double relicPower = 1.8;
+        [Header("Artifacts — first level is a big jump, later levels scale slower")]
+        public double artifactBaseCost        = 10.0;   // in Relics
+        public double artifactCostGrowth      = 1.5;
+        [Tooltip("Bonus granted immediately at level 1 (e.g. 0.20 = +20%)")]
+        public double artifactFirstLevelBonus = 0.20;
+        [Tooltip("Additional flat bonus per level beyond level 1 (smaller than the first-level jump)")]
+        public double artifactBonusPerLevel   = 0.04;
 
         // ── Phase 8: offline ─────────────────────────────────────────
         [Header("Offline")]
@@ -90,6 +94,12 @@ namespace StellarBreaker.Config
         // ── Phase 10: monetization ───────────────────────────────────
         [Header("Monetization")]
         public float dailyResetHourUtc = 0f;   // daily reward resets at this UTC hour
+
+        [Header("Daily reward — day 1..7 cycle, loops after day 7")]
+        [Tooltip("Gold reward on day N = this stage's base kill gold × dailyGoldKillMultiples[N-1]")]
+        public double[] dailyGoldKillMultiples = { 3, 4, 5, 6, 8, 10, 15 };
+        [Tooltip("Day (1-7) that additionally grants a Relic, only once prestige is unlocked")]
+        public int dailyRelicDay = 7;
 
         [Header("Skills — unlock levels & timing")]
         public int[] skillUnlockLevels = { 50, 100, 200, 300, 400, 500 };

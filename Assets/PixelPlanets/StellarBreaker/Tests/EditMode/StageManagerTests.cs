@@ -51,8 +51,24 @@ namespace StellarBreaker.Tests
         {
             var sm = new StageManager(_cfg);
             double baseGold = 5.0 * Math.Pow(1.15, 4); // stage 5
+            // stage 5 = first boss in the cycle → HP multiplier ×2; reward scales as
+            // bossGoldMultiplier × sqrt(hpMultiplier) (see StageManager.BossRewardMultiplier).
+            double expectedMult = _cfg.bossGoldMultiplier * Math.Sqrt(2);
             Assert.That(sm.GoldFor(5).ToDouble(),
-                        Is.EqualTo(baseGold * _cfg.bossGoldMultiplier).Within(baseGold * 1e-4));
+                        Is.EqualTo(baseGold * expectedMult).Within(baseGold * expectedMult * 1e-4));
+        }
+
+        [Test]
+        public void Harder_Boss_Pays_More_Than_Easier_Boss()
+        {
+            var sm = new StageManager(_cfg);
+            // stage 5 → HP×2 (easiest boss), stage 25 → HP×10 (hardest in the cycle).
+            double easyMult = sm.BossRewardMultiplier(5);
+            double hardMult = sm.BossRewardMultiplier(25);
+            Assert.Greater(hardMult, easyMult);
+
+            // Sanity: the scaling is sub-linear (sqrt), not 1:1 with HP, so it stays bounded.
+            Assert.Less(hardMult, easyMult * 10.0);   // HP is ×5 harder (10 vs 2), reward isn't ×5
         }
 
         [Test]

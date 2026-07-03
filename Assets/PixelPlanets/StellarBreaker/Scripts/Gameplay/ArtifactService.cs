@@ -57,14 +57,17 @@ namespace StellarBreaker.Gameplay
             return n;
         }
 
-        /// <summary>Aggregate multiplier for a stat = ∏ (1 + level × bonusPerLevel).</summary>
+        /// <summary>Current fractional bonus for artifact i (0 if unowned). UI-friendly.</summary>
+        public double LevelBonus(int i) => _defs[i].BonusAt(_levels[i]);
+
+        /// <summary>Aggregate multiplier for a stat = ∏ (1 + bonus(level)).</summary>
         public BigNumber Multiplier(ArtifactEffect effect)
         {
             var mult = BigNumber.One;
             for (int i = 0; i < _defs.Count; i++)
             {
                 if (_defs[i].effect != effect || _levels[i] <= 0) continue;
-                mult = mult * new BigNumber(1.0 + _levels[i] * _defs[i].bonusPerLevel);
+                mult = mult * new BigNumber(1.0 + _defs[i].BonusAt(_levels[i]));
             }
             return mult;
         }

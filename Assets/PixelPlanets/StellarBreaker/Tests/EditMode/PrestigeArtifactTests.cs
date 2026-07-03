@@ -33,14 +33,39 @@ namespace StellarBreaker.Tests
             Object.DestroyImmediate(_cfg);
         }
 
-        [Test]
-        public void Relics_From_Stage_Uses_Formula()
+        // Same formula as PrestigeService.RelicsForStage, used to compute expected values
+        // instead of hardcoding pre-calculated numbers (keeps the test valid if the tunable
+        // scale/power in BalanceConfig are retuned again later).
+        double ExpectedRelics(int highestStage)
         {
-            var p = new PrestigeService(_cfg); // start 5, scale 1, power 1
+            int s = System.Math.Max(0, highestStage - _cfg.relicStartStage);
+            return s <= 0 ? 0.0 : System.Math.Floor(_cfg.relicScale * System.Math.Pow(s, _cfg.relicPower));
+        }
+
+        [Test]
+        public void Relics_From_Stage_Uses_SuperLinear_Formula()
+        {
+            var p = new PrestigeService(_cfg);
             Assert.That(p.RelicsForStage(4).IsClose(BigNumber.Zero));
             Assert.That(p.RelicsForStage(5).IsClose(BigNumber.Zero));   // 5-5 = 0
-            Assert.That(p.RelicsForStage(15).ToDouble(), Is.EqualTo(10.0).Within(1e-9));
-            Assert.That(p.RelicsForStage(105).ToDouble(), Is.EqualTo(100.0).Within(1e-9));
+
+            Assert.That(p.RelicsForStage(15).ToDouble(), Is.EqualTo(ExpectedRelics(15)).Within(1e-6));
+            Assert.That(p.RelicsForStage(105).ToDouble(), Is.EqualTo(ExpectedRelics(105)).Within(1e-6));
+
+            // Super-linear: doubling the progress-beyond-start more than doubles the reward.
+            double small = p.RelicsForStage(_cfg.relicStartStage + 5).ToDouble();
+            double big   = p.RelicsForStage(_cfg.relicStartStage + 10).ToDouble();
+            Assert.Greater(big, small * 2.0);
+        }
+
+        [Test]
+        public void First_Prestige_At_Unlock_Stage_Funds_At_Least_One_Artifact_Level()
+        {
+            var p = new PrestigeService(_cfg);
+            var relicsAtUnlock = p.RelicsForStage(_cfg.prestigeUnlockStage);
+            var cheapestArtifactCost = new BigNumber(_cfg.artifactBaseCost);   // level-1 cost of the cheapest artifact
+            Assert.IsTrue(relicsAtUnlock >= cheapestArtifactCost,
+                "first prestige should afford at least one artifact level");
         }
 
         [Test]
@@ -57,17 +82,18 @@ namespace StellarBreaker.Tests
             var p = new PrestigeService(_cfg);
             var gained = p.Prestige(stage.HighestStage, wallet, tap, ships, stage);
 
-            Assert.That(gained.ToDouble(), Is.EqualTo(10.0).Within(1e-9));     // 15-5
+            Assert.That(gained.ToDouble(), Is.EqualTo(ExpectedRelics(15)).Within(1e-6));
             Assert.That(wallet.Stardust.IsClose(BigNumber.Zero));             // reset
             Assert.AreEqual(1, tap.Level);                                    // reset
             Assert.AreEqual(0, ships.LevelOf(0));                             // reset
             Assert.AreEqual(1, stage.CurrentStage);                          // reset
-            Assert.That(p.Relics.Stardust.ToDouble(), Is.EqualTo(10.0).Within(1e-9)); // persists
+            Assert.That(p.Relics.Stardust.ToDouble(), Is.EqualTo(ExpectedRelics(15)).Within(1e-6)); // persists
 
             // second prestige accumulates relics
             var stage2 = new StageManager(_cfg, 25);
-            p.Prestige(stage2.HighestStage, wallet, tap, ships, stage2);     // +20
-            Assert.That(p.Relics.Stardust.ToDouble(), Is.EqualTo(30.0).Within(1e-9));
+            p.Prestige(stage2.HighestStage, wallet, tap, ships, stage2);
+            Assert.That(p.Relics.Stardust.ToDouble(),
+                        Is.EqualTo(ExpectedRelics(15) + ExpectedRelics(25)).Within(1e-6));
         }
 
         [Test]
@@ -77,13 +103,20 @@ namespace StellarBreaker.Tests
             relics.Add(new BigNumber(1000.0));
             var arts = new ArtifactService(_artifacts, relics);
 
-            // DPS artifact (index 0): bonus 0.05/level
             Assert.That(arts.DpsMultiplier().ToDouble(), Is.EqualTo(1.0).Within(1e-9));
 
-            Assert.IsTrue(arts.BuyOrUpgrade(0)); // level 1
+            Assert.IsTrue(arts.BuyOrUpgrade(0)); // level 1 → big first-level jump
+            double afterLevel1 = arts.DpsMultiplier().ToDouble();
+            Assert.That(afterLevel1, Is.EqualTo(1.0 + _cfg.artifactFirstLevelBonus).Within(1e-6));
+            Assert.GreaterOrEqual(_cfg.artifactFirstLevelBonus, 0.15);   // "noticeable" per design intent
+
             Assert.IsTrue(arts.BuyOrUpgrade(0)); // level 2
             Assert.IsTrue(arts.BuyOrUpgrade(0)); // level 3
-            Assert.That(arts.DpsMultiplier().ToDouble(), Is.EqualTo(1.15).Within(1e-6)); // 1 + 3×0.05
+            double expected = 1.0 + _cfg.artifactFirstLevelBonus + 2 * _cfg.artifactBonusPerLevel;
+            Assert.That(arts.DpsMultiplier().ToDouble(), Is.EqualTo(expected).Within(1e-6));
+
+            // Later levels add less than the first level did (scales slower).
+            Assert.Less(_cfg.artifactBonusPerLevel, _cfg.artifactFirstLevelBonus);
 
             Assert.Less(relics.Stardust.ToDouble(), 1000.0); // relics were spent
         }

@@ -45,6 +45,30 @@ namespace StellarBreaker.Tests
         }
 
         [Test]
+        public void Fresh_Player_Hides_All_Advanced_Systems()
+        {
+            var s = new GameSession(_provider, _cfg, 1);
+            s.Begin();
+            var vm = new MainPresenter(s).Build();
+            Assert.IsFalse(vm.showUpgradeTap, "upgrade hidden until first gold");
+            Assert.IsFalse(vm.showFleet);
+            Assert.IsFalse(vm.showArtifacts);
+            Assert.IsFalse(vm.showPrestige);
+            foreach (var sk in vm.skills) Assert.IsFalse(sk.unlocked);  // all skills locked at tap lvl 1
+        }
+
+        [Test]
+        public void First_Gold_Reveals_Upgrade_Button()
+        {
+            var s = new GameSession(_provider, _cfg, 1);
+            s.Begin();
+            s.Enemy.ApplyDamage(new BigNumber(1.0, 9));   // first kill → gold
+            var vm = new MainPresenter(s).Build();
+            Assert.IsTrue(vm.showUpgradeTap);
+            Assert.IsFalse(vm.showPrestige);              // still far from stage 10
+        }
+
+        [Test]
         public void Boss_Stage_Sets_Boss_View_Fields()
         {
             var s = new GameSession(_provider, _cfg, 5);   // stage 5 = boss

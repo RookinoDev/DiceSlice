@@ -55,7 +55,8 @@ namespace StellarBreaker.Tests
 
             Assert.AreEqual(6, s.Stage.CurrentStage);
             Assert.IsFalse(s.Stage.BossActive);
-            double bossGold = 5.0 * Math.Pow(1.15, 4) * _cfg.bossGoldMultiplier;
+            // stage 5 = first boss in the cycle → HP×2 → reward × bossGoldMultiplier × sqrt(2).
+            double bossGold = 5.0 * Math.Pow(1.15, 4) * _cfg.bossGoldMultiplier * Math.Sqrt(2);
             Assert.That(paid.ToDouble(), Is.EqualTo(bossGold).Within(bossGold * 1e-4));
             Assert.That(s.Wallet.Stardust.ToDouble(), Is.EqualTo(bossGold).Within(bossGold * 1e-4));
         }

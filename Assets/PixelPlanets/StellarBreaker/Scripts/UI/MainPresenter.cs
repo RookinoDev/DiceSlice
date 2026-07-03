@@ -34,6 +34,12 @@ namespace StellarBreaker.UI
 
         public string      relicsText;
         public ArtifactVm[] artifacts;
+
+        // Progressive disclosure (FTUE): hide systems until they become relevant.
+        public bool showUpgradeTap;   // after first gold/kill
+        public bool showFleet;        // first ship owned OR close to affordable
+        public bool showArtifacts;    // relics exist or an artifact is owned
+        public bool showPrestige;     // near/at the unlock stage, or relics exist
     }
 
     /// <summary>One skill button's display state.</summary>
@@ -140,7 +146,7 @@ namespace StellarBreaker.UI
             {
                 ArtifactDefinition d = arts.Def(i);
                 int lvl = arts.LevelOf(i);
-                int pct = (int)Math.Round(lvl * d.bonusPerLevel * 100.0);
+                int pct = (int)Math.Round(d.BonusAt(lvl) * 100.0);
                 av[i] = new ArtifactVm
                 {
                     label     = d.displayName,
@@ -150,6 +156,25 @@ namespace StellarBreaker.UI
                 };
             }
             vm.artifacts = av;
+
+            // ── Reveal rules (derived from state → stateless, survives save/load) ──
+            bool progressed = _s.TapUpgrade.Level > 1
+                           || _s.Stage.CurrentStage > 1 || _s.Stage.HighestStage > 1
+                           || _s.Wallet.Stardust > Core.BigNumber.Zero;
+            vm.showUpgradeTap = progressed;
+
+            bool anyShipOwned = ships.Count > 0 && ships.FleetDps() > Core.BigNumber.Zero;
+            bool shipClose    = ships.Count > 0 &&
+                _s.Wallet.Stardust * new Core.BigNumber(2.0) >= ships.NextCost(0);   // ≥50% of first cost
+            vm.showFleet = anyShipOwned || shipClose;
+
+            bool anyArtifact = false;
+            for (int i = 0; i < arts.Count; i++) if (arts.LevelOf(i) > 0) { anyArtifact = true; break; }
+            bool hasRelics = _s.Prestige.Relics.Stardust > Core.BigNumber.Zero;
+            vm.showArtifacts = hasRelics || anyArtifact;
+
+            vm.showPrestige = vm.canPrestige || hasRelics
+                           || _s.Stage.HighestStage >= _s.PrestigeUnlockStage - 2;
             return vm;
         }
 

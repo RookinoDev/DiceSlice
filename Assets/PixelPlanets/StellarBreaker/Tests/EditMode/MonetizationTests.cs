@@ -68,6 +68,36 @@ namespace StellarBreaker.Tests
             Assert.AreEqual(1, s);
         }
 
+        [Test]
+        public void Daily_PreviewStreak_Does_Not_Mutate()
+        {
+            var d = new DailyRewardService();
+            d.Claim(0);   // streak 1, day 0
+
+            Assert.AreEqual(1, d.PreviewStreak(50));        // same day → stays 1
+            Assert.AreEqual(2, d.PreviewStreak(Day));       // next day → would become 2
+            Assert.AreEqual(1, d.PreviewStreak(3 * Day));   // gap → would reset to 1
+
+            Assert.AreEqual(1, d.Streak);                   // preview never mutated state
+        }
+
+        [Test]
+        public void Daily_Restore_Sets_State_Without_Validation()
+        {
+            var d = new DailyRewardService();
+            d.Restore(42, 5);
+            Assert.AreEqual(42, d.LastClaimDay);
+            Assert.AreEqual(5, d.Streak);
+        }
+
+        [Test]
+        public void Daily_SecondsUntilNextDay_Is_Correct()
+        {
+            Assert.AreEqual(Day, DailyRewardService.SecondsUntilNextDay(0));         // exactly at boundary
+            Assert.AreEqual(Day - 1, DailyRewardService.SecondsUntilNextDay(1));
+            Assert.AreEqual(1, DailyRewardService.SecondsUntilNextDay(Day - 1));
+        }
+
         // ── Daily quest ──────────────────────────────────────────────
         [Test]
         public void Daily_Quest_Completes_Claims_And_Resets()

@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using StellarBreaker.Core;
 using StellarBreaker.Gameplay;
+using StellarBreaker.Monetization;
 
 namespace StellarBreaker.Hud
 {
@@ -140,10 +141,11 @@ namespace StellarBreaker.Hud
             {
                 var d = a.Def(i);
                 int lvl = a.LevelOf(i);
-                int pct = (int)System.Math.Round(lvl * d.bonusPerLevel * 100.0);
+                int pct     = (int)System.Math.Round(d.BonusAt(lvl) * 100.0);
+                int nextPct = (int)System.Math.Round(d.BonusAt(lvl + 1) * 100.0);
                 string desc = string.IsNullOrEmpty(d.description) ? "" : "\n   " + d.description;
                 _labels[i].text = "   " + d.displayName + "   Lv " + lvl + desc +
-                                  "\n   +" + pct + "%      Cost " + a.NextCost(i).ToShortString() + " relics";
+                                  "\n   +" + pct + "%  →  +" + nextPct + "%      Cost " + a.NextCost(i).ToShortString() + " relics";
                 _btns[i].interactable = _s.Prestige.Relics.CanAfford(a.NextCost(i));
             }
         }
@@ -180,13 +182,65 @@ namespace StellarBreaker.Hud
             if (!IsOpen) return;
             bool can = _s.CanPrestige();
             _info.text =
-                "Ascend to a new stellar cycle and earn Relics.\n\n" +
+                "Ascend to a new stellar cycle for a PERMANENT power boost.\n\n" +
                 "Highest sector:  " + _s.Stage.HighestStage + "\n" +
                 "Relics gained:  +" + _s.PreviewRelics().ToShortString() + "\n\n" +
                 "RESETS:  sector, Stardust, tap level, fleet\n" +
-                "KEEPS:  relics, artifacts\n\n" +
-                (can ? "Spend Relics on permanent artifacts." : "Reach a higher sector to ascend.");
+                "KEEPS FOREVER:  relics, artifacts\n\n" +
+                (can ? "Spend Relics in the Artifacts panel — even one level is a real jump in power. Ascending sooner means reaching that jump sooner."
+                     : "Reach a higher sector to ascend.");
             _confirm.interactable = can;
+        }
+    }
+
+    // ── Daily reward ─────────────────────────────────────────────────
+    public sealed class DailyPanel : ModalBase
+    {
+        readonly GameSession _s;
+        Text _body; Button _claim; Text _claimLbl;
+        public Action<GameSession.DailyPreview> OnClaimed;
+
+        public DailyPanel(Transform canvas, GameSession s)
+        {
+            _s = s;
+            BuildShell(canvas, "DailyPanel", new Vector2(900, 840), "DAILY REWARD");
+            _body = UiKit.Label(Window, "Body", new Vector2(0.5f, 1f), new Vector2(0, -310), new Vector2(820, 400), 32, TextAnchor.MiddleCenter);
+            _body.supportRichText = true;
+
+            _claim = UiKit.Button(Window, "Claim", new Vector2(0.5f, 0f), new Vector2(0, 110), new Vector2(560, 130), out _claimLbl, 38, UiTheme.Primary);
+            _claim.onClick.AddListener(() =>
+            {
+                AudioManager.Instance?.Click();
+                long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+                var result = _s.ClaimDaily(now);
+                if (result.canClaim) OnClaimed?.Invoke(result);   // canClaim=true here means the claim just succeeded
+                Refresh();
+            });
+        }
+
+        public void Refresh()
+        {
+            if (!IsOpen) return;
+            long now = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var p = _s.PreviewDaily(now);
+
+            if (p.canClaim)
+            {
+                _body.text = "Day " + p.day + " of 7\n\nReward:\n<color=#FFD966>+" + p.gold.ToShortString() + "</color> Stardust" +
+                             (p.relic ? "\n<color=#D2A8FF>+1 Relic</color>" : "");
+                _claim.gameObject.SetActive(true);
+                _claim.interactable = true;
+                _claimLbl.text = "CLAIM";
+            }
+            else
+            {
+                long secs = DailyRewardService.SecondsUntilNextDay(now);
+                int h = (int)(secs / 3600), m = (int)((secs % 3600) / 60);
+                var next = _s.PreviewDaily(now + secs);
+                _body.text = "Day " + p.day + " of 7 — CLAIMED ✓\n\nCome back in\n" + h + "h " + m + "m\nfor Day " + next.day + "!";
+                _claim.interactable = false;
+                _claimLbl.text = "CLAIMED";
+            }
         }
     }
 

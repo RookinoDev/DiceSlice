@@ -20,7 +20,10 @@ public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider, IEnemyView
     [SerializeField] private PixelPlanetGenerator generator;
 
     private GameObject _current;
-    private float      _punch;   // hit-reaction (decays to 0)
+    private float      _punch;       // hit-reaction (decays to 0)
+    private Vector3    _baseScale = Vector3.one;  // the planet's own scale (from the generator)
+    private float       _popT = 1f;   // 0=just spawned (small) → 1=full size (pop-in ease)
+    private const float PopDuration = 0.16f;
 
     public event Action<GameObject> OnPlanetDestroyed;
 
@@ -33,10 +36,52 @@ public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider, IEnemyView
     // ── IEnemyView: hit reaction lives here, on the object that owns the planet root ──
     public void Punch() => _punch = 1f;
 
+    // Destruction ceremony: a lightweight procedural particle burst at the target's
+    // current position. Call BEFORE the planet is replaced (e.g. from GameSession.OnReward,
+    // which fires while the dying planet is still the active _current). Mobile-safe:
+    // short-lived, small particle count, self-destroys.
+    public void Explode()
+    {
+        if (_current == null) return;
+        var go = new GameObject("KillBurst");
+        go.transform.position = _current.transform.position;
+
+        var ps = go.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);  // cancel Unity's auto-play before configuring
+
+        var main = ps.main;
+        main.playOnAwake = false;
+        main.loop = false;
+        main.startLifetime = 0.35f;
+        main.startSpeed = new ParticleSystem.MinMaxCurve(1.2f, 2.6f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.22f);
+        main.startColor = new Color(1f, 0.85f, 0.55f, 1f);
+        main.stopAction = ParticleSystemStopAction.Destroy;
+
+        var emission = ps.emission;
+        emission.SetBursts(new[] { new ParticleSystem.Burst(0f, (short)18) });
+
+        var shape = ps.shape;
+        shape.shapeType = ParticleSystemShapeType.Sphere;
+        shape.radius = 0.15f;
+
+        var renderer = ps.GetComponent<ParticleSystemRenderer>();
+        renderer.material = new Material(Shader.Find("Particles/Standard Unlit"));
+        renderer.material.SetColor("_Color", main.startColor.color);
+
+        ps.Play();
+    }
+
     void Update()
     {
         _punch = Mathf.MoveTowards(_punch, 0f, Time.deltaTime / 0.12f);
-        if (_current != null) _current.transform.localScale = Vector3.one * (1f + 0.12f * _punch);
+        if (_popT < 1f) _popT = Mathf.Min(1f, _popT + Time.deltaTime / PopDuration);
+
+        if (_current != null)
+        {
+            float pop = Mathf.Lerp(0.35f, 1f, Mathf.SmoothStep(0f, 1f, _popT));
+            _current.transform.localScale = _baseScale * pop * (1f + 0.12f * _punch);
+        }
     }
 
     public GameObject SpawnPlanet(int stage)
@@ -59,6 +104,17 @@ public class PlanetGeneratorAdapter : MonoBehaviour, IPlanetProvider, IEnemyView
         }
 
         _current = FindSpawnedRoot();
+
+        // Cosmetic-only pop-in: the new target eases up from a small scale instead of
+        // appearing instantly. Driven from Update() (see _popT) so it can't fight the
+        // hit-punch scale. Purely visual — does not delay spawn/stage logic at all,
+        // so it can't cause a gameplay lock or timing bug.
+        if (_current != null)
+        {
+            _baseScale = _current.transform.localScale;
+            _popT = 0f;
+        }
+
         return _current;
     }
 

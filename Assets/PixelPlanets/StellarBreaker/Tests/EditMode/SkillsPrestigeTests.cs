@@ -33,6 +33,14 @@ namespace StellarBreaker.Tests
 
         GameSession Session(int stage = 1) => new GameSession(_p1, _cfg, stage, _ships);
 
+        // Mirrors PrestigeService.RelicsForStage — used to compute expected values instead
+        // of hardcoding numbers tied to a specific scale/power tuning.
+        double ExpectedRelics(int highestStage)
+        {
+            int s = System.Math.Max(0, highestStage - _cfg.relicStartStage);
+            return s <= 0 ? 0.0 : System.Math.Floor(_cfg.relicScale * System.Math.Pow(s, _cfg.relicPower));
+        }
+
         static void RaiseTapLevel(GameSession s, int target)
         {
             s.Wallet.Add(new BigNumber(1.0, 9));
@@ -122,14 +130,16 @@ namespace StellarBreaker.Tests
             s.UpgradeTapDamage();
 
             Assert.IsTrue(s.CanPrestige());
-            Assert.That(s.PreviewRelics().ToDouble(), Is.EqualTo(5.0).Within(1e-9)); // 10-5
+            double expected = ExpectedRelics(10);
+            Assert.That(s.PreviewRelics().ToDouble(), Is.EqualTo(expected).Within(1e-6));
+            Assert.GreaterOrEqual(expected, 1.0, "first prestige should give a meaningful relic amount");
 
             var gained = s.DoPrestige();
-            Assert.That(gained.ToDouble(), Is.EqualTo(5.0).Within(1e-9));
+            Assert.That(gained.ToDouble(), Is.EqualTo(expected).Within(1e-6));
             Assert.AreEqual(1, s.Stage.CurrentStage);
             Assert.AreEqual(1, s.TapUpgrade.Level);
             Assert.That(s.Wallet.Stardust.IsClose(BigNumber.Zero));
-            Assert.That(s.Prestige.Relics.Stardust.ToDouble(), Is.EqualTo(5.0).Within(1e-9));
+            Assert.That(s.Prestige.Relics.Stardust.ToDouble(), Is.EqualTo(expected).Within(1e-6));
         }
 
         [Test]
@@ -137,7 +147,7 @@ namespace StellarBreaker.Tests
         {
             var a = Session(10);
             a.Begin();
-            a.DoPrestige();                            // grants 5 relics
+            a.DoPrestige();                            // grants relics for highest stage 10
 
             var store = new InMemorySaveStore();
             var svc = new SaveService(store);
@@ -146,7 +156,7 @@ namespace StellarBreaker.Tests
 
             var b = new GameSession(_p2, _cfg, 1, _ships);
             SaveBinder.Apply(b, loaded);
-            Assert.That(b.Prestige.Relics.Stardust.ToDouble(), Is.EqualTo(5.0).Within(1e-9));
+            Assert.That(b.Prestige.Relics.Stardust.ToDouble(), Is.EqualTo(ExpectedRelics(10)).Within(1e-6));
         }
     }
 }

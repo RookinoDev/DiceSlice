@@ -6,7 +6,7 @@ namespace StellarBreaker.Monetization
     /// </summary>
     public class DailyRewardService
     {
-        const long SecondsPerDay = 86400;
+        public const long SecondsPerDay = 86400;
 
         public long LastClaimDay { get; private set; } = long.MinValue;
         public int  Streak       { get; private set; }
@@ -18,18 +18,35 @@ namespace StellarBreaker.Monetization
             Streak       = streak;
         }
 
+        /// <summary>Restore persisted state (e.g. from a save). Does not validate — trusted caller.</summary>
+        public void Restore(long lastClaimDay, int streak)
+        {
+            LastClaimDay = lastClaimDay;
+            Streak       = streak;
+        }
+
         static long DayIndex(long unixSeconds) => unixSeconds / SecondsPerDay;
 
         public bool CanClaim(long nowUnix) => DayIndex(nowUnix) != LastClaimDay;
 
+        /// <summary>What the streak would become if claimed right now (whether or not it's actually claimable).</summary>
+        public int PreviewStreak(long nowUnix)
+        {
+            long day = DayIndex(nowUnix);
+            if (day == LastClaimDay) return Streak;      // already claimed today — stays the same
+            return (LastClaimDay != long.MinValue && day == LastClaimDay + 1) ? Streak + 1 : 1;
+        }
+
+        /// <summary>Seconds remaining until the next UTC day boundary (next possible claim).</summary>
+        public static long SecondsUntilNextDay(long nowUnix)
+            => SecondsPerDay - (nowUnix % SecondsPerDay);
+
         /// <summary>Claim today's reward. Returns the new streak (0 if already claimed today).</summary>
         public int Claim(long nowUnix)
         {
-            long day = DayIndex(nowUnix);
-            if (day == LastClaimDay) return 0;          // already claimed today
-
-            Streak       = (LastClaimDay != long.MinValue && day == LastClaimDay + 1) ? Streak + 1 : 1;
-            LastClaimDay = day;
+            if (!CanClaim(nowUnix)) return 0;            // already claimed today
+            Streak       = PreviewStreak(nowUnix);
+            LastClaimDay = DayIndex(nowUnix);
             return Streak;
         }
     }

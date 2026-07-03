@@ -9,5 +9,8 @@ namespace StellarBreaker.Gameplay
     {
         /// <summary>Brief hit reaction (scale punch / flash).</summary>
         void Punch();
+
+        /// <summary>Destruction ceremony for the current target (burst/VFX). Call once, on kill.</summary>
+        void Explode();
     }
 }
