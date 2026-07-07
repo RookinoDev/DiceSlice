@@ -1,0 +1,2181 @@
+.game-shell {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--palette-bg);
+  color: var(--palette-text-primary);
+  font-family: var(--font-body);
+}
+
+/* Persistent decorative backdrop (nebula blobs + star scatter) - sits behind every screen. */
+.game-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(ellipse 380px 300px at 18% 8%, rgba(67, 221, 238, 0.1), transparent 60%),
+    radial-gradient(ellipse 360px 320px at 88% 18%, rgba(226, 79, 255, 0.09), transparent 60%),
+    radial-gradient(ellipse 480px 400px at 50% 105%, rgba(255, 178, 56, 0.05), transparent 60%);
+}
+.game-shell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 12% 22%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 82% 14%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1.4px 1.4px at 42% 62%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 68% 78%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 24% 88%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1.4px 1.4px at 92% 58%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 55% 30%, rgba(255, 255, 255, 0.3), transparent);
+}
+.game-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes sb-pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.72);
+  }
+}
+@keyframes sb-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sb-pop-in {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes screen-shake-small {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-2px, 1px);
+  }
+  50% {
+    transform: translate(2px, -1px);
+  }
+  75% {
+    transform: translate(-1px, 2px);
+  }
+}
+@keyframes screen-shake-big {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-6px, 3px);
+  }
+  40% {
+    transform: translate(7px, -4px);
+  }
+  60% {
+    transform: translate(-5px, 5px);
+  }
+  80% {
+    transform: translate(4px, -3px);
+  }
+}
+.shake-small {
+  animation: screen-shake-small 0.2s ease-out;
+}
+.shake-big {
+  animation: screen-shake-big 0.35s ease-out;
+}
+
+@keyframes sb-sheet-up {
+  0% {
+    transform: translateY(60px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+@keyframes sb-fade-in {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+@keyframes sb-toast-in {
+  0% {
+    transform: translate(-50%, -14px);
+    opacity: 0;
+  }
+  100% {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+/* -- TopBar -- */
+.topbar-wrap {
+  flex-shrink: 0;
+  position: relative;
+  /* A gas giant's ring can bleed all the way up into this row (see .combat-planet /
+     .game-shell-content.combat-active) - explicit z-index (over game-shell-content's 1)
+     guarantees the top bar always paints above it instead of relying on DOM-order tie-breaking. */
+  z-index: 2;
+  padding-top: calc(var(--tg-safe-top) + 8px);
+  padding-left: calc(var(--tg-safe-left) + 2px);
+  padding-right: calc(var(--tg-safe-right) + 2px);
+  transition: opacity 0.4s ease;
+}
+
+/* Boss Planet Takes Over the Screen - while a boss fight is on the Combat tab, the framing
+   chrome (top bar, bottom nav) recedes so the encounter owns the player's attention. Still
+   fully interactive - just dimmed, never disabled. */
+.game-shell--boss-focus .topbar-wrap,
+.game-shell--boss-focus .bottomnav {
+  opacity: 0.45;
+}
+
+.topbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 36px;
+}
+
+.topbar-icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+.topbar-icon-btn:active {
+  transform: scale(0.92);
+}
+
+.topbar-icon-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 0;
+  gap: 8px;
+}
+
+.status-pill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+.status-pill-gold {
+  background: rgba(255, 178, 56, 0.08);
+  border: 1px solid rgba(255, 178, 56, 0.22);
+}
+.status-pill-gold span {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--palette-gold-label);
+}
+/* Final Resource Impact (#30) - a satisfying punch when the last reward coin lands. */
+.fx-gold-punch {
+  animation: fx-gold-punch 0.3s ease-out;
+}
+@keyframes fx-gold-punch {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.18);
+    box-shadow: 0 0 14px rgba(255, 178, 56, 0.6);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-gold-punch {
+    animation: none;
+  }
+}
+
+.topbar-status-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+}
+.status-chip span {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.status-chip-cyan {
+  background: rgba(67, 221, 238, 0.08);
+  border: 1px solid rgba(67, 221, 238, 0.2);
+}
+.status-chip-cyan span {
+  color: var(--palette-cyan-label);
+}
+.status-chip-magenta {
+  background: rgba(226, 79, 255, 0.08);
+  border: 1px solid rgba(226, 79, 255, 0.22);
+}
+.status-chip-magenta span {
+  color: var(--palette-magenta-light);
+}
+
+.dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--palette-bg);
+}
+.dot-notification {
+  background: var(--palette-success);
+}
+.dot-daily {
+  background: var(--palette-gold);
+}
+.dot-prestige {
+  position: absolute;
+  top: 0;
+  right: -10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--palette-magenta);
+  animation: sb-pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* -- Toast (lowest-ceremony feedback tier) -- */
+.toast {
+  position: absolute;
+  top: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  background: rgba(15, 19, 34, 0.94);
+  border: 1px solid rgba(255, 178, 56, 0.3);
+  padding: 10px 18px;
+  border-radius: 999px;
+  animation: sb-toast-in 0.25s ease-out;
+  pointer-events: none;
+}
+.toast span {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.6px;
+  color: var(--palette-gold-label);
+  white-space: nowrap;
+}
+
+/* -- Content area -- */
+.game-shell-content {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* The Combat screen doesn't need its own scrolling, and a gas giant's ring needs to visually
+   bleed past its own box - letting it run off the edge of the (already viewport-sized) shell
+   is fine, it just shouldn't get clipped by an inner container while there's still real screen
+   space unused. #root's overflow:hidden is what actually stops it at the true screen edge. */
+.game-shell-content.combat-active {
+  overflow: visible;
+}
+
+.screen {
+  padding: 16px calc(var(--tg-safe-right) + 16px) 16px calc(var(--tg-safe-left) + 16px);
+}
+
+.screen-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-bottom: 4px;
+}
+.screen-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: 0.3px;
+  color: var(--palette-text-primary);
+}
+.screen-subtitle {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--palette-text-secondary);
+}
+
+/* -- Combat screen -- */
+.combat-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0;
+  height: 100%;
+  padding: 0 20px;
+  position: relative;
+}
+
+/* Combo Changes Space (#11) - the backdrop behind everything intensifies with the real,
+   cosmetic-only tap streak (see useTapStreak.ts). Sits below the real UI (z-index:1 siblings). */
+.combat-combo-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 178, 56, 0.16), transparent 65%);
+  transition:
+    opacity 0.3s ease,
+    background 0.3s ease;
+}
+.combo-tier-1 .combat-combo-backdrop {
+  opacity: 0.5;
+}
+.combo-tier-2 .combat-combo-backdrop {
+  opacity: 0.75;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 178, 56, 0.24), rgba(226, 79, 255, 0.08) 70%);
+  animation: combo-backdrop-pulse 1.4s ease-in-out infinite;
+}
+.combo-tier-3 .combat-combo-backdrop {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 178, 56, 0.32), rgba(226, 79, 255, 0.16) 70%);
+  animation: combo-backdrop-pulse 0.8s ease-in-out infinite;
+}
+@keyframes combo-backdrop-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.35);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-combo-backdrop {
+    animation: none;
+  }
+}
+
+/* Overdrive Barrage juice - rides the real skill buff (see useOverdriveJuice.ts). */
+.combat-screen--overdrive .combat-combo-backdrop {
+  opacity: 1;
+  background: radial-gradient(circle at 50% 45%, rgba(67, 221, 238, 0.28), rgba(255, 178, 56, 0.12) 70%);
+}
+.combat-screen--overdrive-panic .combat-combo-backdrop {
+  animation: combo-backdrop-pulse 0.35s ease-in-out infinite;
+}
+.overdrive-countdown {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 56px;
+  color: var(--palette-gold-label);
+  text-shadow: 0 0 24px rgba(255, 178, 56, 0.7);
+  animation: sb-pop-in 0.2s ease-out;
+}
+.overdrive-countdown--go {
+  font-size: 40px;
+  letter-spacing: 3px;
+  color: var(--palette-cyan);
+  text-shadow: 0 0 28px rgba(67, 221, 238, 0.8);
+}
+@media (prefers-reduced-motion: reduce) {
+  .overdrive-countdown {
+    animation: none;
+  }
+}
+
+.combat-eyebrow {
+  margin-top: 12px;
+  position: relative;
+  z-index: 1;
+}
+
+.combat-boss-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+.combat-boss-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 2.5px;
+  color: var(--palette-danger);
+}
+.combat-boss-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--palette-text-primary);
+}
+.combat-boss-timer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+.combat-boss-timer-track {
+  width: 150px;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.combat-boss-timer-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.2s linear;
+}
+.combat-boss-timer-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  min-width: 34px;
+}
+
+.combat-sector-caption {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 1.6px;
+  color: var(--palette-text-dim);
+}
+
+.combat-target-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 15px;
+  color: #c7ccdc;
+  margin: 16px 0;
+  position: relative;
+  z-index: 1;
+}
+
+.combat-planet-wrap {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+  position: relative;
+  z-index: 0;
+}
+
+/* Planetary Instability + Core Pulse (#16, #45, #70) - a boss under 25% hull gets a breathing
+   red core glow behind the sphere (the physical jitter comes from the impulse API, see
+   CombatScreen's unstable-interval effect). */
+.combat-planet-wrap--unstable::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(60cqw, 60cqh);
+  height: min(60cqw, 60cqh);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 92, 92, 0.4), transparent 70%);
+  animation: core-pulse 0.9s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes core-pulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.35);
+    opacity: 0.95;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-planet-wrap--unstable::before {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+.combat-planet {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  /* Base size fills whichever dimension of the wrap is smaller, matching a plain planet's size
+     exactly. --planet-scale (1 normally, 3 for a gas giant's ring) then blows the box up
+     around that same center point so the ring has room to render at full size instead of
+     being clipped - it's free to bleed past this box (game-shell-content goes overflow:visible
+     while Combat is active) all the way out to #root's edge, i.e. it can run off the physical
+     screen, but never gets clipped by an arbitrary inner container while there's room to spare.
+     Siblings (eyebrow/hp-bar/skills/tap-footer) sit on z-index:1 so they stay visible on top
+     wherever this box overlaps them. */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: calc(min(100cqw, 100cqh) * var(--planet-scale, 1));
+  height: calc(min(100cqw, 100cqh) * var(--planet-scale, 1));
+  transform: translate(-50%, -50%);
+}
+
+/* -- Particle FX layer (see combatFx/useParticles.ts) -- */
+.fx-particle-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+.fx-particle-layer > div {
+  position: absolute;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+/* Generic "fly out, spin, fade" - debris chips, tap ghosts, sparks. Consumes --tx/--ty/--rot
+   (translate delta in px, rotation in deg) set per-particle via inline style. */
+@keyframes fx-fly-fade {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(calc(-50% + var(--tx, 0px)), calc(-50% + var(--ty, 0px))) rotate(var(--rot, 0deg));
+    opacity: 0;
+  }
+}
+/* Expanding ring - impact shockwaves. */
+@keyframes fx-ring-expand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0;
+  }
+}
+/* Point-to-point travel - energy beams from UI to weapon. Consumes --tx/--ty (full travel delta). */
+@keyframes fx-travel {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--tx, 0px), var(--ty, 0px));
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fx-particle-layer {
+    display: none;
+  }
+}
+
+/* True Impact Position (#2) - a faint mark left right where the player tapped, fading in place. */
+.fx-tap-ghost {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.55);
+  animation: fx-fly-fade 0.5s ease-out forwards;
+}
+/* Small Debris Break-Offs (#3) - tiny chips flung outward, colored per planet material. */
+.fx-debris {
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  animation-name: fx-fly-fade;
+  animation-timing-function: ease-out;
+  animation-fill-mode: forwards;
+}
+/* Overkill Destruction (#23) implosion preset - the same fly-fade run backwards, so debris
+   converges INTO the impact point instead of spraying out of it. */
+.fx-debris--implode {
+  animation-direction: reverse;
+  animation-timing-function: ease-in;
+}
+/* Secret Rare Destruction (#63) - iridescent debris, ignores the material color on purpose so
+   the rare variant is unmistakably "not a normal explosion". */
+.fx-debris--secret {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: conic-gradient(#f49cff, #8fe3ff, #ffc24d, #f49cff);
+  box-shadow: 0 0 8px rgba(244, 156, 255, 0.8);
+}
+
+/* Shell-level reward layer needs to clear the top bar (z-index:2) so coins stay visible as
+   they arrive at the gold pill, unlike the combat-local layer which only needs to clear the
+   planet (z-index:1 is enough there). */
+.fx-particle-layer--shell {
+  z-index: 3;
+}
+/* Resource Vacuum (#27) - reward coins flying from the planet to the gold pill. */
+.fx-coin {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--palette-gold-light), var(--palette-gold-deep));
+  box-shadow: 0 0 6px rgba(255, 178, 56, 0.6);
+  animation-name: fx-travel;
+  animation-timing-function: ease-in;
+  animation-fill-mode: forwards;
+}
+
+.combat-planet.hit {
+  animation: combat-planet-hit 0.14s ease-out;
+}
+@keyframes combat-planet-hit {
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    filter: brightness(1.6);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    filter: brightness(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-planet.hit {
+    animation: none;
+  }
+}
+
+.combo-chip {
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(255, 178, 56, 0.14);
+  border: 1px solid rgba(255, 178, 56, 0.4);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.6px;
+  color: var(--palette-gold-label);
+  pointer-events: none;
+  animation: sb-pop-in 0.22s ease-out;
+  transition:
+    opacity 0.3s ease,
+    font-size 0.15s ease;
+}
+/* Living Combo Counter (#10) - grows a touch at each tier. */
+.combo-tier-2 .combo-chip {
+  font-size: 15px;
+  padding: 7px 18px;
+}
+.combo-tier-3 .combo-chip {
+  font-size: 17px;
+  padding: 8px 20px;
+}
+/* Combo Almost Lost (#13) - fades in place instead of vanishing abruptly. */
+.combo-chip--fading {
+  opacity: 0.4;
+}
+/* Perfect Rhythm Bonus (#57) - a brighter accent when consecutive taps land at a steady pace. */
+.combo-chip--rhythm {
+  border-color: var(--palette-cyan);
+  color: var(--palette-cyan-light);
+  box-shadow: 0 0 12px rgba(67, 221, 238, 0.35);
+}
+@media (prefers-reduced-motion: reduce) {
+  .combo-chip {
+    animation: none;
+  }
+}
+
+/* Record-Breaking Hit Celebration (#60) - a deterministic personal-best, not a fake crit. */
+.record-hit-banner {
+  position: relative;
+  z-index: 1;
+  margin: 4px 0;
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: rgba(226, 79, 255, 0.14);
+  border: 1px solid rgba(226, 79, 255, 0.5);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.6px;
+  color: var(--palette-magenta-light);
+  animation: sb-pop-in 0.25s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .record-hit-banner {
+    animation: none;
+  }
+}
+
+.combat-planet-visual {
+  width: 100%;
+  height: 100%;
+  display: block;
+  transition: transform 0.08s ease-out;
+}
+.combat-planet:active .combat-planet-visual {
+  transform: scale(0.96);
+}
+
+.combat-planet-loading {
+  position: relative;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--palette-panel), var(--palette-bg) 70%);
+  animation: combat-planet-pulse 1.2s ease-in-out infinite;
+}
+.combat-planet-loading::after {
+  content: '';
+  position: absolute;
+  inset: 35%;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 178, 56, 0.15);
+  border-top-color: var(--palette-gold);
+  animation: sb-spin 0.9s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-planet-loading::after {
+    animation: none;
+  }
+}
+@keyframes combat-planet-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.combat-hp-bar {
+  position: relative;
+  z-index: 1;
+  width: 224px;
+  margin-top: 18px;
+  flex-shrink: 0;
+}
+.combat-hp-track {
+  height: 10px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+.combat-hp-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.15s linear;
+}
+.combat-hp-caption-row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+.combat-hp-caption {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--palette-text-dim);
+  letter-spacing: 0.5px;
+}
+.combat-hp-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  color: #c7ccdc;
+}
+
+/* Living Boss Health Bar (#43) - a single hit that removes a visible chunk of max HP rattles
+   the whole bar (key-remounted per big hit so rapid chunks each replay it). */
+.combat-hp-bar--shake {
+  animation: hp-bar-shake 0.28s ease-out;
+}
+@keyframes hp-bar-shake {
+  0% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+  75% {
+    transform: translateX(-2px);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-hp-bar--shake {
+    animation: none;
+  }
+}
+
+.combat-skills {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  padding: 14px 0 12px;
+}
+
+.skill-slot {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: var(--palette-panel);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.skill-slot.ready {
+  border-color: rgba(255, 178, 56, 0.5);
+}
+.skill-slot:active {
+  transform: scale(0.92);
+}
+.skill-slot:disabled {
+  cursor: default;
+}
+.skill-cooldown-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.skill-cooldown-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--palette-text-primary);
+}
+.combat-tap-footer {
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 22px;
+}
+.combat-tap-upgrade {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.combat-tap-upgrade.affordable {
+  border-color: rgba(255, 178, 56, 0.55);
+  background: linear-gradient(90deg, rgba(255, 178, 56, 0.16), rgba(255, 178, 56, 0.05));
+}
+.combat-tap-upgrade:active {
+  transform: scale(0.97);
+}
+.combat-tap-icon-chip {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+/* Energy Transfer / Rapid Upgrade Escalation (#35, #36) - a brief glow pulse each purchase. */
+.combat-tap-icon-chip--pulse {
+  animation: combat-tap-icon-pulse 0.3s ease-out;
+}
+@keyframes combat-tap-icon-pulse {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 178, 56, 0.6);
+    transform: scale(1);
+  }
+  40% {
+    box-shadow: 0 0 16px rgba(255, 178, 56, 0.7);
+    transform: scale(1.12);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 178, 56, 0);
+    transform: scale(1);
+  }
+}
+.combat-tap-icon-chip--pulse-strong {
+  animation-name: combat-tap-icon-pulse-strong;
+}
+@keyframes combat-tap-icon-pulse-strong {
+  0% {
+    box-shadow: 0 0 0 rgba(226, 79, 255, 0.6);
+    transform: scale(1);
+  }
+  40% {
+    box-shadow: 0 0 22px rgba(226, 79, 255, 0.8);
+    transform: scale(1.22);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(226, 79, 255, 0);
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-tap-icon-chip--pulse,
+  .combat-tap-icon-chip--pulse-strong {
+    animation: none;
+  }
+}
+.combat-tap-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.combat-tap-text {
+  text-align: left;
+}
+.combat-tap-level {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: 0.4px;
+  color: var(--palette-text-primary);
+}
+.combat-tap-damage-wrap {
+  position: relative;
+}
+.combat-tap-damage {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--palette-text-secondary);
+  margin-top: 2px;
+  animation: sb-pop-in 0.18s ease-out;
+}
+/* Show the Power Difference (#34) - the old value gets visibly pushed out by the new one. */
+.combat-tap-damage-old {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--palette-text-dimmest);
+  animation: combat-tap-damage-push-out 0.5s ease-out forwards;
+  pointer-events: none;
+}
+@keyframes combat-tap-damage-push-out {
+  0% {
+    transform: translateX(0);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .combat-tap-damage,
+  .combat-tap-damage-old {
+    animation: none;
+  }
+}
+.combat-tap-cost-block {
+  text-align: right;
+  flex-shrink: 0;
+}
+.combat-tap-cost-caption {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  color: var(--palette-text-dimmer);
+}
+.combat-tap-upgrade.affordable .combat-tap-cost-caption {
+  color: var(--palette-success);
+}
+.combat-tap-cost {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--palette-danger);
+}
+.combat-tap-upgrade.affordable .combat-tap-cost {
+  color: var(--palette-gold-label);
+}
+
+/* -- Fleet / Artifacts rows -- */
+.fleet-list,
+.artifact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 2px 0 16px;
+}
+
+.fleet-row,
+.artifact-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px;
+  border-radius: 18px;
+  background: var(--palette-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.fleet-row.is-new {
+  border-color: rgba(67, 221, 238, 0.4);
+}
+.fleet-row.is-locked {
+  opacity: 0.85;
+}
+
+.row-icon-wrap {
+  position: relative;
+  width: 50px;
+  height: 50px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.row-icon-pop {
+  animation: sb-pop-in 0.28s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .row-icon-pop {
+    animation: none;
+  }
+}
+.row-icon-shape {
+  width: 25px;
+  height: 25px;
+}
+.row-icon-locked-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 13, 24, 0.55);
+  border-radius: 14px;
+}
+.row-new-badge {
+  position: absolute;
+  top: -7px;
+  left: 9px;
+  background: var(--palette-cyan);
+  color: #052430;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  padding: 2px 7px;
+  border-radius: 8px;
+}
+
+.row-info {
+  flex: 1;
+  min-width: 0;
+}
+.row-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--palette-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row-name.is-locked {
+  color: var(--palette-text-dimmer);
+}
+.row-class {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  color: var(--palette-text-dimmer);
+  margin-top: 2px;
+}
+.row-detail {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--palette-text-secondary);
+  margin-top: 3px;
+}
+.row-detail.accent {
+  color: var(--palette-cyan-label);
+}
+
+.row-action {
+  flex-shrink: 0;
+  min-width: 76px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  text-align: center;
+}
+.row-action:active {
+  transform: scale(0.95);
+}
+.row-action.affordable {
+  background: linear-gradient(180deg, var(--palette-gold-light), var(--palette-gold-deep));
+}
+.row-action-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  color: var(--palette-text-dimmer);
+}
+.row-action.affordable .row-action-label {
+  color: #241606;
+}
+.row-action-cost {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--palette-danger);
+  margin-top: 1px;
+}
+.row-action.affordable .row-action-cost {
+  color: var(--palette-success);
+}
+.row-unlock-req {
+  flex-shrink: 0;
+  max-width: 88px;
+  text-align: right;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--palette-text-dim);
+  line-height: 1.3;
+}
+
+.artifact-row-action {
+  flex-shrink: 0;
+  min-width: 76px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  text-align: center;
+}
+.artifact-row-action:active {
+  transform: scale(0.95);
+}
+.artifact-row-action.affordable {
+  background: linear-gradient(180deg, var(--palette-magenta-light), #c13be0);
+}
+.artifact-row-action .row-action-label {
+  color: var(--palette-text-dimmer);
+}
+.artifact-row-action.affordable .row-action-label {
+  color: #2a0a33;
+}
+.artifact-row-action .row-action-cost {
+  color: var(--palette-danger);
+}
+.artifact-row-action.affordable .row-action-cost {
+  color: var(--palette-success);
+}
+.artifact-row.is-locked {
+  opacity: 0.6;
+}
+
+/* -- Prestige screen -- */
+.prestige-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.prestige-intro {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--palette-text-secondary);
+  margin: 2px 0 18px;
+}
+.prestige-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px;
+  border-radius: 24px;
+  background: radial-gradient(circle at 50% 0%, rgba(226, 79, 255, 0.16), var(--palette-panel) 70%);
+  border: 1px solid rgba(226, 79, 255, 0.25);
+  margin-bottom: 16px;
+}
+.prestige-hero-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--palette-magenta-light);
+  margin-bottom: 6px;
+}
+.prestige-gained {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 46px;
+  color: var(--palette-magenta-light);
+  line-height: 1;
+}
+.prestige-current {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--palette-text-secondary);
+  margin-top: 8px;
+}
+.prestige-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.prestige-stat-box {
+  flex: 1;
+  padding: 13px;
+  border-radius: 16px;
+  background: var(--palette-panel);
+}
+.prestige-stat-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  color: var(--palette-text-dim);
+}
+.prestige-stat-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--palette-text-primary);
+  margin-top: 4px;
+}
+.resets-keeps-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+.resets-box,
+.keeps-box {
+  flex: 1;
+  padding: 13px;
+  border-radius: 16px;
+  text-align: left;
+}
+.resets-box {
+  background: rgba(255, 92, 108, 0.06);
+  border: 1px solid rgba(255, 92, 108, 0.18);
+}
+.keeps-box {
+  background: rgba(58, 220, 132, 0.06);
+  border: 1px solid rgba(58, 220, 132, 0.18);
+}
+.resets-keeps-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+.resets-box .resets-keeps-title {
+  color: var(--palette-danger);
+}
+.keeps-box .resets-keeps-title {
+  color: var(--palette-success);
+}
+.resets-keeps-body {
+  font-family: var(--font-body);
+  font-size: 11.5px;
+  color: #c7ccdc;
+  line-height: 1.65;
+}
+
+.prestige-gradient-btn {
+  width: 100%;
+  padding: 16px;
+  border-radius: 18px;
+  border: none;
+  background: linear-gradient(135deg, var(--palette-gold-light), var(--palette-magenta));
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15.5px;
+  letter-spacing: 0.5px;
+  color: #1b0620;
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(226, 79, 255, 0.25);
+}
+.prestige-gradient-btn:active {
+  transform: scale(0.98);
+}
+.prestige-gradient-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+  box-shadow: none;
+}
+
+/* -- BottomNav -- */
+.bottomnav {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 8px 10px calc(8px + var(--tg-safe-bottom));
+  background: var(--palette-navbar);
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+  position: relative;
+  /* Same reasoning as .topbar-wrap - guarantee this stays above a bleeding planet ring
+     regardless of DOM-order tie-breaking against game-shell-content. */
+  z-index: 2;
+  transition: opacity 0.4s ease;
+}
+
+.bottomnav-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  width: 64px;
+  padding: 4px 0;
+}
+.bottomnav-icon {
+  position: relative;
+  display: flex;
+}
+.bottomnav-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.4px;
+}
+
+/* -- Sheets -- */
+.sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(6, 8, 16, 0.72);
+  animation: sb-fade-in 0.18s ease-out;
+}
+
+.sheet-panel {
+  width: 100%;
+  max-height: 80%;
+  background: var(--palette-sheet);
+  border-radius: 28px 28px 0 0;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  box-sizing: border-box;
+  animation: sb-sheet-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.sheet-drag-handle-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 10px;
+  flex-shrink: 0;
+}
+.sheet-drag-handle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px 6px;
+  flex-shrink: 0;
+}
+.sheet-header h2 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  letter-spacing: 0.3px;
+  color: var(--palette-text-primary);
+  margin: 0;
+}
+.sheet-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.sheet-body {
+  overflow-y: auto;
+  padding: 10px 20px 26px;
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  width: 100%;
+}
+.sheet-button-primary,
+.sheet-button-secondary {
+  flex: 1;
+  padding: 15px;
+  border-radius: 16px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.sheet-button-primary:active,
+.sheet-button-secondary:active {
+  transform: scale(0.96);
+}
+.sheet-button-primary {
+  border: none;
+  background: linear-gradient(135deg, var(--palette-gold-light), var(--palette-magenta));
+  color: #1b0620;
+}
+.sheet-button-secondary {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: none;
+  color: #c7ccdc;
+}
+
+/* -- Missions sheet -- */
+.missions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.mission-row {
+  padding: 13px;
+  border-radius: 16px;
+  background: var(--palette-sheet-row);
+}
+.mission-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--palette-text-primary);
+  margin-bottom: 8px;
+}
+.mission-progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.mission-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.15s linear;
+}
+.mission-footer-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.mission-progress-label {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--palette-text-secondary);
+}
+.mission-claim {
+  flex-shrink: 0;
+  padding: 7px 15px;
+  border-radius: 10px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.4px;
+  cursor: pointer;
+}
+.mission-claim.claimable {
+  background: var(--palette-success);
+  color: #0a2413;
+}
+.mission-claim.claimable:active {
+  transform: scale(0.93);
+}
+.mission-claim:not(.claimable) {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--palette-text-dimmer);
+}
+.mission-claim:disabled {
+  cursor: default;
+}
+
+/* -- Daily reward sheet -- */
+.daily-grid {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.daily-cell {
+  flex-shrink: 0;
+  width: 42px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 3px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1.5px solid rgba(255, 255, 255, 0.07);
+}
+.daily-cell.past {
+  border-color: rgba(58, 220, 132, 0.3);
+}
+.daily-cell.today {
+  background: rgba(255, 178, 56, 0.1);
+  border-color: rgba(255, 178, 56, 0.55);
+}
+.daily-cell-day {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9.5px;
+  color: var(--palette-text-dim);
+}
+.daily-cell.past .daily-cell-day {
+  color: var(--palette-text-dimmer);
+}
+.daily-cell.today .daily-cell-day {
+  color: var(--palette-gold-label);
+}
+.daily-cell-glyph {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.daily-cell-reward {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  color: var(--palette-text-dim);
+}
+.daily-cell.past .daily-cell-reward {
+  color: var(--palette-success);
+}
+.daily-cell.today .daily-cell-reward {
+  color: var(--palette-gold-label);
+}
+.daily-claim-button {
+  width: 100%;
+  padding: 15px;
+  border-radius: 16px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.daily-claim-button.claimable {
+  background: linear-gradient(180deg, var(--palette-gold-light), var(--palette-gold-deep));
+  color: #241606;
+}
+.daily-claim-button:disabled {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--palette-text-dim);
+  cursor: default;
+}
+
+/* -- Settings sheet -- */
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.settings-row span {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--palette-text-primary);
+}
+.settings-toggle {
+  width: 44px;
+  height: 25px;
+  border-radius: 13px;
+  border: none;
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 0.15s;
+}
+.settings-toggle.on {
+  background: var(--palette-success);
+}
+.settings-toggle:active {
+  transform: scale(0.95);
+}
+.settings-toggle-knob {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: left 0.15s;
+}
+.settings-toggle.on .settings-toggle-knob {
+  left: 21px;
+}
+.settings-reset-button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px;
+  border-radius: 14px;
+  background: rgba(255, 92, 108, 0.1);
+  border: 1px solid rgba(255, 92, 108, 0.35);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--palette-danger);
+  cursor: pointer;
+}
+.settings-confirm-box {
+  margin-top: 10px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--palette-sheet-row);
+  text-align: center;
+}
+.settings-confirm-text {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: #c7ccdc;
+  margin-bottom: 10px;
+}
+.settings-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+.settings-cancel-button,
+.settings-erase-button {
+  flex: 1;
+  padding: 11px;
+  border-radius: 10px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.settings-cancel-button {
+  background: rgba(255, 255, 255, 0.06);
+  color: #c7ccdc;
+}
+.settings-erase-button {
+  background: var(--palette-danger);
+  color: #2b0507;
+}
+.settings-version {
+  text-align: center;
+  margin-top: 18px;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  letter-spacing: 0.5px;
+  color: var(--palette-text-dimmest);
+}
+
+/* -- Offline rewards -- */
+.offline-body-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 4px 4px;
+  gap: 10px;
+}
+.offline-icon-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #2a3352, var(--palette-sheet-row));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.offline-headline {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--palette-text-primary);
+}
+.offline-body {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--palette-text-secondary);
+}
+.offline-collected-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  color: var(--palette-success);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+}
+.offline-gold-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 12px 22px;
+  border-radius: 16px;
+  background: var(--palette-sheet-row);
+}
+.offline-gold-pill span {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 24px;
+  color: var(--palette-gold);
+}
+.offline-collect-button {
+  width: 100%;
+  padding: 15px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(180deg, var(--palette-gold-light), var(--palette-gold-deep));
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14.5px;
+  color: #241606;
+  cursor: pointer;
+}
+.offline-collect-button:active {
+  transform: scale(0.98);
+}
+
+/* -- Ship Unlock celebration (full-bleed, not a sheet) -- */
+.ship-unlock-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 80;
+  background: radial-gradient(circle at 50% 38%, rgba(67, 221, 238, 0.16), rgba(6, 8, 16, 0.94) 65%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0 30px;
+  box-sizing: border-box;
+  animation: sb-fade-in 0.25s ease-out;
+}
+.ship-unlock-eyebrow {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 3px;
+  color: var(--palette-cyan);
+  margin-bottom: 14px;
+}
+.ship-unlock-icon-wrap {
+  width: 116px;
+  height: 116px;
+  border-radius: 32px;
+  background: rgba(67, 221, 238, 0.08);
+  border: 1.5px solid rgba(67, 221, 238, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  animation: sb-pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.ship-unlock-icon-shape {
+  width: 58px;
+  height: 58px;
+}
+.ship-unlock-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 25px;
+  color: var(--palette-text-primary);
+  margin-bottom: 4px;
+}
+.ship-unlock-class {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 1.4px;
+  color: var(--palette-text-secondary);
+  margin-bottom: 14px;
+}
+.ship-unlock-quote {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: #c7ccdc;
+  max-width: 280px;
+  margin-bottom: 22px;
+}
+.ship-unlock-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 280px;
+}
+.ship-unlock-dismiss {
+  flex: 1;
+  padding: 15px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: none;
+  color: #c7ccdc;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.ship-unlock-dismiss:active,
+.ship-unlock-view-fleet:active {
+  transform: scale(0.96);
+}
+.ship-unlock-view-fleet {
+  flex: 1;
+  padding: 15px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(180deg, #5ce8f5, #1daec2);
+  color: #04222a;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+/* -- Prestige success state -- */
+.prestige-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 4px 6px;
+  gap: 12px;
+}
+.prestige-success-badge {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--palette-success), #1c8a4c);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: sb-pop-in 0.4s ease-out;
+}
+.prestige-success-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--palette-text-primary);
+}
+.prestige-success-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 38px;
+  color: var(--palette-magenta);
+}
+.prestige-success-body {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--palette-text-secondary);
+  max-width: 260px;
+}
+.prestige-confirm-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 4px 2px 2px;
+}
+.prestige-confirm-amount {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 34px;
+  color: var(--palette-magenta-light);
+}
+.prestige-confirm-warning {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  color: var(--palette-text-secondary);
+  margin: 8px 0 16px;
+  max-width: 280px;
+}
+.prestige-success-continue {
+  width: 100%;
+  margin-top: 6px;
+  padding: 15px;
+  border-radius: 16px;
+  border: none;
+  background: linear-gradient(180deg, var(--palette-gold-light), var(--palette-gold-deep));
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  color: #241606;
+  cursor: pointer;
+}
+
+/* -- Floating numbers -- */
+.floating-numbers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.floating-number {
+  position: absolute;
+  top: 42%;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 23px;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+  animation: floating-number-rise linear forwards;
+}
+@keyframes floating-number-rise {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  75% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-38px);
+  }
+}
+
+/* -- Super Juice Phase 5: UI personality & polish -- */
+
+/* Living Notification Badges (#53) - dots pop in with an overshoot when they first appear
+   (they mount/unmount with claimability, so a mount animation IS the first-appearance pop),
+   then keep breathing so an unclaimed reward stays noticeable. */
+.dot-notification,
+.dot-daily {
+  animation:
+    dot-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+    sb-pulse-dot 1.8s ease-in-out 0.5s infinite;
+}
+@keyframes dot-pop-in {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.45);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Affordable Upgrade Attention (#54) - a slow, gentle glow breath (deliberately NOT a flash)
+   on the tap-upgrade card while it's actually affordable. */
+.combat-tap-upgrade.affordable {
+  animation: affordable-breathe 2.4s ease-in-out infinite;
+}
+@keyframes affordable-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(255, 178, 56, 0);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(255, 178, 56, 0.28);
+  }
+}
+
+/* Different UI Personalities (#51) - each button category presses with its own signature.
+   The shared trick: a snappy press-in (short transition while :active) and a slower, springy
+   pop back out (the base transition takes over on release). */
+/* Utility (settings/missions/daily): quick functional dip, no theatrics. */
+.topbar-icon-btn {
+  transition: transform 0.1s ease;
+}
+/* Weapons (skill slots): sharp arming snap with a slight twist, springy release. */
+.skill-slot {
+  transition: transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.skill-slot:active {
+  transform: scale(0.88) rotate(-3deg);
+  transition-duration: 0.05s;
+}
+/* Upgrades (tap footer / fleet / artifact rows): a firm, weighty press that rebounds. */
+.combat-tap-upgrade,
+.row-action,
+.artifact-row-action {
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.combat-tap-upgrade:active,
+.row-action:active,
+.artifact-row-action:active {
+  transition-duration: 0.07s;
+}
+/* Navigation: tabs hop up instead of squashing down. */
+.bottomnav-tab {
+  transition: transform 0.18s ease-out;
+}
+.bottomnav-tab:active {
+  transform: translateY(-3px);
+}
+/* Rewards (mission claim / offline collect / prestige): extra-bouncy celebratory release. */
+.mission-claim.claimable,
+.offline-collect-button,
+.prestige-gradient-btn {
+  transition: transform 0.32s cubic-bezier(0.34, 1.8, 0.64, 1);
+}
+
+/* Returning Player Power Boost (#61) - for ~10s after coming back from an offline stretch,
+   combat FX render bigger so the first minute back feels amped. Cosmetic scale only. */
+.game-shell--returning .fx-debris {
+  width: 7px;
+  height: 7px;
+}
+.game-shell--returning .fx-coin {
+  width: 13px;
+  height: 13px;
+}
+.game-shell--returning .fx-tap-ghost {
+  width: 14px;
+  height: 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot-notification,
+  .dot-daily,
+  .combat-tap-upgrade.affordable {
+    animation: none;
+  }
+  .topbar-icon-btn,
+  .skill-slot,
+  .combat-tap-upgrade,
+  .row-action,
+  .artifact-row-action,
+  .bottomnav-tab,
+  .mission-claim.claimable,
+  .offline-collect-button,
+  .prestige-gradient-btn {
+    transition: none;
+  }
+}

@@ -52,11 +52,11 @@ namespace StellarBreaker.Config
         {
             return new List<SkillDefinition>
             {
-                SkillDefinition.Create(SkillType.Overdrive,    "Overcharge", 3, 10f, 30f, false, c.overdriveTapPerLvl, c.overdriveTapBase, "Temporarily boosts Tap Cannon damage."),
-                SkillDefinition.Create(SkillType.BattleCry,    "Surge",      5, 10f, 40f, false, c.battleCryDpsPerLvl, c.battleCryDpsBase, "Fleet Surge: temporarily boosts Fleet DPS."),
-                SkillDefinition.Create(SkillType.MeteorStrike, "Meteor",     2, 0f,  20f, true,  c.meteorPerLevel,     0,                  "Meteor Strike: instant massive damage to the target."),
-                SkillDefinition.Create(SkillType.DroneSwarm,   "Drones",     4, 10f, 35f, false, c.droneTapsPerLevel,  c.droneTapsBase,    "Drone Swarm: launches drones for temporary auto-fire."),
-                SkillDefinition.Create(SkillType.MidasBeam,    "Harvest",    6, 12f, 45f, false, c.midasGoldPerLvl,    c.midasGoldBase,    "Cosmic Harvest: more Stardust from destroyed planets."),
+                SkillDefinition.Create(SkillType.Overdrive,    "Overdrive Barrage", 3, 10f, 30f, false, c.overdriveTapPerLvl, c.overdriveTapBase, "Temporarily boosts Tap Cannon damage."),
+                SkillDefinition.Create(SkillType.BattleCry,    "Fleet Surge",       5, 10f, 40f, false, c.battleCryDpsPerLvl, c.battleCryDpsBase, "Fleet Surge: temporarily boosts Fleet DPS."),
+                SkillDefinition.Create(SkillType.MeteorStrike, "Meteor Call",       2, 0f,  20f, true,  c.meteorPerLevel,     0,                  "Meteor Call: instant massive damage to the target."),
+                SkillDefinition.Create(SkillType.DroneSwarm,   "Drone Swarm",       4, 10f, 35f, false, c.droneTapsPerLevel,  c.droneTapsBase,    "Drone Swarm: launches drones for temporary auto-fire."),
+                SkillDefinition.Create(SkillType.MidasBeam,    "Golden Horizon",    6, 12f, 45f, false, c.midasGoldPerLvl,    c.midasGoldBase,    "Golden Horizon: more Stardust from destroyed planets."),
             };
         }
 
@@ -69,12 +69,12 @@ namespace StellarBreaker.Config
 
             return new List<SkillDefinition>
             {
-                SkillDefinition.Create(SkillType.MeteorStrike,    "Meteor Strike",   U(0), 0f,  cd, true,  c.meteorPerLevel,      0,                     "Instant massive damage to the target."),
-                SkillDefinition.Create(SkillType.DroneSwarm,      "Drone Swarm",     U(1), dur, cd, false, c.droneTapsPerLevel,   c.droneTapsBase,       "Launches drones for temporary auto-fire."),
-                SkillDefinition.Create(SkillType.TargetingSystem, "Targeting Array", U(2), dur, cd, false, c.targetingCritPerLvl, c.targetingCritBase,   "Boosts critical-hit chance."),
-                SkillDefinition.Create(SkillType.BattleCry,       "Fleet Surge",     U(3), dur, cd, false, c.battleCryDpsPerLvl,  c.battleCryDpsBase,    "Temporarily boosts Fleet DPS."),
-                SkillDefinition.Create(SkillType.Overdrive,       "Overcharge",      U(4), dur, cd, false, c.overdriveTapPerLvl,  c.overdriveTapBase,    "Temporarily boosts Tap Cannon damage."),
-                SkillDefinition.Create(SkillType.MidasBeam,       "Cosmic Harvest",  U(5), dur, cd, false, c.midasGoldPerLvl,     c.midasGoldBase,       "Increases Stardust from destroyed planets."),
+                SkillDefinition.Create(SkillType.MeteorStrike,    "Meteor Call",      U(0), 0f,  cd, true,  c.meteorPerLevel,      0,                     "Instant massive damage to the target."),
+                SkillDefinition.Create(SkillType.DroneSwarm,      "Drone Swarm",      U(1), dur, cd, false, c.droneTapsPerLevel,   c.droneTapsBase,       "Launches drones for temporary auto-fire."),
+                SkillDefinition.Create(SkillType.TargetingSystem, "Targeting Array",  U(2), dur, cd, false, c.targetingCritPerLvl, c.targetingCritBase,   "Boosts critical-hit chance."),
+                SkillDefinition.Create(SkillType.BattleCry,       "Fleet Surge",      U(3), dur, cd, false, c.battleCryDpsPerLvl,  c.battleCryDpsBase,    "Temporarily boosts Fleet DPS."),
+                SkillDefinition.Create(SkillType.Overdrive,       "Overdrive Barrage",U(4), dur, cd, false, c.overdriveTapPerLvl,  c.overdriveTapBase,    "Temporarily boosts Tap Cannon damage."),
+                SkillDefinition.Create(SkillType.MidasBeam,       "Golden Horizon",   U(5), dur, cd, false, c.midasGoldPerLvl,     c.midasGoldBase,       "Increases Stardust from destroyed planets."),
             };
         }
     }

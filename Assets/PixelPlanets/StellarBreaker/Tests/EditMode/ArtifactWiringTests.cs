@@ -43,7 +43,8 @@ namespace StellarBreaker.Tests
 
             Assert.IsTrue(s.BuyArtifact(0));   // Dps artifact, baseCost 10
             Assert.AreEqual(1, s.Artifacts.LevelOf(0));
-            Assert.That(s.Artifacts.DpsMultiplier().ToDouble(), Is.EqualTo(1.05).Within(1e-6));
+            // Level 1 grants the full firstLevelBonus jump (0.20) — not a flat +5%/level.
+            Assert.That(s.Artifacts.DpsMultiplier().ToDouble(), Is.EqualTo(1.0 + _cfg.artifactFirstLevelBonus).Within(1e-6));
             Assert.Less(s.Prestige.Relics.Stardust.ToDouble(), 1000.0);
         }
 
@@ -53,13 +54,13 @@ namespace StellarBreaker.Tests
             var s = Session(_p1);
             s.Begin();
             s.Prestige.Relics.Add(new BigNumber(1000.0));
-            s.BuyArtifact(1);                  // Gold artifact → +5%
+            s.BuyArtifact(1);                  // Gold artifact → level-1 bonus
 
             BigNumber paid = BigNumber.Zero;
             s.OnReward += (p, g) => paid = g;
             s.Enemy.ApplyDamage(new BigNumber(1.0, 9));   // kill stage 1 (gold 5)
 
-            Assert.That(paid.ToDouble(), Is.EqualTo(5.0 * 1.05).Within(1e-4));   // ×1.05
+            Assert.That(paid.ToDouble(), Is.EqualTo(5.0 * (1.0 + _cfg.artifactFirstLevelBonus)).Within(1e-4));
         }
 
         [Test]
@@ -68,13 +69,13 @@ namespace StellarBreaker.Tests
             var s = Session(_p1);
             s.Begin();
             s.Prestige.Relics.Add(new BigNumber(1000.0));
-            s.BuyArtifact(2);                  // TapDamage artifact → +5%
+            s.BuyArtifact(2);                  // TapDamage artifact → level-1 bonus
 
             var cd  = s.TapUpgrade.CurrentDamage;
             var max = s.Enemy.Current.MaxHP;
             s.Tap();
             var drop = max - s.Enemy.Current.CurrentHP;
-            Assert.That(drop.IsClose(cd * new BigNumber(1.05), 1e-4));
+            Assert.That(drop.IsClose(cd * new BigNumber(1.0 + _cfg.artifactFirstLevelBonus), 1e-4));
         }
 
         [Test]
@@ -92,7 +93,9 @@ namespace StellarBreaker.Tests
             var b = Session(_p2);
             SaveBinder.Apply(b, loaded);
             Assert.AreEqual(2, b.Artifacts.LevelOf(0));
-            Assert.That(b.Artifacts.DpsMultiplier().ToDouble(), Is.EqualTo(1.10).Within(1e-6)); // 1 + 2×0.05
+            // Level 2 = firstLevelBonus (level 1) + one extra bonusPerLevel step.
+            double expected = 1.0 + _cfg.artifactFirstLevelBonus + _cfg.artifactBonusPerLevel;
+            Assert.That(b.Artifacts.DpsMultiplier().ToDouble(), Is.EqualTo(expected).Within(1e-6));
             Assert.That(b.Prestige.Relics.Stardust.IsClose(a.Prestige.Relics.Stardust, 1e-4));
         }
     }

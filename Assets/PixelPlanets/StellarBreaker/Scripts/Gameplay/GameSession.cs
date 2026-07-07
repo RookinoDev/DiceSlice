@@ -24,6 +24,7 @@ namespace StellarBreaker.Gameplay
         public SkillService     Skills     { get; }
         public PrestigeService  Prestige   { get; }
         public ArtifactService  Artifacts  { get; }
+        public MissionService   Missions   { get; }
         public DailyRewardService Daily    { get; } = new DailyRewardService();
 
         /// <summary>The active skills exposed to the UI (in display order).</summary>
@@ -47,6 +48,7 @@ namespace StellarBreaker.Gameplay
             Skills     = new SkillService(SkillCatalog.BuildPrototype(cfg), () => TapUpgrade.Level);
             Prestige   = new PrestigeService(cfg);
             Artifacts  = new ArtifactService(ArtifactCatalog.BuildDefault(cfg), Prestige.Relics);
+            Missions   = new MissionService(MissionCatalog.BuildDefault(), Wallet);
             SkillSlots = new[] { SkillType.Overdrive, SkillType.BattleCry, SkillType.MeteorStrike,
                                  SkillType.DroneSwarm, SkillType.MidasBeam };
 
@@ -55,6 +57,9 @@ namespace StellarBreaker.Gameplay
                                      () => Skills.TapDamageMultiplier() * Artifacts.TapDamageMultiplier());
 
             Enemy.OnPlanetKilled += HandleKill;
+            Enemy.OnPlanetKilled += _ => Missions.NotifyPlanetDestroyed();
+            Taps.OnDamageDealt   += e => Missions.NotifyTapDamage(e.Amount);
+            Ships.OnShipChanged  += (_, __) => Missions.NotifyShipUpgraded();
             Stage.OnBossFailed   += HandleBossFailed;
         }
 
@@ -87,6 +92,9 @@ namespace StellarBreaker.Gameplay
         /// <summary>Buy/upgrade a permanent artifact with Relics. False if unaffordable.</summary>
         public bool BuyArtifact(int i) => Artifacts.BuyOrUpgrade(i);
 
+        /// <summary>Claim a completed mission's Gold reward. False if not complete or already claimed.</summary>
+        public bool ClaimMission(int i) => Missions.Claim(i);
+
         // ── Buy Max (spend everything affordable; never overspends) ──
         public int UpgradeTapDamageMax() => TapUpgrade.UpgradeMax(Wallet);
         public int BuyShipMax(int i)     => Ships.BuyOrUpgradeMax(i, Wallet);
@@ -108,6 +116,8 @@ namespace StellarBreaker.Gameplay
         // ── Prestige ────────────────────────────────────────────────
         /// <summary>Stage at which prestige unlocks (read-only, for UI reveal rules).</summary>
         public int       PrestigeUnlockStage => _cfg.prestigeUnlockStage;
+        /// <summary>Full boss-timer duration in seconds (for UI fill bars).</summary>
+        public double    BossTimerSeconds    => _cfg.bossTimerSeconds;
         public bool      CanPrestige()   => Stage.HighestStage >= _cfg.prestigeUnlockStage;
         public BigNumber PreviewRelics() => Prestige.RelicsForStage(Stage.HighestStage);
 
@@ -145,6 +155,17 @@ namespace StellarBreaker.Gameplay
             bool relic = DailyRewardTable.GrantsRelic(streak, _cfg) && Stage.HighestStage >= _cfg.prestigeUnlockStage;
             return new DailyPreview(day, gold, relic, can);
         }
+
+        /// <summary>Gold preview for a specific day-in-cycle (1..7), independent of the current
+        /// streak — used to render the full 7-day reward grid at once.</summary>
+        public BigNumber DailyGoldForDay(int dayInCycle)
+        {
+            BigNumber oneKillGold = GoldReward.ForStage(Stage.CurrentStage, _cfg.goldBase, _cfg.goldGrowth);
+            return DailyRewardTable.GoldFor(dayInCycle, oneKillGold, _cfg);
+        }
+
+        /// <summary>True if the given day-in-cycle (1..7) additionally grants a Relic.</summary>
+        public bool DailyGrantsRelicOnDay(int dayInCycle) => DailyRewardTable.GrantsRelic(dayInCycle, _cfg);
 
         /// <summary>Claim today's daily reward. Returns what was granted (canClaim=false if already claimed today).</summary>
         public DailyPreview ClaimDaily(long nowUnixSeconds)

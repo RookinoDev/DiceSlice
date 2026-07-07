@@ -1,0 +1,19 @@
+{
+  "name": "stellar-breaker-bot",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "grammy": "^1.30.0",
+    "https-proxy-agent": "^9.1.0",
+    "undici": "^6.19.8"
+  }
+}

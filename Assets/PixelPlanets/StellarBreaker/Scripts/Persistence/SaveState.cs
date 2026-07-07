@@ -17,6 +17,9 @@ namespace StellarBreaker.Persistence
         public int[]          shipLevels     = Array.Empty<int>();
         public int[]          artifactLevels = Array.Empty<int>();
 
+        public BigNumberData[] missionProgress = Array.Empty<BigNumberData>();
+        public bool[]           missionClaimed  = Array.Empty<bool>();
+
         public int            currentStage   = 1;
         public int            highestStage    = 1;
 

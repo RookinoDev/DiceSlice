@@ -12,6 +12,13 @@ public class AudioManager : MonoBehaviour
     public bool Muted { get => muted; set => muted = value; }
     public void ToggleMute() => muted = !muted;
 
+    // No music track exists yet in this project (SFX are all procedural tones) — this flag is
+    // a persisted placeholder for the Settings "Music" toggle so the UI has something real to
+    // bind to; wire it to an actual AudioSource/clip when music is added.
+    [SerializeField] private bool musicMuted = false;
+    public bool MusicMuted { get => musicMuted; set => musicMuted = value; }
+    public void ToggleMusicMuted() => musicMuted = !musicMuted;
+
     AudioSource _src;
     AudioClip _tap, _death, _click, _skill, _prestige, _explosion;
     AudioClip _bossStart, _bossTick, _bossFail, _bossDown;

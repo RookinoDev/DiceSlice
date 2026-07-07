@@ -39,6 +39,9 @@ public class StellarBreakerBootstrap : MonoBehaviour
     [Header("Saving")]
     [SerializeField] private float autosaveSeconds = 15f;
 
+    [Header("UI (art-driven shell — assign once you've built the mockup screens; leave empty to keep the placeholder runtime HUD)")]
+    [SerializeField] private StellarBreaker.HudViews.GameShellView shellView;
+
     private PixelPlanetGenerator   _generator;
     private PlanetGeneratorAdapter _adapter;
     private GameSession            _session;
@@ -91,16 +94,23 @@ public class StellarBreakerBootstrap : MonoBehaviour
 
         _session.Begin();
 
-        _hud = GetComponent<StellarBreaker.Hud.HudView>();
-        if (_hud == null) _hud = gameObject.AddComponent<StellarBreaker.Hud.HudView>();
-
         Action onResetSave = () =>
         {
             _save.Delete();
             var idx = UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex;
             UnityEngine.SceneManagement.SceneManager.LoadScene(idx);
         };
-        _hud.Bind(_session, _adapter, onResetSave, offlineSeconds, offline);
+
+        if (shellView != null)
+        {
+            shellView.Bind(_session, _adapter, onResetSave, offlineSeconds, offline);
+        }
+        else
+        {
+            _hud = GetComponent<StellarBreaker.Hud.HudView>();
+            if (_hud == null) _hud = gameObject.AddComponent<StellarBreaker.Hud.HudView>();
+            _hud.Bind(_session, _adapter, onResetSave, offlineSeconds, offline);
+        }
 
         // Visual-only: place colored placeholder boxes on the ShipPlaceMent slots.
         if (GetComponent<FleetVisualPlacer>() == null) gameObject.AddComponent<FleetVisualPlacer>();

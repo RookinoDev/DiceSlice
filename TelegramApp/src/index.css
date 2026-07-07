@@ -1,0 +1,67 @@
+:root {
+  --tg-bg-color: #16171d;
+  --tg-text-color: #f3f4f6;
+  --tg-hint-color: #9ca3af;
+  --tg-button-color: #aa3bff;
+  --tg-button-text-color: #ffffff;
+  --tg-secondary-bg-color: #1f2028;
+
+  --tg-safe-top: 0px;
+  --tg-safe-bottom: 0px;
+  --tg-safe-left: 0px;
+  --tg-safe-right: 0px;
+
+  /* Design tokens from the Claude Design "Stellar Breaker" system (GamePhone.dc.html). */
+  --palette-bg: #0a0d18;
+  --palette-navbar: rgba(16, 21, 36, 0.82);
+  --palette-panel: #141a2c;
+  --palette-sheet: #131829;
+  --palette-sheet-row: #171e33;
+
+  --palette-text-primary: #f4f6fb;
+  --palette-text-secondary: #8b93ac;
+  --palette-text-dim: #5c6480;
+  --palette-text-dimmer: #6e7695;
+  --palette-text-dimmest: #4a5170;
+
+  --palette-gold: #ffb238;
+  --palette-gold-deep: #e8930f;
+  --palette-gold-light: #ffc24d;
+  --palette-gold-label: #ffd873;
+
+  --palette-cyan: #43ddee;
+  --palette-cyan-light: #8fe3ff;
+  --palette-cyan-light2: #4fc3f7;
+  --palette-cyan-label: #7ce9f2;
+
+  --palette-magenta: #e24fff;
+  --palette-magenta-light: #f49cff;
+
+  --palette-success: #3adc84;
+  --palette-danger: #ff5c6c;
+
+  --font-display: 'Rajdhani', sans-serif;
+  --font-body: 'Sora', sans-serif;
+
+  font: 16px/145% var(--font-body);
+  color-scheme: dark;
+  color: var(--palette-text-primary);
+  background: var(--palette-bg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+#root {
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}

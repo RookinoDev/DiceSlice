@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace StellarBreaker.Core
 {
@@ -143,16 +144,16 @@ namespace StellarBreaker.Core
             {
                 double v = m * Math.Pow(10, e);
                 if (Math.Abs(v - Math.Round(v)) < 1e-9 && v < 1e15)
-                    return sign + ((long)Math.Round(v)).ToString();
-                return sign + v.ToString("0.##");
+                    return sign + ((long)Math.Round(v)).ToString(CultureInfo.InvariantCulture);
+                return sign + v.ToString("0.##", CultureInfo.InvariantCulture);
             }
 
             int    group  = e / 3;
             int    within = e % 3;
             double disp   = m * Math.Pow(10, within);   // [1,1000)
-            string num    = disp >= 100 ? disp.ToString("0")
-                          : disp >= 10  ? disp.ToString("0.0")
-                                        : disp.ToString("0.00");
+            string num    = disp >= 100 ? disp.ToString("0", CultureInfo.InvariantCulture)
+                          : disp >= 10  ? disp.ToString("0.0", CultureInfo.InvariantCulture)
+                                        : disp.ToString("0.00", CultureInfo.InvariantCulture);
             return sign + num + Suffix(group);
         }
 
