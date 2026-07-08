@@ -21,6 +21,28 @@ db.exec(`
   )
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS saves (
+    telegram_user_id INTEGER PRIMARY KEY,
+    save_json TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`)
+
+/** Upsert the user's cloud save (last write wins - the client decides which save is better). */
+export function putSave(telegramUserId, saveJson) {
+  db.prepare(`
+    INSERT INTO saves (telegram_user_id, save_json, updated_at) VALUES (?, ?, ?)
+    ON CONFLICT(telegram_user_id) DO UPDATE SET save_json = excluded.save_json, updated_at = excluded.updated_at
+  `).run(telegramUserId, saveJson, Date.now())
+}
+
+/** The user's cloud save JSON string, or null if they never synced. */
+export function getSave(telegramUserId) {
+  const row = db.prepare('SELECT save_json FROM saves WHERE telegram_user_id = ?').get(telegramUserId)
+  return row ? row.save_json : null
+}
+
 export function recordPurchase(telegramUserId, item) {
   db.prepare('INSERT INTO purchases (telegram_user_id, item, created_at) VALUES (?, ?, ?)').run(telegramUserId, item, Date.now())
 }

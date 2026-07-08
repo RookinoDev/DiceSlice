@@ -35,6 +35,8 @@ interface GameShellProps {
   session: GameSession
   offline: OfflineReport | null
   claimedGrants: PurchaseGrant[]
+  /** Bumped by useGameSession whenever the session is rebooted from a better cloud save. */
+  cloudRestores: number
 }
 
 // Human-readable label for a purchase grant's toast announcement, keyed by the same
@@ -44,7 +46,7 @@ const GRANT_LABELS: Record<string, string> = {
   stardust_pack_500: '+500 Stardust',
 }
 
-export function GameShell({ session, offline, claimedGrants }: GameShellProps) {
+export function GameShell({ session, offline, claimedGrants, cloudRestores }: GameShellProps) {
   const [tab, setTab] = useState<NavTab>('combat')
   const [prestigeConfirmOpen, setPrestigeConfirmOpen] = useState(false)
   const [missionsOpen, setMissionsOpen] = useState(false)
@@ -118,6 +120,17 @@ export function GameShell({ session, offline, claimedGrants }: GameShellProps) {
     announcedGrantCount.current = claimedGrants.length
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimedGrants])
+
+  // Same pattern for cloud restores: announce each session reboot from a cloud save once.
+  const announcedRestoreCount = useRef(0)
+  useEffect(() => {
+    if (cloudRestores > announcedRestoreCount.current) {
+      announcedRestoreCount.current = cloudRestores
+      showToast('PROGRESS RESTORED FROM CLOUD')
+      hapticSuccess()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloudRestores])
 
   // Returning Player Power Boost (#61) - purely-visual FX scale-up for the first ~10s back
   // after an offline stretch (see .game-shell--returning in ui.css). Real numbers untouched.

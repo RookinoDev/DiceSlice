@@ -27,7 +27,11 @@ jobs:
 
       - run: npm test
 
+      # VITE_API_URL is baked into the bundle at build time; without it, purchase
+      # claiming and cloud saves are silently disabled in the deployed app.
       - run: npm run build
+        env:
+          VITE_API_URL: https://stellar-breaker-bot-production.up.railway.app
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
