@@ -1,0 +1,38 @@
+name: Deploy Telegram App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Telegram/TelegramApp/**'
+      - '.github/workflows/deploy-telegram-app.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Telegram/TelegramApp
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Telegram/TelegramApp/package-lock.json
+
+      - run: npm ci
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 15e2e6ae4f1776f568bdda14f832b6c5
+          workingDirectory: Telegram/TelegramApp
+          command: pages deploy dist --project-name stellar-breaker --branch main
