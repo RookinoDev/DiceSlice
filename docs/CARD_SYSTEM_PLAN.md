@@ -1,6 +1,6 @@
 # Stellar Breaker — Collectible Card Ecosystem: Master Plan
 
-Status: **design approved-pending** · Lead platform: **Telegram Mini App** (React/TS/three.js) + **TelegramBot backend** (Node/SQLite on Railway) · Unity remains the mirror for the game core only.
+Status: **design approved-pending** · Platform: **Telegram Mini App** (React/TS/three.js) + **TelegramBot backend** (Node/SQLite on Railway) · Unity development is paused (decision Jul 2026): everything in this plan targets the web app only; the Unity/ folder stays untouched.
 
 Guiding principle (from the product owner): every mechanic must reinforce that players are building a **valuable, long-term collection of real astronomical objects** — not unlocking cosmetics. Design consequences used throughout:
 
@@ -209,8 +209,8 @@ Implementation notes: card tilt is pure CSS (no WebGL needed until focus); the o
 - Virtualized grids; masks/atlases lazy-fetched per set.
 - Memory: dispose object viewer scene on close (pattern already in `PlanetCanvas` cleanup); LRU the thumb cache (~30MB cap).
 
-### Unity mapping (when/if the card system ports)
-`CardDefinition` ⇒ ScriptableObjects generated from the same JSON catalog (single source of truth, code-generated — no hand-sync). Addressables groups per set for masks/atlases; holo = one shader with per-rarity keywords; inventory via the same HTTP API (server stays the only truth). **Decision: the card system is web-led; Unity port is optional and never blocks a web release.**
+### Unity
+Out of scope — Unity development is paused entirely (product decision, Jul 2026). If it ever resumes: generate ScriptableObjects from the same JSON catalog, Addressables per set, inventory via the same HTTP API. Nothing in the web implementation should ever wait on or bend for a Unity port.
 
 ### Scalability honesty
 SQLite on one Railway node is fine to ~tens of thousands of players. The schema above ports to Postgres mechanically (the escape hatch when needed). The real scaling risk is not storage — it's the pack-earning trust model (client-authoritative progress). Mitigations: server-derived earning, rate caps, anomaly flags, and accepting that a single-player idle game tolerates soft cheating until trading ships — **trading is the hard trust boundary; gate it on account health checks.**
