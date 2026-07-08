@@ -382,7 +382,11 @@
    cosmetic-only tap streak (see useTapStreak.ts). Sits below the real UI (z-index:1 siblings). */
 .combat-combo-backdrop {
   position: absolute;
-  inset: 0;
+  /* Overshoot the combat screen generously on every side so the combo/overdrive glow runs
+     seamlessly behind the (transparent) top bar and bottom nav instead of cutting off in a
+     hard line at the content edge. The parent chain already has overflow: visible for the
+     ring bleed, and the chrome's z-index 2 keeps its content painted above the glow. */
+  inset: -180px -20px -160px;
   z-index: 0;
   pointer-events: none;
   opacity: 0;
