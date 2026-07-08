@@ -4,166 +4,10 @@
 // -> confirmed exoplanets) and cycle; boss sectors escalate through the giants, then real
 // stars, then nebulae, galaxies, and finally black holes. Everything is deterministic:
 // the same sector always shows the same object with the same look.
-import type { PlanetProfile } from './planetProfiles'
-import type { RGB } from './themes'
+import { blackHole, FAINT_WHITE_CLOUDS, galaxy, gas, ice, lava, nebula, NO_CLOUDS, noAtmo, rock, star, terran, type RealPlanet } from './profileBuilders'
+import { GENERATED_BOSSES, GENERATED_REGULAR } from './rosterGen'
 
-export interface RealPlanet {
-  name: string
-  profile: PlanetProfile
-}
-
-// One shared light direction (upper-left key light) so the roster reads as a coherent set.
-const LIGHT: [number, number] = [0.36, 0.31]
-
-function noAtmo(name: string, seed: number, ground: [RGB, RGB, RGB], craters: [RGB, RGB], terrainSize = 50, craterSize = 8): RealPlanet {
-  return {
-    name,
-    profile: { kind: 'noAtmosphere', seed, lightOrigin: LIGHT, rotationRate: 0.025, groundColors: ground, craterColors: craters, terrainSize, craterSize, craterTimeSpeed: 0.05 },
-  }
-}
-
-interface TerranOpts {
-  landCutoff?: number
-  cloudCover?: number
-  terrainSize?: number
-}
-
-function terran(name: string, seed: number, water: [RGB, RGB, RGB], land: [RGB, RGB, RGB, RGB], clouds: [RGB, RGB, RGB, RGB], opts: TerranOpts = {}): RealPlanet {
-  return {
-    name,
-    profile: {
-      kind: 'terranWet',
-      seed,
-      lightOrigin: LIGHT,
-      rotationRate: 0.06,
-      waterColors: water,
-      landColors: land,
-      cloudColors: clouds,
-      terrainSize: opts.terrainSize ?? 50,
-      cloudSize: 40,
-      landCutoff: opts.landCutoff ?? 0.5,
-      cloudCover: opts.cloudCover ?? 1.2,
-      cloudStretch: 2.0,
-      cloudSpeed: 0.12,
-      cloudCurve: 1.4,
-    },
-  }
-}
-
-interface GasOpts {
-  bands?: number
-  ring?: boolean
-  gasTimeSpeed?: number
-  ringColors?: [RGB, RGB, RGB]
-  ringDarkColors?: [RGB, RGB, RGB]
-}
-
-function gas(name: string, seed: number, light: [RGB, RGB, RGB], dark: [RGB, RGB, RGB], opts: GasOpts = {}): RealPlanet {
-  return {
-    name,
-    profile: {
-      kind: 'gasGiant',
-      seed,
-      lightOrigin: LIGHT,
-      rotationRate: 0.18,
-      lightColors: light,
-      darkColors: dark,
-      gasSize: 55,
-      cloudCover: 0.4,
-      bands: opts.bands ?? 1.6,
-      stretch: 2.2,
-      gasTimeSpeed: opts.gasTimeSpeed ?? 0.12,
-      ring: opts.ring ?? false,
-      ringColors: opts.ringColors,
-      ringDarkColors: opts.ringDarkColors,
-    },
-  }
-}
-
-/** A star: roiling plasma via the gas shader - soft banding, fast churn, no surface to crack. */
-function star(name: string, seed: number, light: [RGB, RGB, RGB], dark: [RGB, RGB, RGB], churn = 0.32): RealPlanet {
-  return gas(name, seed, light, dark, { bands: 0.7, gasTimeSpeed: churn })
-}
-
-/** A black hole: near-black body wrapped in a glowing accretion disk (the ring, in disk colors). */
-function blackHole(name: string, seed: number, disk: [RGB, RGB, RGB], diskDark: [RGB, RGB, RGB]): RealPlanet {
-  return gas(
-    name,
-    seed,
-    [[0.07, 0.05, 0.04], [0.04, 0.03, 0.02], [0.02, 0.01, 0.01]],
-    [[0.03, 0.02, 0.01], [0.015, 0.01, 0.005], [0.005, 0.003, 0.002]],
-    { bands: 0.3, gasTimeSpeed: 0.4, ring: true, ringColors: disk, ringDarkColors: diskDark },
-  )
-}
-
-/** A galaxy: bright warm core with the ring as its disk of spiral arms. */
-function galaxy(name: string, seed: number, core: [RGB, RGB, RGB], arms: [RGB, RGB, RGB], armsDark: [RGB, RGB, RGB]): RealPlanet {
-  return gas(
-    name,
-    seed,
-    core,
-    [[core[2][0] * 0.6, core[2][1] * 0.6, core[2][2] * 0.6], [core[2][0] * 0.35, core[2][1] * 0.35, core[2][2] * 0.35], [core[2][0] * 0.15, core[2][1] * 0.15, core[2][2] * 0.15]],
-    { bands: 0.3, gasTimeSpeed: 0.06, ring: true, ringColors: arms, ringDarkColors: armsDark },
-  )
-}
-
-/** A nebula: surfaceless stacked wisps - a dense colored core inside a thin outer shell. */
-function nebula(name: string, seed: number, inner: [RGB, RGB, RGB, RGB], outer: [RGB, RGB, RGB, RGB]): RealPlanet {
-  return {
-    name,
-    profile: { kind: 'nebula', seed, lightOrigin: LIGHT, rotationRate: 0.015, innerColors: inner, outerColors: outer, innerCover: 0.5, outerCover: 0.95, cloudSize: 36 },
-  }
-}
-
-function ice(name: string, seed: number, land: [RGB, RGB, RGB], lakes: [RGB, RGB, RGB], clouds: [RGB, RGB, RGB, RGB], cloudCover = 1.55): RealPlanet {
-  return {
-    name,
-    profile: {
-      kind: 'iceWorld',
-      seed,
-      lightOrigin: LIGHT,
-      rotationRate: 0.025,
-      landColors: land,
-      lakeColors: lakes,
-      cloudColors: clouds,
-      terrainSize: 50,
-      cloudSize: 40,
-      cloudCover,
-      cloudStretch: 2.0,
-      cloudSpeed: 0.1,
-      cloudCurve: 1.3,
-    },
-  }
-}
-
-function lava(name: string, seed: number, ground: [RGB, RGB, RGB], craters: [RGB, RGB], lavaColors: [RGB, RGB, RGB], riverCutoff = 0.58): RealPlanet {
-  return {
-    name,
-    profile: {
-      kind: 'lavaWorld',
-      seed,
-      lightOrigin: LIGHT,
-      rotationRate: 0.05,
-      groundColors: ground,
-      craterColors: craters,
-      lavaColors: lavaColors,
-      terrainSize: 50,
-      craterSize: 8,
-      craterTimeSpeed: 0.05,
-      riverCutoff,
-      lavaTimeSpeed: 0.25,
-    },
-  }
-}
-
-function rock(name: string, seed: number, colors: [RGB, RGB, RGB], size = 50): RealPlanet {
-  return { name, profile: { kind: 'asteroid', seed, lightOrigin: LIGHT, rotationRate: 0.12, colors, size } }
-}
-
-// Very high cloudCover value = almost no clouds (the shader treats cover as "1.61 - density").
-const NO_CLOUDS = 1.58
-// Wisps of white for airless-ish icy bodies.
-const FAINT_WHITE_CLOUDS: [RGB, RGB, RGB, RGB] = [[0.95, 0.96, 0.98], [0.85, 0.87, 0.9], [0.72, 0.75, 0.8], [0.58, 0.62, 0.68]]
+export type { RealPlanet } from './profileBuilders'
 
 /**
  * Regular-sector roster: the journey outward. Rocky inner worlds, the great moons,
@@ -255,16 +99,22 @@ export const BOSS_PLANETS: RealPlanet[] = [
   blackHole('M87*', 3.5, [[1.0, 0.8, 0.42], [0.98, 0.6, 0.2], [0.88, 0.42, 0.08]], [[0.66, 0.26, 0.04], [0.45, 0.15, 0.02], [0.26, 0.07, 0.01]]), // the first black hole ever photographed
 ]
 
+// Full rosters: the hand-tuned objects first (sectors 1-36 / bosses 1-30 keep their exact
+// look), then the database-generated extension (see rosterGen.ts / scripts/genRoster.mjs) -
+// ~1100 more real objects before anything repeats.
+const ALL_REGULAR: RealPlanet[] = [...REGULAR_PLANETS, ...GENERATED_REGULAR]
+const ALL_BOSSES: RealPlanet[] = [...BOSS_PLANETS, ...GENERATED_BOSSES]
+
 /**
- * The body shown in a given sector. Boss sectors (every `bossInterval`th) cycle the giant
+ * The body shown in a given sector. Boss sectors (every `bossInterval`th) cycle the boss
  * roster in order; other sectors cycle the regular roster, indexed by how many non-boss
  * sectors precede them so no entry is skipped.
  */
 export function realPlanetForStage(stage: number, bossInterval: number): RealPlanet {
   const s = Math.max(1, Math.floor(stage))
   if (bossInterval > 0 && s % bossInterval === 0) {
-    return BOSS_PLANETS[(s / bossInterval - 1) % BOSS_PLANETS.length]
+    return ALL_BOSSES[(s / bossInterval - 1) % ALL_BOSSES.length]
   }
   const bossesBefore = bossInterval > 0 ? Math.floor((s - 1) / bossInterval) : 0
-  return REGULAR_PLANETS[(s - 1 - bossesBefore) % REGULAR_PLANETS.length]
+  return ALL_REGULAR[(s - 1 - bossesBefore) % ALL_REGULAR.length]
 }
