@@ -17,11 +17,13 @@ import { dirname, join } from 'node:path'
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'planet', 'generatedRoster.json')
 
-// Caps keep the bundle sane (~1000 objects ≈ 60KB raw, ~15KB gzipped). Raise freely later.
-const MAX_EXOPLANETS = 500
-const MAX_STARS = 300
-const MAX_DEEP_SKY = 60
-const MAX_COMETS = 50
+// Effectively uncapped: take everything the databases have that passes the quality filters
+// (the Exoplanet Archive holds ~6000 confirmed planets; ones without a radius+distance are
+// skipped since the visual mapping needs them). ~6000 entries ≈ 350KB raw, ~70KB gzipped.
+const MAX_EXOPLANETS = 6000
+const MAX_STARS = 1000
+const MAX_DEEP_SKY = 120
+const MAX_COMETS = 100
 
 async function fetchText(url, label, attempts = 4) {
   for (let i = 1; ; i++) {
