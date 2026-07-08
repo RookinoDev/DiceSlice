@@ -1,32 +1,32 @@
-# React + TypeScript + Vite
+# Stellar Breaker — Telegram Mini App
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React 19 + TypeScript + Vite port of the Stellar Breaker idle clicker (the Unity original lives in `Unity/` at the repo root). Planets are rendered with three.js using shaders ported from the PixelPlanets generator.
 
-Currently, two official plugins are available:
+## Development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+npm ci
+npm run dev      # local dev server
+npm test         # vitest suite (game core / economy)
+npm run build    # type-check + production bundle in dist/
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+## Deployment
+
+Deployed to Cloudflare Pages at https://stellar-breaker.pages.dev (project `stellar-breaker`, direct upload — not git-connected).
+
+Pushes to `main` that touch this folder deploy automatically via GitHub Actions (`.github/workflows/deploy-telegram-app.yml`); it needs the `CLOUDFLARE_API_TOKEN` repo secret (Cloudflare token with Pages: Edit). Manual deploy:
+
+```bash
+npm run build
+npx wrangler pages deploy dist --project-name stellar-breaker
+```
+
+## Structure
+
+- `src/game/` — game core, a 1:1 port of the Unity C# (`Config`, `Core`, `Economy`, `Gameplay`, `Monetization`, `Persistence`). Balance lives in `src/game/config/BalanceConfig.ts`.
+- `src/ui/` — React shell: screens, sheets, and the juice hooks (screen shake, tap streaks, floating numbers, particles).
+- `src/planet/` — three.js planet canvas + GLSL shaders.
+- `src/telegram.ts` — Telegram WebApp SDK glue.
+
+The companion bot/backend (grammY + Stars payments) is in `../TelegramBot`.
