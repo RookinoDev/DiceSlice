@@ -158,6 +158,10 @@ export class GameSession {
   get bossTimerSeconds(): number {
     return this.cfg.bossTimerSeconds
   }
+  /** Every Nth stage is a boss (read-only, for the real-planet roster lookup). */
+  get bossStageInterval(): number {
+    return this.cfg.bossStageInterval
+  }
   canPrestige(): boolean {
     return this.stage.highestStage >= this.cfg.prestigeUnlockStage
   }

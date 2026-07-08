@@ -73,6 +73,8 @@ export interface GasGiantProfile {
   bands: number
   stretch: number
   gasTimeSpeed: number
+  /** Saturn-style ring quad. Real ringless giants (Jupiter, Neptune...) set this false. */
+  ring: boolean
 }
 
 export interface IceWorldProfile {
@@ -167,6 +169,7 @@ export function createGasGiantProfile(): GasGiantProfile {
     bands: randRange(0.4, 2.5),
     stretch: randRange(1.2, 3.0),
     gasTimeSpeed: randRange(0.04, 0.28),
+    ring: true,
   }
 }
 
@@ -240,5 +243,5 @@ export const RING_SCALE = 3
 
 /** How many multiples of the base 1x sphere size this profile's largest layer needs on screen. */
 export function planetMaxScale(profile: PlanetProfile): number {
-  return profile.kind === 'gasGiant' ? RING_SCALE : 1
+  return profile.kind === 'gasGiant' && profile.ring ? RING_SCALE : 1
 }

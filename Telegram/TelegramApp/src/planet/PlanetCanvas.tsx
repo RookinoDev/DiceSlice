@@ -202,7 +202,7 @@ function buildLayers(profile: PlanetProfile): LayerSpec[] {
       rotationOffset: 0.7,
       scale: RING_SCALE,
     }
-    return [gas, ring]
+    return profile.ring ? [gas, ring] : [gas]
   }
 
   if (profile.kind === 'lavaWorld') {

@@ -3,7 +3,8 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import { buildMainViewModel } from '../../game/ui/MainPresenter'
-import { createRandomPlanetProfile, planetMaxScale } from '../../planet/planetProfiles'
+import { planetMaxScale } from '../../planet/planetProfiles'
+import { realPlanetForStage } from '../../planet/realPlanets'
 import type { PlanetImpulseApi } from '../../planet/PlanetCanvas'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticSuccess, hapticTap } from '../../telegram'
@@ -130,9 +131,11 @@ interface CombatScreenProps {
 
 export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatScreenProps) {
   const vm = buildMainViewModel(s)
-  // A fresh profile only when the actual planet instance changes (new spawn), not every render.
+  // Deterministic real-world body for this sector; recomputed only when the actual planet
+  // instance changes (new spawn), not every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const profile = useMemo(() => createRandomPlanetProfile(), [s.enemy.current])
+  const target = useMemo(() => realPlanetForStage(s.enemy.current?.stage ?? s.stage.currentStage, s.bossStageInterval), [s.enemy.current])
+  const profile = target.profile
   const planetScale = planetMaxScale(profile)
   const { ref: planetRef, pulse: pulsePlanet } = usePlanetHitFlash(s)
   const { ref: screenRef, triggerShake } = useScreenShake<HTMLDivElement>()
@@ -293,7 +296,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         )}
       </div>
 
-      <div className="combat-target-name">{vm.zoneLabel || vm.stageLabel}</div>
+      <div className="combat-target-name">{target.name}</div>
 
       <div className={`combat-planet-wrap ${unstable ? 'combat-planet-wrap--unstable' : ''}`}>
         {tapStreak >= 5 && (
