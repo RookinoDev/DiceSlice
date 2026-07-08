@@ -15,6 +15,7 @@ const MATERIALS: Record<PlanetProfile['kind'], ImpactMaterial> = {
   gasGiant: { playImpactSound: audio.impactGas, debrisColor: '#e8d8a0' },
   lavaWorld: { playImpactSound: audio.impactLava, debrisColor: '#ff8a4c' },
   asteroid: { playImpactSound: audio.impactMetal, debrisColor: '#9aa0a8' },
+  nebula: { playImpactSound: audio.impactGas, debrisColor: '#e88ad8' },
 }
 
 export function impactMaterialFor(profile: PlanetProfile): ImpactMaterial {

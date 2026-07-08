@@ -15,11 +15,27 @@ describe('realPlanetForStage', () => {
     expect(realPlanetForStage(3, BOSS_INTERVAL).name).toBe('EARTH')
   })
 
-  it('boss sectors always serve giants, starting with Jupiter then Saturn', () => {
+  it('boss sectors escalate: giants, then stars, then nebulae, galaxies, black holes', () => {
     expect(realPlanetForStage(10, BOSS_INTERVAL).name).toBe('JUPITER')
     expect(realPlanetForStage(20, BOSS_INTERVAL).name).toBe('SATURN')
-    for (let boss = 1; boss <= 30; boss++) {
-      expect(realPlanetForStage(boss * BOSS_INTERVAL, BOSS_INTERVAL).profile.kind).toBe('gasGiant')
+    expect(realPlanetForStage(110, BOSS_INTERVAL).name).toBe('THE SUN') // boss #11: first star
+    expect(realPlanetForStage(210, BOSS_INTERVAL).name).toBe('ORION NEBULA') // boss #21: first nebula
+    expect(realPlanetForStage(210, BOSS_INTERVAL).profile.kind).toBe('nebula')
+    expect(realPlanetForStage(290, BOSS_INTERVAL).name).toBe('SAGITTARIUS A*')
+    expect(realPlanetForStage(300, BOSS_INTERVAL).name).toBe('M87*')
+    for (let boss = 1; boss <= 60; boss++) {
+      const kind = realPlanetForStage(boss * BOSS_INTERVAL, BOSS_INTERVAL).profile.kind
+      expect(['gasGiant', 'nebula']).toContain(kind)
+    }
+  })
+
+  it('black holes and galaxies carry their disk on the ring quad with their own palette', () => {
+    const m87 = realPlanetForStage(300, BOSS_INTERVAL).profile
+    expect(m87.kind).toBe('gasGiant')
+    if (m87.kind === 'gasGiant') {
+      expect(m87.ring).toBe(true)
+      expect(m87.ringColors).toBeDefined()
+      expect(m87.ringColors![0][0]).toBeGreaterThan(m87.lightColors[0][0]) // disk glows brighter than the shadow body
     }
   })
 
@@ -42,8 +58,9 @@ describe('realPlanetForStage', () => {
     expect(new Set(BOSS_PLANETS.map((p) => p.name)).size).toBe(BOSS_PLANETS.length)
   })
 
-  it('only true ringed giants carry a ring', () => {
-    const ringed = BOSS_PLANETS.filter((p) => p.profile.kind === 'gasGiant' && p.profile.ring).map((p) => p.name)
+  it('among the planets, only true ringed giants carry a ring', () => {
+    const planetBosses = BOSS_PLANETS.slice(0, 10)
+    const ringed = planetBosses.filter((p) => p.profile.kind === 'gasGiant' && p.profile.ring).map((p) => p.name)
     expect(ringed).toEqual(['SATURN', 'J1407 B'])
   })
 

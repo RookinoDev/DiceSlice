@@ -75,6 +75,25 @@ export interface GasGiantProfile {
   gasTimeSpeed: number
   /** Saturn-style ring quad. Real ringless giants (Jupiter, Neptune...) set this false. */
   ring: boolean
+  /** Ring palette override - lets a black hole pair a near-black body with a glowing accretion disk. Defaults to the body colors. */
+  ringColors?: RGB[]
+  ringDarkColors?: RGB[]
+}
+
+/** A surfaceless wisp: stacked cloud shells with nothing underneath (nebulae, supernova remnants). */
+export interface NebulaProfile {
+  kind: 'nebula'
+  seed: number
+  lightOrigin: [number, number]
+  rotationRate: number
+  /** dense core wisps (cloud colors x4) */
+  innerColors: RGB[]
+  /** thin outer shell (cloud colors x4) */
+  outerColors: RGB[]
+  /** planetClouds cover semantics: lower = denser */
+  innerCover: number
+  outerCover: number
+  cloudSize: number
 }
 
 export interface IceWorldProfile {
@@ -117,7 +136,7 @@ export interface AsteroidProfile {
   size: number
 }
 
-export type PlanetProfile = NoAtmosphereProfile | TerranWetProfile | GasGiantProfile | IceWorldProfile | LavaWorldProfile | AsteroidProfile
+export type PlanetProfile = NoAtmosphereProfile | TerranWetProfile | GasGiantProfile | IceWorldProfile | LavaWorldProfile | AsteroidProfile | NebulaProfile
 
 export function createNoAtmosphereProfile(): NoAtmosphereProfile {
   const theme = pickRandom(themesNoAtmo)

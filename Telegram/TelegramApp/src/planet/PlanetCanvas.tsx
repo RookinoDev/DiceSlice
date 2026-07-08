@@ -159,6 +159,15 @@ function buildLayers(profile: PlanetProfile): LayerSpec[] {
     return [land, lakes, cloudLayer(profile.cloudSize, profile.cloudSpeed, profile.cloudCover, profile.cloudStretch, profile.cloudCurve, profile.cloudColors, 2)]
   }
 
+  if (profile.kind === 'nebula') {
+    // No solid body at all: a slow thin outer shell under a denser, faster core - overlapping
+    // translucent wisps read as gas. Damage thins both via planetClouds' uHpFraction stripping.
+    return [
+      cloudLayer(profile.cloudSize * 1.5, 0.05, profile.outerCover, 2.8, 1.7, profile.outerColors, 0),
+      cloudLayer(profile.cloudSize, 0.09, profile.innerCover, 1.9, 1.3, profile.innerColors, 1),
+    ]
+  }
+
   if (profile.kind === 'gasGiant') {
     const gas: LayerSpec = {
       fragmentShader: gasLayersFragmentShader,
@@ -194,8 +203,8 @@ function buildLayers(profile: PlanetProfile): LayerSpec[] {
         uRingPerspective: { value: 4 },
         uScaleRelPlanet: { value: 6 },
         uHpFraction: { value: 1 },
-        uColors: { value: colorsToVec4(profile.lightColors) },
-        uDarkColors: { value: colorsToVec4(profile.darkColors) },
+        uColors: { value: colorsToVec4(profile.ringColors ?? profile.lightColors) },
+        uDarkColors: { value: colorsToVec4(profile.ringDarkColors ?? profile.darkColors) },
       },
       timeRate: TIME_RATE_RING,
       renderOrder: 1,
@@ -346,7 +355,7 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
 
     const scene = new Scene()
     const layers = buildLayers(profile)
-    if (profile.kind !== 'gasGiant') layers.push(buildCrackLayer(profile))
+    if (profile.kind !== 'gasGiant' && profile.kind !== 'nebula') layers.push(buildCrackLayer(profile))
     const crackUniforms = layers.find((l) => l.isCracks)?.uniforms ?? null
     // Widen the frustum to the largest layer scale so a gas giant's ring is captured in full
     // instead of clipped at the frame edge. The canvas box itself doesn't change size (it's
