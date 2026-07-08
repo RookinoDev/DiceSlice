@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
-import { claimPurchases, getProfile, getSave, putSave, upsertProfile } from './db.mjs'
+import { claimPurchases, getCollection, getProfile, getSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, upsertProfile } from './db.mjs'
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/stellar-breaker\.pages\.dev$/,
@@ -112,9 +112,62 @@ export function startServer(botToken, port) {
         putSave(userId, JSON.stringify(body.save))
         // Saves are the profile heartbeat: refresh Telegram-signed identity on each sync.
         upsertProfile(userId, { firstName: user.first_name, username: user.username, photoUrl: user.photo_url })
-        sendJson(res, 200, { ok: true })
+        // ...and the pack-earning heartbeat: new boss kills in the save grant card packs.
+        grantPacksFromSave(userId, body.save)
+        sendJson(res, 200, { ok: true, pendingPacks: listUnopenedPacks(userId).length })
       } catch (e) {
         console.error('[server] save error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Card packs + collection (docs/CARD_SYSTEM_PLAN.md phase 1). The server rolls all
+    // pack contents and mints serials; the client only animates results.
+    if (req.method === 'POST' && req.url === '/api/packs') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        sendJson(res, 200, { packs: listUnopenedPacks(userId) })
+      } catch (e) {
+        console.error('[server] packs error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    if (req.method === 'POST' && req.url === '/api/packs/open') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        const packId = Number(body.packId)
+        if (!Number.isInteger(packId)) {
+          sendJson(res, 400, { error: 'bad packId' })
+          return
+        }
+        const result = openPack(userId, packId)
+        if (!result) {
+          sendJson(res, 404, { error: 'pack not found' })
+          return
+        }
+        sendJson(res, 200, result)
+      } catch (e) {
+        console.error('[server] pack-open error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    if (req.method === 'POST' && req.url === '/api/collection') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        sendJson(res, 200, { cards: getCollection(userId) })
+      } catch (e) {
+        console.error('[server] collection error:', e)
         sendJson(res, 400, { error: 'bad request' })
       }
       return

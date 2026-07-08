@@ -1,0 +1,332 @@
+[
+ {
+  "no": 1,
+  "id": "mercury",
+  "rarity": "rare"
+ },
+ {
+  "no": 2,
+  "id": "venus",
+  "rarity": "rare"
+ },
+ {
+  "no": 3,
+  "id": "earth",
+  "rarity": "ultra"
+ },
+ {
+  "no": 4,
+  "id": "luna",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 5,
+  "id": "mars",
+  "rarity": "rare"
+ },
+ {
+  "no": 6,
+  "id": "phobos",
+  "rarity": "common"
+ },
+ {
+  "no": 7,
+  "id": "ceres",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 8,
+  "id": "vesta",
+  "rarity": "common"
+ },
+ {
+  "no": 9,
+  "id": "io",
+  "rarity": "rare"
+ },
+ {
+  "no": 10,
+  "id": "europa",
+  "rarity": "rare"
+ },
+ {
+  "no": 11,
+  "id": "ganymede",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 12,
+  "id": "callisto",
+  "rarity": "common"
+ },
+ {
+  "no": 13,
+  "id": "titan",
+  "rarity": "rare"
+ },
+ {
+  "no": 14,
+  "id": "enceladus",
+  "rarity": "rare"
+ },
+ {
+  "no": 15,
+  "id": "mimas",
+  "rarity": "common"
+ },
+ {
+  "no": 16,
+  "id": "triton",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 17,
+  "id": "pluto",
+  "rarity": "rare"
+ },
+ {
+  "no": 18,
+  "id": "charon",
+  "rarity": "common"
+ },
+ {
+  "no": 19,
+  "id": "haumea",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 20,
+  "id": "makemake",
+  "rarity": "common"
+ },
+ {
+  "no": 21,
+  "id": "eris",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 22,
+  "id": "sedna",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 23,
+  "id": "proxima-centauri-b",
+  "rarity": "rare"
+ },
+ {
+  "no": 24,
+  "id": "trappist-1e",
+  "rarity": "rare"
+ },
+ {
+  "no": 25,
+  "id": "kepler-452b",
+  "rarity": "rare"
+ },
+ {
+  "no": 26,
+  "id": "kepler-186f",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 27,
+  "id": "55-cancri-e",
+  "rarity": "rare"
+ },
+ {
+  "no": 28,
+  "id": "corot-7b",
+  "rarity": "common"
+ },
+ {
+  "no": 29,
+  "id": "gj-1214-b",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 30,
+  "id": "k2-18-b",
+  "rarity": "rare"
+ },
+ {
+  "no": 31,
+  "id": "16-psyche",
+  "rarity": "uncommon"
+ },
+ {
+  "no": 32,
+  "id": "halleys-comet",
+  "rarity": "rare"
+ },
+ {
+  "no": 33,
+  "id": "67p",
+  "rarity": "common"
+ },
+ {
+  "no": 34,
+  "id": "oumuamua",
+  "rarity": "epic"
+ },
+ {
+  "no": 35,
+  "id": "iapetus",
+  "rarity": "common"
+ },
+ {
+  "no": 36,
+  "id": "titania",
+  "rarity": "common"
+ },
+ {
+  "no": 37,
+  "id": "jupiter",
+  "rarity": "epic"
+ },
+ {
+  "no": 38,
+  "id": "saturn",
+  "rarity": "epic"
+ },
+ {
+  "no": 39,
+  "id": "uranus",
+  "rarity": "epic"
+ },
+ {
+  "no": 40,
+  "id": "neptune",
+  "rarity": "epic"
+ },
+ {
+  "no": 41,
+  "id": "hd-189733-b",
+  "rarity": "epic"
+ },
+ {
+  "no": 42,
+  "id": "wasp-12b",
+  "rarity": "epic"
+ },
+ {
+  "no": 43,
+  "id": "51-pegasi-b",
+  "rarity": "legendary"
+ },
+ {
+  "no": 44,
+  "id": "hd-209458-b",
+  "rarity": "epic"
+ },
+ {
+  "no": 45,
+  "id": "gj-504-b",
+  "rarity": "epic"
+ },
+ {
+  "no": 46,
+  "id": "j1407-b",
+  "rarity": "legendary"
+ },
+ {
+  "no": 47,
+  "id": "the-sun",
+  "rarity": "legendary"
+ },
+ {
+  "no": 48,
+  "id": "proxima-centauri",
+  "rarity": "epic"
+ },
+ {
+  "no": 49,
+  "id": "sirius",
+  "rarity": "epic"
+ },
+ {
+  "no": 50,
+  "id": "vega",
+  "rarity": "epic"
+ },
+ {
+  "no": 51,
+  "id": "aldebaran",
+  "rarity": "epic"
+ },
+ {
+  "no": 52,
+  "id": "betelgeuse",
+  "rarity": "legendary"
+ },
+ {
+  "no": 53,
+  "id": "rigel",
+  "rarity": "epic"
+ },
+ {
+  "no": 54,
+  "id": "antares",
+  "rarity": "epic"
+ },
+ {
+  "no": 55,
+  "id": "uy-scuti",
+  "rarity": "legendary"
+ },
+ {
+  "no": 56,
+  "id": "psr-b1919-21",
+  "rarity": "legendary"
+ },
+ {
+  "no": 57,
+  "id": "orion-nebula",
+  "rarity": "legendary"
+ },
+ {
+  "no": 58,
+  "id": "crab-nebula",
+  "rarity": "legendary"
+ },
+ {
+  "no": 59,
+  "id": "helix-nebula",
+  "rarity": "epic"
+ },
+ {
+  "no": 60,
+  "id": "eagle-nebula",
+  "rarity": "epic"
+ },
+ {
+  "no": 61,
+  "id": "cats-eye-nebula",
+  "rarity": "epic"
+ },
+ {
+  "no": 62,
+  "id": "andromeda",
+  "rarity": "legendary"
+ },
+ {
+  "no": 63,
+  "id": "whirlpool-galaxy",
+  "rarity": "epic"
+ },
+ {
+  "no": 64,
+  "id": "sombrero-galaxy",
+  "rarity": "epic"
+ },
+ {
+  "no": 65,
+  "id": "sagittarius-a-star",
+  "rarity": "ultra"
+ },
+ {
+  "no": 66,
+  "id": "m87-star",
+  "rarity": "ultra"
+ }
+]
