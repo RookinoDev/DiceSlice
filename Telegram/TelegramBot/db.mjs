@@ -29,6 +29,41 @@ db.exec(`
   )
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS profiles (
+    telegram_user_id INTEGER PRIMARY KEY,
+    first_name TEXT,
+    username TEXT,
+    photo_url TEXT,
+    first_synced_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )
+`)
+
+/** Upsert the player's public identity (from Telegram-signed initData). Keeps first_synced_at. */
+export function upsertProfile(telegramUserId, { firstName, username, photoUrl }) {
+  const now = Date.now()
+  db.prepare(`
+    INSERT INTO profiles (telegram_user_id, first_name, username, photo_url, first_synced_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(telegram_user_id) DO UPDATE SET
+      first_name = excluded.first_name, username = excluded.username,
+      photo_url = excluded.photo_url, updated_at = excluded.updated_at
+  `).run(telegramUserId, firstName ?? null, username ?? null, photoUrl ?? null, now, now)
+}
+
+/** Public profile: identity row + the synced save JSON (null when the user never synced). */
+export function getProfile(telegramUserId) {
+  const row = db
+    .prepare(
+      `SELECT p.telegram_user_id, p.first_name, p.username, p.photo_url, p.first_synced_at, s.save_json
+       FROM profiles p LEFT JOIN saves s ON s.telegram_user_id = p.telegram_user_id
+       WHERE p.telegram_user_id = ?`,
+    )
+    .get(telegramUserId)
+  return row ?? null
+}
+
 /** Upsert the user's cloud save (last write wins - the client decides which save is better). */
 export function putSave(telegramUserId, saveJson) {
   db.prepare(`

@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
-import { claimPurchases, getSave, putSave } from './db.mjs'
+import { claimPurchases, getProfile, getSave, putSave, upsertProfile } from './db.mjs'
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/stellar-breaker\.pages\.dev$/,
@@ -19,7 +19,7 @@ function withCors(req, res) {
   const origin = req.headers.origin
   if (isAllowedOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
   }
 }
@@ -48,6 +48,27 @@ function requireUser(body, res, botToken) {
     return null
   }
   return userId
+}
+
+/** The public slice of a profile row + its synced save. Never exposes the raw save blob. */
+function publicProfilePayload(row) {
+  let save = null
+  try {
+    save = row.save_json ? JSON.parse(row.save_json) : null
+  } catch {
+    save = null
+  }
+  return {
+    userId: row.telegram_user_id,
+    firstName: row.first_name,
+    username: row.username,
+    photoUrl: row.photo_url,
+    firstSyncedAt: row.first_synced_at,
+    highestStage: save?.highestStage ?? null,
+    relics: save?.relics ?? null,
+    dailyStreak: save?.dailyStreak ?? null,
+    stats: save?.stats ?? null,
+  }
 }
 
 export function startServer(botToken, port) {
@@ -79,16 +100,43 @@ export function startServer(botToken, port) {
     if (req.method === 'POST' && req.url === '/api/save') {
       try {
         const body = await readJsonBody(req)
-        const userId = requireUser(body, res, botToken)
-        if (userId === null) return
+        const { valid, userId, user } = validateInitData(body.initData, botToken)
+        if (!valid) {
+          sendJson(res, 401, { error: 'invalid initData' })
+          return
+        }
         if (!body.save || typeof body.save !== 'object' || Array.isArray(body.save)) {
           sendJson(res, 400, { error: 'save must be an object' })
           return
         }
         putSave(userId, JSON.stringify(body.save))
+        // Saves are the profile heartbeat: refresh Telegram-signed identity on each sync.
+        upsertProfile(userId, { firstName: user.first_name, username: user.username, photoUrl: user.photo_url })
         sendJson(res, 200, { ok: true })
       } catch (e) {
         console.error('[server] save error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Public read-only profile (no auth: it exposes only display identity + progression
+    // stats, never the raw save). Powers visitor profile views / future leaderboards.
+    if (req.method === 'GET' && req.url?.startsWith('/api/profile?')) {
+      try {
+        const id = Number(new URL(req.url, 'http://x').searchParams.get('id'))
+        if (!Number.isInteger(id) || id <= 0) {
+          sendJson(res, 400, { error: 'bad id' })
+          return
+        }
+        const row = getProfile(id)
+        if (!row) {
+          sendJson(res, 404, { error: 'not found' })
+          return
+        }
+        sendJson(res, 200, { profile: publicProfilePayload(row) })
+      } catch (e) {
+        console.error('[server] profile error:', e)
         sendJson(res, 400, { error: 'bad request' })
       }
       return

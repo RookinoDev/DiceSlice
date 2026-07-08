@@ -31,7 +31,9 @@ export function validateInitData(initData, botToken) {
 
   try {
     const user = JSON.parse(userJson)
-    return { valid: true, userId: user.id }
+    // `user` carries Telegram-signed identity (first_name, username, photo_url when present) -
+    // safe to persist for public profiles since the HMAC covered it.
+    return { valid: true, userId: user.id, user }
   } catch {
     return { valid: false }
   }

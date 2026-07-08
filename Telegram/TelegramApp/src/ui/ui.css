@@ -2179,3 +2179,117 @@
     transition: none;
   }
 }
+
+/* ===== Profile sheet ===== */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 2px 16px;
+}
+
+.profile-avatar {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 2px solid var(--palette-gold);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.profile-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--palette-sheet-row);
+  color: var(--palette-gold);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.profile-identity {
+  min-width: 0;
+}
+
+.profile-name {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--palette-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-username {
+  font-size: 12px;
+  color: var(--palette-text-secondary);
+}
+
+.profile-since {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--palette-text-dim);
+}
+
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.profile-stat {
+  background: var(--palette-sheet-row);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 12px 10px;
+  text-align: center;
+}
+
+.profile-stat-value {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--palette-text-primary);
+}
+
+.profile-stat--gold .profile-stat-value {
+  color: var(--palette-gold);
+}
+.profile-stat--cyan .profile-stat-value {
+  color: var(--palette-cyan);
+}
+.profile-stat--magenta .profile-stat-value {
+  color: var(--palette-magenta-light);
+}
+
+.profile-stat-label {
+  margin-top: 3px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--palette-text-dimmer);
+}
+
+.profile-share-btn {
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--palette-gold-deep), var(--palette-gold));
+  color: #1a1408;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+
+.profile-share-btn:active {
+  transform: scale(0.98);
+}

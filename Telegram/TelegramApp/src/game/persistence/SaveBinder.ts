@@ -24,6 +24,7 @@ export function captureSave(s: GameSession): SaveState {
     lastSaveUnixSeconds: Math.floor(Date.now() / 1000),
     lastDailyClaimUnixSeconds: Number.isFinite(s.daily.lastClaimDay) ? s.daily.lastClaimDay * DailyRewardService.SECONDS_PER_DAY : 0,
     dailyStreak: s.daily.streak,
+    stats: { ...s.stats, deepestStage: Math.max(s.stats.deepestStage, s.stage.highestStage) },
   }
 }
 
@@ -38,6 +39,14 @@ export function applySave(s: GameSession, st: SaveState): void {
   if (st.lastDailyClaimUnixSeconds > 0) {
     s.daily.restore(Math.floor(st.lastDailyClaimUnixSeconds / DailyRewardService.SECONDS_PER_DAY), st.dailyStreak)
   }
+  if (st.stats) {
+    Object.assign(s.stats, st.stats)
+  } else {
+    // Pre-profile save: seed what we can infer so profiles never show zeros for veterans.
+    s.stats.deepestStage = st.highestStage
+    if (st.lastSaveUnixSeconds > 0) s.stats.firstPlayedUnixSeconds = st.lastSaveUnixSeconds
+  }
+  s.stats.deepestStage = Math.max(s.stats.deepestStage, st.highestStage)
 }
 
 function captureShipLevels(s: GameSession): number[] {

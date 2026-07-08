@@ -7,7 +7,8 @@ import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import type { OfflineReport } from '../game/useGameSession'
 import type { PurchaseGrant } from '../game/monetization/purchases'
 import { audio } from '../game/audio/AudioManager'
-import { hapticSuccess, useTelegramBackButton } from '../telegram'
+import { getStartParam, getTelegramUser, hapticSuccess, useTelegramBackButton } from '../telegram'
+import { fetchPublicProfile, type PublicProfile } from '../game/profileApi'
 import { useScreenShake } from './useScreenShake'
 import { useParticles } from './combatFx/useParticles'
 import { ParticleLayer } from './combatFx/ParticleLayer'
@@ -25,6 +26,7 @@ import { PrestigeConfirmSheet } from './sheets/PrestigeConfirmSheet'
 import { MissionsSheet } from './sheets/MissionsSheet'
 import { DailyRewardSheet } from './sheets/DailyRewardSheet'
 import { SettingsSheet } from './sheets/SettingsSheet'
+import { ProfileSheet } from './sheets/ProfileSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { ShipUnlockToast, type ShipUnlockInfo } from './ShipUnlockToast'
 import './ui.css'
@@ -52,6 +54,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [missionsOpen, setMissionsOpen] = useState(false)
   const [dailyOpen, setDailyOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  // A visited player's profile, opened via a "u_<id>" deep-link start param.
+  const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
   const [shipUnlock, setShipUnlock] = useState<ShipUnlockInfo | null>(null)
   const [toastText, setToastText] = useState<string | null>(null)
@@ -216,11 +221,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         ? 'daily'
         : settingsOpen
           ? 'settings'
-          : offlineOpen
-            ? 'offline'
-            : shipUnlock
-              ? 'shipUnlock'
-              : null
+          : profileOpen
+            ? 'profile'
+            : offlineOpen
+              ? 'offline'
+              : shipUnlock
+                ? 'shipUnlock'
+                : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
@@ -228,11 +235,31 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       missions: () => setMissionsOpen(false),
       daily: () => setDailyOpen(false),
       settings: () => setSettingsOpen(false),
+      profile: () => {
+        setProfileOpen(false)
+        setVisitorProfile(null)
+      },
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
     }
     return useTelegramBackButton(openSheet !== null, () => openSheet && closers[openSheet]())
   }, [openSheet])
+
+  // Profile deep link ("u_<id>" start param): open that player's profile on launch.
+  // Falls back silently if the profile doesn't exist or the API is unreachable.
+  useEffect(() => {
+    const param = getStartParam()
+    const match = param?.match(/^u_(\d+)$/)
+    if (!match) return
+    const userId = Number(match[1])
+    if (userId === getTelegramUser()?.id) return // own profile via link: nothing special to fetch
+    fetchPublicProfile(import.meta.env.VITE_API_URL, userId).then((p) => {
+      if (p) {
+        setVisitorProfile(p)
+        setProfileOpen(true)
+      }
+    })
+  }, [])
 
   // Boss Planet Takes Over the Screen: dim/recede the surrounding chrome while a boss fight is
   // live and the player is actually looking at it, so attention stays on the encounter.
@@ -240,7 +267,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
 
   return (
     <div ref={shellRef} className={`game-shell ${bossTakeover ? 'game-shell--boss-focus' : ''} ${returningBoost ? 'game-shell--returning' : ''}`}>
-      <TopBar session={session} onSettingsClick={() => setSettingsOpen(true)} onNotificationClick={() => setMissionsOpen(true)} onDailyClick={() => setDailyOpen(true)} />
+      <TopBar
+        session={session}
+        onSettingsClick={() => setSettingsOpen(true)}
+        onProfileClick={() => setProfileOpen(true)}
+        onNotificationClick={() => setMissionsOpen(true)}
+        onDailyClick={() => setDailyOpen(true)}
+      />
       <Toast text={toastText} />
 
       <div className={`game-shell-content ${tab === 'combat' ? 'combat-active' : ''}`}>
@@ -262,6 +295,15 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       <MissionsSheet session={session} open={missionsOpen} onClose={() => setMissionsOpen(false)} onClaimed={() => showToast('MISSION COMPLETE')} />
       <DailyRewardSheet session={session} open={dailyOpen} onClose={() => setDailyOpen(false)} onClaimed={handleDailyClaimed} />
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <ProfileSheet
+        session={session}
+        open={profileOpen}
+        visitor={visitorProfile}
+        onClose={() => {
+          setProfileOpen(false)
+          setVisitorProfile(null)
+        }}
+      />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
     </div>

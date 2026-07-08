@@ -20,6 +20,15 @@ export function SettingsIcon({ color = '#C7CCDC', size = 17 }: IconProps) {
   )
 }
 
+export function ProfileIcon({ color = '#C7CCDC', size = 17 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="8.5" r="3.5" stroke={color} strokeWidth="1.8" />
+      <path d="M5 20c.8-3.5 3.6-5.5 7-5.5s6.2 2 7 5.5" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function MissionsBellIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

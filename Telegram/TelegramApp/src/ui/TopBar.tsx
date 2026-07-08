@@ -6,16 +6,17 @@ import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import { audio } from '../game/audio/AudioManager'
 import { useCountUp } from './useCountUp'
 import { registerLandmark } from './combatFx/landmarks'
-import { SettingsIcon, MissionsBellIcon, DailyGiftIcon, GoldIcon, FleetDpsIcon, RelicIcon } from './icons'
+import { SettingsIcon, ProfileIcon, MissionsBellIcon, DailyGiftIcon, GoldIcon, FleetDpsIcon, RelicIcon } from './icons'
 
 interface TopBarProps {
   session: GameSession
   onSettingsClick: () => void
+  onProfileClick: () => void
   onNotificationClick: () => void
   onDailyClick: () => void
 }
 
-export function TopBar({ session: s, onSettingsClick, onNotificationClick, onDailyClick }: TopBarProps) {
+export function TopBar({ session: s, onSettingsClick, onProfileClick, onNotificationClick, onDailyClick }: TopBarProps) {
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero) || s.canPrestige()
 
   let anyMissionClaimable = false
@@ -40,16 +41,28 @@ export function TopBar({ session: s, onSettingsClick, onNotificationClick, onDai
   return (
     <div className="topbar-wrap">
       <div className="topbar-row">
-        <button
-          className="topbar-icon-btn"
-          onClick={() => {
-            audio.click()
-            onSettingsClick()
-          }}
-          aria-label="Settings"
-        >
-          <SettingsIcon />
-        </button>
+        <div className="topbar-icon-group">
+          <button
+            className="topbar-icon-btn"
+            onClick={() => {
+              audio.click()
+              onSettingsClick()
+            }}
+            aria-label="Settings"
+          >
+            <SettingsIcon />
+          </button>
+          <button
+            className="topbar-icon-btn"
+            onClick={() => {
+              audio.click()
+              onProfileClick()
+            }}
+            aria-label="Profile"
+          >
+            <ProfileIcon />
+          </button>
+        </div>
 
         <div className="topbar-icon-group">
           <button

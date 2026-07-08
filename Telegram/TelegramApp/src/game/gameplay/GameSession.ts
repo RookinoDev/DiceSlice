@@ -19,6 +19,7 @@ import { SkillService } from './SkillService'
 import { StageManager } from './StageManager'
 import { TapController } from './TapController'
 import { TapDamageUpgrade } from './TapDamageUpgrade'
+import { newLifetimeStats, type LifetimeStats } from './LifetimeStats'
 
 export interface DailyPreview {
   /** 1..7 in the cycle */
@@ -47,6 +48,9 @@ export class GameSession {
   readonly artifacts: ArtifactService
   readonly missions: MissionService
   readonly daily = new DailyRewardService()
+
+  /** Lifetime profile counters (survive prestige; persisted via SaveState.stats). */
+  readonly stats: LifetimeStats = newLifetimeStats(Math.floor(Date.now() / 1000))
 
   /** The active skills exposed to the UI (in display order). */
   readonly skillSlots: readonly SkillType[] = [
@@ -82,6 +86,14 @@ export class GameSession {
     this.taps.onDamageDealt.on((e) => this.missions.notifyTapDamage(e.amount))
     this.ships.onShipChanged.on(() => this.missions.notifyShipUpgraded())
     this.stage.onBossFailed.on((stage) => this.handleBossFailed(stage))
+
+    // Lifetime profile counters - observe-only, never feed back into gameplay.
+    this.enemy.onPlanetKilled.on(() => this.stats.planetsDestroyed++)
+    this.stage.onBossCleared.on(() => this.stats.bossesDefeated++)
+    this.stage.onStageEntered.on((stage) => {
+      if (stage > this.stats.deepestStage) this.stats.deepestStage = stage
+    })
+    this.prestige.onPrestiged.on(() => this.stats.prestigeCount++)
   }
 
   begin(): void {

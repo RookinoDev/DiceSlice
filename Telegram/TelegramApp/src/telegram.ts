@@ -15,14 +15,22 @@ interface BackButton {
   offClick(handler: () => void): void
 }
 
+export interface TelegramUser {
+  id: number
+  first_name: string
+  username?: string
+  photo_url?: string
+}
+
 interface TelegramWebApp {
   ready(): void
   expand(): void
   enableClosingConfirmation(): void
+  openTelegramLink(url: string): void
   colorScheme: 'light' | 'dark'
   themeParams: Record<string, string>
   initData: string
-  initDataUnsafe: { user?: { id: number; first_name: string; username?: string } }
+  initDataUnsafe: { user?: TelegramUser; start_param?: string }
   viewportHeight: number
   viewportStableHeight: number
   safeAreaInset?: { top: number; bottom: number; left: number; right: number }
@@ -92,6 +100,21 @@ function applySafeArea(webApp: TelegramWebApp) {
 /** Raw initData string for server-side validation (e.g. claiming a Stars purchase). Null outside Telegram. */
 export function getInitData(): string | null {
   return cachedWebApp?.initData || null
+}
+
+/** The Telegram user opening the app (display-only - servers must use validated initData). */
+export function getTelegramUser(): TelegramUser | null {
+  return cachedWebApp?.initDataUnsafe.user ?? null
+}
+
+/** Deep-link start parameter (t.me startapp links), e.g. "u_12345" for a profile visit. */
+export function getStartParam(): string | null {
+  return cachedWebApp?.initDataUnsafe.start_param ?? null
+}
+
+/** Opens Telegram's native share sheet with prefilled text + link. No-ops outside Telegram. */
+export function shareViaTelegram(url: string, text: string): void {
+  cachedWebApp?.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`)
 }
 
 /** Light haptic tap - use for frequent, low-weight actions (regular taps). */
