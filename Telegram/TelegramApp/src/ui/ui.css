@@ -3010,6 +3010,161 @@
   letter-spacing: 0.06em;
   color: var(--palette-gold-label);
 }
+.pack-item {
+  position: relative;
+  overflow: hidden;
+  touch-action: none; /* hold-to-tear must not start a scroll */
+}
+.pack-item--tearing .pack-item-icon {
+  animation: pack-shake 0.28s linear infinite;
+}
+.pack-tear-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--palette-gold-light), var(--palette-magenta));
+  transition: none;
+}
+@keyframes pack-shake {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(1.02);
+  }
+  25% {
+    transform: rotate(-3deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(3deg) scale(1.05);
+  }
+}
+
+/* -- Stack reveal: face-down pile, tap flips the top card -- */
+.pack-stack {
+  position: relative;
+  height: 380px;
+  margin: 8px 0 4px;
+  cursor: pointer;
+}
+.pack-stack-card {
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: min(78%, 230px);
+  aspect-ratio: 0.7;
+  transform: translateX(-50%) translateY(var(--stack-offset, 0px));
+  perspective: 700px;
+}
+.pack-stack-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pack-stack-card--revealed .pack-stack-card-inner {
+  transform: rotateY(180deg);
+}
+.pack-stack-card--revealed {
+  animation: stack-card-land 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes stack-card-land {
+  0% {
+    transform: translateX(-50%) translateY(var(--stack-offset, 0px)) scale(1);
+  }
+  45% {
+    transform: translateX(-50%) translateY(calc(var(--stack-offset, 0px) - 14px)) scale(1.06);
+  }
+  100% {
+    transform: translateX(-50%) translateY(var(--stack-offset, 0px)) scale(1);
+  }
+}
+.pack-stack-card-back,
+.pack-stack-card-front {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  backface-visibility: hidden;
+}
+.pack-stack-card-back {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(67, 221, 238, 0.12), transparent 55%),
+    linear-gradient(135deg, var(--palette-panel), var(--palette-sheet-row));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+/* The rarity TELL: only the top, still-hidden card leaks its coming rarity as an edge glow. */
+.pack-stack-card--top:not(.pack-stack-card--revealed) .pack-stack-card-back {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--rarity-color) 55%, transparent);
+  border-color: color-mix(in srgb, var(--rarity-color) 65%, transparent);
+  animation: card-edge-pulse 1.4s ease-in-out infinite;
+}
+.pack-stack-card-front {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px;
+  border: 2px solid var(--rarity-color, rgba(255, 255, 255, 0.15));
+  background: var(--palette-sheet);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--rarity-color, transparent) 55%, transparent);
+}
+.pack-stack-hint {
+  position: absolute;
+  bottom: -22px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--palette-text-dim);
+}
+
+/* -- Recap -- */
+.pack-recap-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 6px 0 14px;
+}
+.pack-recap-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 6px;
+  border: 1px solid var(--rarity-color);
+  border-radius: 12px;
+  background: var(--palette-sheet-row);
+}
+.pack-recap-card--best {
+  box-shadow: 0 0 18px color-mix(in srgb, var(--rarity-color) 65%, transparent);
+  animation: card-edge-pulse 1.8s ease-in-out infinite;
+}
+.pack-recap-best-tag {
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--palette-gold-light);
+  color: #241300;
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pack-item--tearing .pack-item-icon,
+  .pack-stack-card--revealed,
+  .pack-stack-card--top:not(.pack-stack-card--revealed) .pack-stack-card-back,
+  .pack-recap-card--best {
+    animation: none;
+  }
+}
 
 /* -- Pack opening reveal -- */
 .pack-reveal-grid {

@@ -143,6 +143,7 @@ function getClips(): Record<string, Clip> {
     overdriveBeat: tone(900, 0.06), // 3-2-1 countdown pip
     overdriveGo: twoTone(1100, 1650, 0.08), // "OVERDRIVE" text landing
     overdriveEnd: boom(0.35), // final-blast on natural expiry
+    packTear: noise(0.24, 1.3), // foil-wrapper rip for the pack-opening ceremony
   }
   for (let tier = 1; tier <= COMBO_TIER_CLIPS; tier++) {
     // ~12% frequency step per tier - a pleasant ascending run, not a harsh chromatic climb.
@@ -206,6 +207,7 @@ export const audio = {
   overdriveBeat: () => play('overdriveBeat', 0.4),
   overdriveGo: () => play('overdriveGo', 0.55),
   overdriveEnd: () => play('overdriveEnd', 0.5),
+  packTear: () => play('packTear', 0.5),
   /** Hushes every non-finisher sound for `ms` - call right before a finisher clip for a beat of silence first. */
   silence: (ms: number) => {
     silencedUntil = performance.now() + ms

@@ -75,6 +75,7 @@ export async function fetchPendingPacks(apiBaseUrl: string | undefined): Promise
 }
 
 export async function openPackRequest(apiBaseUrl: string | undefined, packId: number): Promise<OpenPackResult | null> {
+  if (useDevMock()) return (await import('./devMock')).mockOpenPack(packId)
   return postJson<OpenPackResult>(apiBaseUrl, '/api/packs/open', { packId })
 }
 
