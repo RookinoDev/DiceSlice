@@ -50,7 +50,6 @@ interface ShipState {
   spec: FleetProjectileSpec
   angle: number
   entranceStart: number
-  el: HTMLDivElement | null
   /** Last on-screen position in fleet-layer-local px, so a hit can fire from where the ship actually is. */
   x: number
   y: number
@@ -111,6 +110,14 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   const registerRoot = useRef((el: HTMLDivElement | null) => (rootElRef.current = el)).current
   const { containerRef: particlesRef, spawn } = useParticles()
   const shipsRef = useRef(new Map<number, ShipState>())
+  // DOM element per ship index, tracked SEPARATELY from shipsRef. A sprite's ref callback fires
+  // during commit, before the sync-effect below (a passive effect) has had a chance to create
+  // that index's ShipState entry - looking up shipsRef.current.get(index) from inside the ref
+  // callback would silently miss on every ship's first mount (confirmed: this was a real,
+  // permanent bug, not a transient one - the ref callback is stable and never fires again once
+  // missed). Keeping element refs in their own map that's never wholesale-replaced means it
+  // doesn't matter which one - the ref callback or the sync effect - runs first.
+  const elByIndexRef = useRef(new Map<number, HTMLDivElement | null>())
   const boxSizeRef = useRef({ w: 0, h: 0 })
   const formationRef = useRef<FormationTarget>({ radius: 1, speed: 1, squash: 1 })
   const flybyStartRef = useRef(0)
@@ -141,12 +148,16 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
         spec: projectileSpecForShip(i, s.ships.def(i)),
         angle: params.phase,
         entranceStart: now,
-        el: null,
         x: 0,
         y: 0,
       })
     }
     shipsRef.current = next
+    // Drop element refs for indices that dropped out of visibility (e.g. an unlikely top-8
+    // eviction) so elByIndexRef doesn't accumulate stale entries forever.
+    for (const i of elByIndexRef.current.keys()) {
+      if (!next.has(i)) elByIndexRef.current.delete(i)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visibleKey])
 
@@ -209,7 +220,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
       if (boxSize > 0) {
         const half = (boxSize * planetScaleRef.current) / 2
 
-        for (const ship of shipsRef.current.values()) {
+        for (const [index, ship] of shipsRef.current) {
           if (!reducedMotionRef.current) {
             ship.angle += dt * ship.params.angularSpeed * formationRef.current.speed * flyby
           }
@@ -228,7 +239,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
           const opacity = lerp(0.5, 1.0, depthT) * entrance
           const z = Math.sin(ship.angle) >= 0 ? 1 : -1
 
-          const el = ship.el
+          const el = elByIndexRef.current.get(index)
           if (el) {
             // translate(-50%,-50%) centers the sprite's own box on (x,y) - translate order doesn't
             // affect the result (pure translates commute), matching .combat-planet's own convention.
@@ -260,7 +271,8 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   useEffect(() => {
     return s.ships.onShipHit.on(({ index }) => {
       const ship = shipsRef.current.get(index)
-      if (!ship || !ship.el) return
+      const el = elByIndexRef.current.get(index)
+      if (!ship || !el) return
 
       if (reducedMotionRef.current) return // static parked ships, no projectiles - per the plan
 
@@ -269,7 +281,6 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
       if (hitTimestampsRef.current.length >= MAX_VISUAL_HITS_PER_SECOND) return
       hitTimestampsRef.current.push(now)
 
-      const el = ship.el
       el.classList.remove('siege-ship--recoil')
       void el.offsetWidth
       el.classList.add('siege-ship--recoil')
@@ -300,10 +311,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   const registerSprite = (index: number) => {
     let cb = spriteRefCallbacks.current.get(index)
     if (!cb) {
-      cb = (el: HTMLDivElement | null) => {
-        const ship = shipsRef.current.get(index)
-        if (ship) ship.el = el
-      }
+      cb = (el: HTMLDivElement | null) => elByIndexRef.current.set(index, el)
       spriteRefCallbacks.current.set(index, cb)
     }
     return cb
