@@ -3,6 +3,7 @@
 // result; never compute rarity/serials locally. See docs/CARD_SYSTEM_PLAN.md.
 import { getInitData } from '../../telegram'
 import type { CardRarity } from './catalog'
+import type { CardVariant } from './variants'
 
 const FETCH_TIMEOUT_MS = 6000
 
@@ -17,8 +18,10 @@ export interface PendingPack {
 export interface MintedCard {
   cardId: string
   rarity: CardRarity
-  holo: boolean
+  variant: CardVariant
   serial: number
+  /** First copy of this base card the player has ever owned (server-computed). */
+  isNew: boolean
 }
 
 export interface OpenPackResult {
@@ -27,10 +30,18 @@ export interface OpenPackResult {
 }
 
 export interface OwnedCard {
+  /** Server instance id - the handle for refine operations. */
+  instanceId: number
   cardId: string
-  holo: boolean
+  variant: CardVariant
   serial: number
   mintedAtMs: number
+}
+
+export interface CollectionResult {
+  cards: OwnedCard[]
+  /** Prism Dust balance (duplicate-refine currency). */
+  dust: number
 }
 
 async function postJson<T>(apiBaseUrl: string | undefined, path: string, body: Record<string, unknown>): Promise<T | null> {
@@ -51,7 +62,13 @@ async function postJson<T>(apiBaseUrl: string | undefined, path: string, body: R
   }
 }
 
+/** True in dev-preview outside Telegram: no initData means no real API - serve the DEV mock. */
+function useDevMock(): boolean {
+  return import.meta.env.DEV && !getInitData()
+}
+
 export async function fetchPendingPacks(apiBaseUrl: string | undefined): Promise<PendingPack[]> {
+  if (useDevMock()) return (await import('./devMock')).mockPacks()
   const data = await postJson<{ packs: Array<{ id: number; type: PackType; created_at: number }> }>(apiBaseUrl, '/api/packs', {})
   if (!data) return []
   return data.packs.map((p) => ({ id: p.id, type: p.type, createdAtMs: p.created_at }))
@@ -61,10 +78,38 @@ export async function openPackRequest(apiBaseUrl: string | undefined, packId: nu
   return postJson<OpenPackResult>(apiBaseUrl, '/api/packs/open', { packId })
 }
 
-export async function fetchCollection(apiBaseUrl: string | undefined): Promise<OwnedCard[]> {
-  const data = await postJson<{ cards: Array<{ card_id: string; holo: number; serial: number; minted_at: number }> }>(apiBaseUrl, '/api/collection', {})
-  if (!data) return []
-  return data.cards.map((c) => ({ cardId: c.card_id, holo: c.holo === 1, serial: c.serial, mintedAtMs: c.minted_at }))
+export async function fetchCollection(apiBaseUrl: string | undefined): Promise<CollectionResult> {
+  if (useDevMock()) return (await import('./devMock')).mockCollection()
+  const data = await postJson<{ cards: Array<{ id: number; card_id: string; variant: CardVariant; serial: number; minted_at: number }>; dust: number }>(
+    apiBaseUrl,
+    '/api/collection',
+    {},
+  )
+  if (!data) return { cards: [], dust: 0 }
+  return {
+    cards: data.cards.map((c) => ({ instanceId: c.id, cardId: c.card_id, variant: c.variant, serial: c.serial, mintedAtMs: c.minted_at })),
+    dust: data.dust ?? 0,
+  }
+}
+
+/** Refine (destroy) duplicate instances into dust. Server enforces the dupes-only rule. */
+export async function refineCards(apiBaseUrl: string | undefined, instanceIds: number[]): Promise<{ refined: number; gained: number; dust: number } | null> {
+  return postJson(apiBaseUrl, '/api/cards/refine', { instanceIds })
+}
+
+/** Craft a chosen card + variant for dust (bad-luck protection / variant progression). */
+export async function craftCardRequest(
+  apiBaseUrl: string | undefined,
+  cardId: string,
+  variant: CardVariant,
+): Promise<{ cardId: string; rarity: CardRarity; variant: CardVariant; serial: number; cost: number; dust: number } | null> {
+  return postJson(apiBaseUrl, '/api/cards/craft', { cardId, variant })
+}
+
+/** Persist the profile showcase (ordered owned cardId+variant pairs, max 8). */
+export async function saveShowcase(apiBaseUrl: string | undefined, cards: Array<{ cardId: string; variant: CardVariant }>): Promise<boolean> {
+  const res = await postJson<{ ok: boolean }>(apiBaseUrl, '/api/showcase', { cards })
+  return res?.ok === true
 }
 
 export const PACK_LABEL: Record<PackType, string> = {

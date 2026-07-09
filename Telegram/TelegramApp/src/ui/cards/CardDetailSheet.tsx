@@ -4,7 +4,9 @@ import { lazy, Suspense, useRef, useState, type CSSProperties, type PointerEvent
 import { Sheet } from '../Sheet'
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, collectionNo } from './cardTheme'
-import { CARD_CATALOG, RARITY_LABEL, type CardDefinition } from '../../game/cards/catalog'
+import { RARITY_LABEL, type CardDefinition } from '../../game/cards/catalog'
+import { FULL_CATALOG } from '../../game/cards/generatedCards'
+import { VARIANT_LABEL, variantRank } from '../../game/cards/variants'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
 import type { HoloLightVector } from './HoloOverlay'
 
@@ -87,7 +89,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
             ) : (
               <div className="card-detail-art-wrap">
                 <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
-                {owned?.hasHolo && (
+                {owned && variantRank(owned.bestVariant) >= variantRank('holo') && (
                   <Suspense fallback={null}>
                     <HoloOverlay rarity={card.rarity} lightRef={holoLightRef} className="card-detail-holo-overlay" />
                   </Suspense>
@@ -96,11 +98,11 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
             )}
             <div className="card-detail-rarity-tag">{RARITY_LABEL[card.rarity]}</div>
             <div className="card-detail-name">{locked ? '???' : card.name}</div>
-            <div className="card-detail-no">{collectionNo(card.no, CARD_CATALOG.length)}</div>
+            <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
             {owned && (
               <div className="card-detail-mint">
                 Mint #{String(owned.bestSerial).padStart(4, '0')}
-                {owned.hasHolo ? ' · HOLO' : ''}
+                {owned.bestVariant !== 'standard' ? ` · ${VARIANT_LABEL[owned.bestVariant].toUpperCase()}` : ''}
                 {owned.count > 1 ? ` · ×${owned.count} owned` : ''}
               </div>
             )}

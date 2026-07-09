@@ -67,6 +67,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [offlineOpen, setOfflineOpen] = useState(false)
   const [shipUnlock, setShipUnlock] = useState<ShipUnlockInfo | null>(null)
   const [ownedCards, setOwnedCards] = useState<OwnedCard[]>([])
+  const [dust, setDust] = useState(0)
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
   const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null)
   const [objectViewerOpen, setObjectViewerOpen] = useState(false)
@@ -271,7 +272,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   // while this tab is backgrounded).
   const refreshCards = () => {
     const apiUrl = import.meta.env.VITE_API_URL
-    fetchCollection(apiUrl).then(setOwnedCards)
+    fetchCollection(apiUrl).then(({ cards, dust: dustBalance }) => {
+      setOwnedCards(cards)
+      setDust(dustBalance)
+    })
     fetchPendingPacks(apiUrl).then(setPendingPacks)
   }
   useEffect(() => {
@@ -286,7 +290,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
 
   const handlePackOpened = (packId: number, result: OpenPackResult) => {
     setPendingPacks((prev) => prev.filter((p) => p.id !== packId))
-    setOwnedCards((prev) => [...prev, ...result.cards.map((c) => ({ cardId: c.cardId, holo: c.holo, serial: c.serial, mintedAtMs: Date.now() }))])
+    // instanceId -1 marks optimistic rows; the next refreshCards() replaces them with server truth.
+    setOwnedCards((prev) => [...prev, ...result.cards.map((c) => ({ instanceId: -1, cardId: c.cardId, variant: c.variant, serial: c.serial, mintedAtMs: Date.now() }))])
   }
 
   // Profile deep link ("u_<id>" start param): open that player's profile on launch.
@@ -336,7 +341,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         {tab === 'artifacts' && vm.showArtifacts && <ArtifactsScreen session={session} onToast={showToast} />}
         {tab === 'prestige' && vm.showPrestige && <PrestigeScreen session={session} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} />}
         {tab === 'cards' && showCards && (
-          <CardsScreen ownedCards={ownedCards} pendingPackCount={pendingPacks.length} onSelectCard={setSelectedCard} onOpenPacks={() => setPackSheetOpen(true)} />
+          <CardsScreen ownedCards={ownedCards} dust={dust} pendingPackCount={pendingPacks.length} onSelectCard={setSelectedCard} onOpenPacks={() => setPackSheetOpen(true)} />
         )}
       </div>
 

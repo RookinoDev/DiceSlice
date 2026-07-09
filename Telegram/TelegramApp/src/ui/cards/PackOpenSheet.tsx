@@ -6,7 +6,9 @@ import { CardArt } from './CardArt'
 import { RARITY_COLOR } from './cardTheme'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticSuccess } from '../../telegram'
-import { CARD_CATALOG, RARITY_LABEL, type CardRarity } from '../../game/cards/catalog'
+import { RARITY_LABEL, type CardRarity } from '../../game/cards/catalog'
+import { cardById } from '../../game/cards/generatedCards'
+import { VARIANT_LABEL } from '../../game/cards/variants'
 import { openPackRequest, PACK_LABEL, type MintedCard, type OpenPackResult, type PendingPack } from '../../game/cards/cardsApi'
 
 interface PackOpenSheetProps {
@@ -65,7 +67,7 @@ export function PackOpenSheet({ apiBaseUrl, pendingPacks, onOpened, open, onClos
     }
   }
 
-  const cardName = (cardId: string) => CARD_CATALOG.find((c) => c.id === cardId)?.name ?? cardId
+  const cardName = (cardId: string) => cardById(cardId)?.name ?? cardId
 
   return (
     <Sheet open={open} onClose={onClose} title={result ? 'PACK OPENED' : 'CARD PACKS'}>
@@ -112,7 +114,8 @@ function RevealedCard({ card, name, revealed }: { card: MintedCard; name: string
           <CardArt cardName={name} mode="grid" className="pack-reveal-art" />
           <div className="pack-reveal-rarity">{RARITY_LABEL[card.rarity]}</div>
           <div className="pack-reveal-name">{name}</div>
-          {card.holo && <div className="pack-reveal-holo">HOLOGRAPHIC</div>}
+          {card.variant !== 'standard' && <div className={`pack-reveal-variant pack-reveal-variant--${card.variant}`}>{VARIANT_LABEL[card.variant].toUpperCase()}</div>}
+          {card.isNew && <div className="pack-reveal-new">NEW</div>}
           <div className="pack-reveal-serial">#{String(card.serial).padStart(4, '0')}</div>
         </div>
       </div>

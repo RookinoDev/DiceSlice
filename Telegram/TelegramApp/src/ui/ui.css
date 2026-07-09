@@ -2468,11 +2468,89 @@
   font-size: 11px;
 }
 
-.card-grid {
+/* The cards screen owns its own scrolling (virtualized) - the screen itself must not grow. */
+.cards-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.cards-search {
+  flex-shrink: 0;
+  width: 100%;
+  margin-top: 8px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--palette-text-primary);
+  font-family: var(--font-body);
+  font-size: 13px;
+  outline: none;
+}
+.cards-search:focus {
+  border-color: var(--palette-cyan);
+}
+
+.cards-filter-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 6px 0 2px;
+  scrollbar-width: none;
+}
+.cards-filter-row::-webkit-scrollbar {
+  display: none;
+}
+.cards-filter-chip {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--palette-text-dim);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cards-filter-chip--active {
+  background: rgba(67, 221, 238, 0.16);
+  border-color: var(--palette-cyan);
+  color: var(--palette-cyan);
+}
+
+.cards-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--palette-text-dim);
+  font-size: 13px;
+}
+
+/* Virtualized grid: viewport scrolls, spacer reserves full height, rows position absolutely. */
+.card-grid-viewport {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 6px;
+  overscroll-behavior: contain;
+}
+.card-grid-spacer {
+  position: relative;
+}
+.card-grid-row {
+  position: absolute;
+  left: 0;
+  right: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
-  padding: 10px 0 24px;
+  height: 138px; /* + 10px effective gap = ROW_HEIGHT_PX (148) in CardsScreen.tsx */
 }
 
 .card-grid-item {
@@ -2519,11 +2597,54 @@
     background-position: -50% 100%;
   }
 }
-.card-grid-item--ghost {
-  border-color: rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.02);
-  box-shadow: none;
-  opacity: 0.65;
+/* Grid cells have a fixed height (virtualization needs uniform rows). */
+.card-grid-item {
+  height: 138px;
+  overflow: hidden;
+}
+
+/* Per-variant grid treatments: cheap CSS-only tiers (the focused card gets the WebGL holo). */
+.card-grid-item--foil {
+  border-color: rgba(210, 220, 255, 0.55);
+}
+.card-grid-item--fullart .card-art {
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--rarity-color) 60%, transparent);
+}
+.card-grid-item--negative {
+  filter: saturate(0.4) contrast(1.25);
+  border-color: rgba(255, 255, 255, 0.7);
+}
+.card-grid-item--polychrome::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  background: conic-gradient(from 0deg, rgba(255, 110, 110, 0.28), rgba(255, 210, 90, 0.28), rgba(130, 255, 150, 0.28), rgba(100, 210, 255, 0.28), rgba(200, 130, 255, 0.28), rgba(255, 110, 110, 0.28));
+  mix-blend-mode: screen;
+  animation: card-holo-sheen 2.6s linear infinite;
+  pointer-events: none;
+}
+
+.card-grid-variant {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--palette-gold-label);
+}
+.card-grid-fav {
+  position: absolute;
+  bottom: 34px;
+  right: 8px;
+  font-size: 11px;
+  color: var(--palette-magenta);
+  text-shadow: 0 0 6px rgba(226, 79, 255, 0.7);
 }
 
 .card-art {
@@ -2869,11 +2990,37 @@
   white-space: nowrap;
   width: 100%;
 }
-.pack-reveal-holo {
+.pack-reveal-variant {
   font-size: 8px;
   letter-spacing: 0.1em;
   color: var(--palette-magenta-light);
   margin-top: 2px;
+}
+.pack-reveal-variant--foil {
+  color: #d2dcff;
+}
+.pack-reveal-variant--fullart {
+  color: var(--palette-gold-label);
+}
+.pack-reveal-variant--negative {
+  color: #ffffff;
+}
+.pack-reveal-variant--polychrome {
+  background: linear-gradient(90deg, #ff6e6e, #ffd25a, #82ff96, #64d2ff, #c882ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.pack-reveal-new {
+  margin-top: 2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--palette-success);
+  color: #04150a;
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
 }
 .pack-reveal-serial {
   font-size: 8.5px;
