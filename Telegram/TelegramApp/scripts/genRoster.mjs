@@ -85,13 +85,20 @@ async function fetchExoplanets() {
 }
 
 // ---------- JPL Small-Body Database ----------
+// "     4 Vesta (A807 FA)" -> "VESTA". Objects with ONLY a provisional designation
+// ("     (2002 MS4)") would strip to nothing - fall back to the designation itself.
+function smallBodyName(fullName) {
+  const trimmed = fullName.trim()
+  const name = trimmed.replace(/^\d+\s+/, '').replace(/\s*\(.*\)$/, '')
+  return (name || trimmed.match(/\(([^)]+)\)/)?.[1] || trimmed).toUpperCase()
+}
+
 async function fetchAsteroids() {
   const cdata = encodeURIComponent(JSON.stringify({ AND: ['diameter|GE|100'] }))
   const url = `https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,diameter&sb-kind=a&sb-cdata=${cdata}`
   const json = JSON.parse(await fetchText(url, 'JPL SBDB asteroids'))
   return json.data.map(([fullName, diameter]) => ({
-    // "     4 Vesta (A807 FA)" -> "VESTA"
-    n: fullName.trim().replace(/^\d+\s+/, '').replace(/\s*\(.*\)$/, '').toUpperCase(),
+    n: smallBodyName(fullName),
     c: 'asteroid',
     D: num(diameter), // km
   }))
