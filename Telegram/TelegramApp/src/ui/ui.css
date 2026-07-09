@@ -2363,9 +2363,9 @@
    dot (fx-travel doesn't fit here: JS sets width to the exact shot length and --ang to aim it). */
 .siege-proj-beam {
   position: absolute;
-  height: 2px;
-  margin-top: -1px;
-  border-radius: 1px;
+  height: 3px;
+  margin-top: -1.5px;
+  border-radius: 1.5px;
   transform-origin: 0 50%;
   animation: siege-beam-fire 0.26s ease-out forwards;
 }
@@ -2386,17 +2386,27 @@
 
 /* Impact response at the planet - flash for Heavy-archetype hits, a small puff otherwise. */
 .siege-impact-flash {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
-  border: 2px solid;
+  border: 3px solid;
   animation: fx-ring-expand 0.26s ease-out forwards;
 }
 .siege-impact-puff {
-  width: 6px;
-  height: 6px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   animation: fx-fly-fade 0.2s ease-out forwards;
+}
+
+/* Muzzle flash: fires the instant a ship shoots, right at the ship, so the shot itself reads
+   clearly even before the (small, fast) projectile can be tracked by eye. */
+.siege-muzzle-flash {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid;
+  animation: fx-ring-expand 0.18s ease-out forwards;
 }
 
 /* Reduced motion: the engine itself freezes orbiting and skips firing visuals entirely (see

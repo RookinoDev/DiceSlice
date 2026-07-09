@@ -42,7 +42,10 @@ export function projectileSpecForShip(index: number, def: ShipDefinition): Fleet
   return {
     shape,
     color: tier.color,
-    sizePx: 5 + Math.min(9, index * 0.42),
+    // Visible at a glance on a real phone screen, not just under a zoomed-in inspector - a
+    // tiny 5px dot against a busy combat screen (floating numbers, combo glow, planet shader)
+    // read as "no particle at all" in practice.
+    sizePx: 9 + Math.min(11, index * 0.6),
     travelMs: def.archetype === ShipArchetype.Fast ? 260 : def.archetype === ShipArchetype.Heavy ? 480 : 360,
     impact: shape === 'orb' || shape === 'beam' ? 'flash' : 'puff',
     impulseStrength: isHeavy ? 0.025 : 0,

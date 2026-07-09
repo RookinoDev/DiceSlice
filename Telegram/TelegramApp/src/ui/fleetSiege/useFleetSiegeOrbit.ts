@@ -239,11 +239,19 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
           const opacity = lerp(0.5, 1.0, depthT) * entrance
           const z = Math.sin(ship.angle) >= 0 ? 1 : -1
 
+          // Nose toward the planet: the sprite's clip-path shape (shipTierVisualForIndex) points
+          // "up" at rotate(0), i.e. screen angle -90deg. The direction FROM the ship TO the
+          // planet's center is the reverse of its offset from center, atan2(-y,-x); rotating by
+          // that angle + 90 turns the shape's fixed "up" point to face it exactly, every frame,
+          // all the way around the orbit - this is what actually reads as "pivoting" rather than
+          // a static icon sliding around.
+          const rotationDeg = (Math.atan2(-y, -x) * 180) / Math.PI + 90
+
           const el = elByIndexRef.current.get(index)
           if (el) {
             // translate(-50%,-50%) centers the sprite's own box on (x,y) - translate order doesn't
             // affect the result (pure translates commute), matching .combat-planet's own convention.
-            el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) scale(${scale})`
+            el.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%) rotate(${rotationDeg}deg) scale(${scale})`
             el.style.opacity = String(opacity)
             el.style.zIndex = String(z)
           }
@@ -330,6 +338,17 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, b
   const destBase = { x: box.w / 2, y: box.h / 2 }
   const jitterR = (Math.min(box.w, box.h) * planetScale) / 2 / 8
 
+  // Muzzle flash: a bright ring punching outward right at the ship, so "this ship just fired"
+  // is unmistakable even before the eye can track the (small, fast) projectile itself. The
+  // recoil filter-flash on the sprite alone (see the caller) was too subtle to read as a shot.
+  spawn({
+    className: 'siege-muzzle-flash',
+    x: ship.x,
+    y: ship.y,
+    durationMs: 180,
+    style: { borderColor: spec.color } as CSSProperties,
+  })
+
   for (let i = 0; i < spec.shots; i++) {
     const jAngle = Math.random() * Math.PI * 2
     const destX = destBase.x + Math.cos(jAngle) * jitterR * Math.random()
@@ -347,7 +366,7 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, b
           x: ship.x,
           y: ship.y,
           durationMs: 260,
-          style: { width: `${len}px`, background: spec.color, '--ang': `${angleDeg}deg` } as CSSProperties,
+          style: { width: `${len}px`, background: spec.color, boxShadow: `0 0 6px ${spec.color}`, '--ang': `${angleDeg}deg` } as CSSProperties,
         })
       } else {
         spawn({
