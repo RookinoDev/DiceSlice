@@ -3,7 +3,7 @@
 // this component is just the DOM shell it drives. Render as a sibling of `.combat-planet`
 // inside `.combat-planet-wrap` - see useFleetSiegeOrbit's stacking-context comment for why
 // ship z-index values interleave correctly with the planet without any wrapper tricks.
-import { memo, type RefObject } from 'react'
+import { memo, useMemo, type RefObject } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import type { PlanetImpulseApi } from '../../planet/PlanetCanvas'
 import { shipTierVisualForIndex } from '../shipTierVisuals'
@@ -15,7 +15,6 @@ interface FleetSiegeOrbitProps {
   planetRef: RefObject<HTMLElement | null>
   impulseApiRef: RefObject<PlanetImpulseApi | null>
   triggerShake: (intensity: 'small' | 'big') => void
-  planetScale: number
   bossActive: boolean
   bossSecondsLeft: number
   bossTimerSeconds: number
@@ -26,20 +25,27 @@ function spriteSizePx(index: number): number {
   return 15 + Math.min(13, index * 0.65)
 }
 
-function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, planetScale, bossActive, bossSecondsLeft, bossTimerSeconds }: FleetSiegeOrbitProps) {
-  const { visibleIndices, registerSprite, registerRoot, particlesRef } = useFleetSiegeOrbit({
+function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, bossActive, bossSecondsLeft, bossTimerSeconds }: FleetSiegeOrbitProps) {
+  const { visibleIndices, registerSprite, registerRoot, registerTrail, trailPoolSize, particlesRef } = useFleetSiegeOrbit({
     session,
     planetRef,
     impulseApiRef,
     triggerShake,
-    planetScale,
     bossActive,
     bossSecondsLeft,
     bossTimerSeconds,
   })
 
+  // Fixed-size pool, indices never change identity - a stable array to map over without
+  // reallocating one every render (the actual particle slots live in the hook, this is just
+  // "how many <div>s to render", computed once).
+  const trailSlots = useMemo(() => Array.from({ length: trailPoolSize }, (_, i) => i), [trailPoolSize])
+
   return (
     <div ref={registerRoot} className="siege-layer">
+      {trailSlots.map((i) => (
+        <div key={`trail-${i}`} ref={registerTrail(i)} className="siege-trail" />
+      ))}
       {visibleIndices.map((i) => {
         const tier = shipTierVisualForIndex(i)
         const size = spriteSizePx(i)

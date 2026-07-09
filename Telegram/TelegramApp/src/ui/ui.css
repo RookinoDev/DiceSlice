@@ -2316,6 +2316,28 @@
   will-change: transform, opacity;
 }
 
+/* Engine trail pool (see updateTrailPool/emitTrail in useFleetSiegeOrbit.ts) - a fixed set of
+   these render once and are only ever repositioned/recolored/faded via direct style writes,
+   never created or destroyed per-emission. No CSS animation here on purpose: unlike the
+   fire-and-forget particles below (each a fresh DOM node driven by a keyframe for its one-shot
+   lifetime), a pooled trail dot is reused hundreds of times and the engine drives its opacity/
+   position every frame directly - a CSS animation would fight that on every reuse.
+   opacity:0 initial so a freshly-mounted, not-yet-emitted pool slot is invisible. */
+.siege-trail {
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+  .siege-trail {
+    display: none;
+  }
+}
+
 /* Firing recoil - a pure brightness flash. Never touches transform/opacity so it can't fight
    the per-frame orbit transform the engine writes directly to this same element's style. */
 .siege-ship--recoil {

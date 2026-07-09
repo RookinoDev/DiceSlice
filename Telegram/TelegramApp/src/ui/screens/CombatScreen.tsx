@@ -310,7 +310,6 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
           planetRef={planetRef}
           impulseApiRef={impulseApiRef}
           triggerShake={triggerShake}
-          planetScale={planetScale}
           bossActive={vm.bossActive}
           bossSecondsLeft={vm.bossSecondsLeft}
           bossTimerSeconds={s.bossTimerSeconds}
