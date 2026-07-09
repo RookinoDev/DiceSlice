@@ -5,9 +5,19 @@
 // stars, then nebulae, galaxies, and finally black holes. Everything is deterministic:
 // the same sector always shows the same object with the same look.
 import { blackHole, FAINT_WHITE_CLOUDS, galaxy, gas, ice, lava, nebula, NO_CLOUDS, noAtmo, rock, star, terran, type RealPlanet } from './profileBuilders'
+import type { FeatureSpec } from './planetProfiles'
 import { GENERATED_BOSSES, GENERATED_REGULAR } from './rosterGen'
 
 export type { RealPlanet } from './profileBuilders'
+
+// Signature Features (docs/CARD_SYSTEM_PLAN.md §1): a handful of real, recognizable landmarks
+// stamped onto their object via the featureDecal shader layer, and surfaced as tappable fact
+// chips in the Phase 2 object viewer (see ui/cards/ObjectViewer.tsx). Placement is aesthetic
+// disc-space, not true lat/lon (see FeatureSpec's doc comment on planetProfiles.ts) - chosen to
+// roughly match where each landmark reads in real photographs.
+function withFeatures(planet: RealPlanet, features: FeatureSpec[]): RealPlanet {
+  return { name: planet.name, profile: { ...planet.profile, features } }
+}
 
 /**
  * Regular-sector roster: the journey outward. Rocky inner worlds, the great moons,
@@ -19,7 +29,17 @@ export const REGULAR_PLANETS: RealPlanet[] = [
   gas('VENUS', 1.7, [[0.93, 0.87, 0.7], [0.85, 0.76, 0.55], [0.72, 0.6, 0.4]], [[0.6, 0.48, 0.3], [0.45, 0.34, 0.2], [0.3, 0.22, 0.12]], { bands: 0.5, gasTimeSpeed: 0.05 }),
   terran('EARTH', 4.2, [[0.05, 0.12, 0.4], [0.08, 0.2, 0.55], [0.03, 0.06, 0.22]], [[0.1, 0.3, 0.1], [0.18, 0.48, 0.16], [0.35, 0.58, 0.22], [0.62, 0.55, 0.28]], [[0.9, 0.92, 0.95], [0.75, 0.78, 0.85], [0.58, 0.63, 0.72], [0.4, 0.44, 0.52]], { landCutoff: 0.6, cloudCover: 1.15 }),
   noAtmo('LUNA', 2.4, [[0.72, 0.72, 0.72], [0.55, 0.55, 0.55], [0.3, 0.3, 0.3]], [[0.48, 0.48, 0.48], [0.22, 0.22, 0.22]], 48, 12),
-  noAtmo('MARS', 5.8, [[0.72, 0.36, 0.16], [0.55, 0.25, 0.1], [0.34, 0.13, 0.05]], [[0.45, 0.18, 0.07], [0.24, 0.08, 0.03]], 52, 9),
+  withFeatures(noAtmo('MARS', 5.8, [[0.72, 0.36, 0.16], [0.55, 0.25, 0.1], [0.34, 0.13, 0.05]], [[0.45, 0.18, 0.07], [0.24, 0.08, 0.03]], 52, 9), [
+    {
+      id: 'valles-marineris',
+      label: 'Valles Marineris',
+      fact: 'A canyon system over 4,000 km long and up to 7 km deep - it would stretch across the continental United States.',
+      uv: [0.56, 0.48],
+      radius: [0.22, 0.04],
+      angle: 0.15,
+      color: [0.26, 0.09, 0.05],
+    },
+  ]),
   rock('PHOBOS', 6.3, [[0.16, 0.14, 0.13], [0.35, 0.31, 0.28], [0.52, 0.47, 0.43]], 42),
   noAtmo('CERES', 7.9, [[0.35, 0.34, 0.32], [0.24, 0.23, 0.22], [0.13, 0.13, 0.12]], [[0.85, 0.84, 0.78], [0.55, 0.54, 0.5]], 45, 7), // bright Occator-style spots
   rock('VESTA', 8.6, [[0.3, 0.26, 0.19], [0.55, 0.48, 0.36], [0.75, 0.68, 0.52]], 48),
@@ -29,11 +49,37 @@ export const REGULAR_PLANETS: RealPlanet[] = [
   noAtmo('GANYMEDE', 4.8, [[0.55, 0.5, 0.44], [0.4, 0.36, 0.31], [0.24, 0.21, 0.18]], [[0.68, 0.64, 0.58], [0.3, 0.27, 0.23]], 50, 10),
   noAtmo('CALLISTO', 5.2, [[0.36, 0.31, 0.26], [0.25, 0.21, 0.17], [0.14, 0.11, 0.09]], [[0.6, 0.56, 0.5], [0.28, 0.24, 0.2]], 60, 6), // dark, densely speckled
   terran('TITAN', 6.1, [[0.28, 0.18, 0.06], [0.2, 0.12, 0.04], [0.1, 0.06, 0.02]], [[0.55, 0.38, 0.12], [0.68, 0.48, 0.16], [0.78, 0.58, 0.22], [0.85, 0.66, 0.3]], [[0.92, 0.7, 0.35], [0.82, 0.58, 0.25], [0.68, 0.45, 0.18], [0.52, 0.33, 0.12]], { landCutoff: 0.45, cloudCover: 0.85 }), // orange haze, dark methane lakes
-  ice('ENCELADUS', 7.4, [[0.96, 0.97, 0.99], [0.86, 0.89, 0.94], [0.72, 0.77, 0.86]], [[0.55, 0.72, 0.88], [0.38, 0.55, 0.75], [0.22, 0.36, 0.58]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // blue tiger stripes on white
+  withFeatures(
+    ice('ENCELADUS', 7.4, [[0.96, 0.97, 0.99], [0.86, 0.89, 0.94], [0.72, 0.77, 0.86]], [[0.55, 0.72, 0.88], [0.38, 0.55, 0.75], [0.22, 0.36, 0.58]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // blue tiger stripes on white
+    [
+      {
+        id: 'tiger-stripes',
+        label: 'Tiger Stripes',
+        fact: "Four parallel fractures at the south pole vent water-ice geysers into space, feeding Saturn's E ring.",
+        uv: [0.5, 0.2],
+        radius: [0.2, 0.045],
+        angle: -0.3,
+        color: [0.14, 0.3, 0.52],
+      },
+    ],
+  ),
   noAtmo('MIMAS', 8.2, [[0.68, 0.67, 0.66], [0.52, 0.51, 0.5], [0.32, 0.31, 0.3]], [[0.44, 0.43, 0.42], [0.2, 0.2, 0.19]], 46, 18), // one giant crater
   // — Kuiper belt & beyond —
   ice('TRITON', 1.3, [[0.88, 0.82, 0.78], [0.76, 0.68, 0.64], [0.6, 0.52, 0.48]], [[0.66, 0.5, 0.44], [0.5, 0.36, 0.3], [0.34, 0.22, 0.18]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // pinkish nitrogen ice
-  ice('PLUTO', 2.2, [[0.85, 0.72, 0.58], [0.72, 0.58, 0.44], [0.55, 0.42, 0.3]], [[0.32, 0.18, 0.12], [0.22, 0.11, 0.07], [0.12, 0.05, 0.03]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // tan with dark maculae
+  withFeatures(
+    ice('PLUTO', 2.2, [[0.85, 0.72, 0.58], [0.72, 0.58, 0.44], [0.55, 0.42, 0.3]], [[0.32, 0.18, 0.12], [0.22, 0.11, 0.07], [0.12, 0.05, 0.03]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // tan with dark maculae
+    [
+      {
+        id: 'tombaugh-regio',
+        label: 'Tombaugh Regio',
+        fact: "A vast plain of frozen nitrogen nicknamed \"the heart\", informally honoring Clyde Tombaugh, who discovered Pluto in 1930.",
+        uv: [0.44, 0.54],
+        radius: [0.22, 0.18],
+        angle: 0,
+        color: [0.94, 0.87, 0.73],
+      },
+    ],
+  ),
   noAtmo('CHARON', 3.4, [[0.58, 0.55, 0.53], [0.44, 0.41, 0.4], [0.27, 0.25, 0.24]], [[0.5, 0.32, 0.24], [0.26, 0.15, 0.1]], 48, 8), // gray, reddish polar stain
   ice('HAUMEA', 4.5, [[0.93, 0.94, 0.96], [0.82, 0.84, 0.88], [0.68, 0.71, 0.78]], [[0.6, 0.65, 0.75], [0.45, 0.5, 0.62], [0.3, 0.34, 0.46]], FAINT_WHITE_CLOUDS, NO_CLOUDS),
   noAtmo('MAKEMAKE', 5.6, [[0.6, 0.42, 0.3], [0.46, 0.3, 0.2], [0.3, 0.18, 0.11]], [[0.4, 0.26, 0.17], [0.2, 0.12, 0.07]], 50, 7),
@@ -63,8 +109,34 @@ export const REGULAR_PLANETS: RealPlanet[] = [
  * galaxies and black holes reuse the ring quad as their disk.
  */
 export const BOSS_PLANETS: RealPlanet[] = [
-  gas('JUPITER', 1.5, [[0.9, 0.78, 0.62], [0.82, 0.62, 0.44], [0.68, 0.44, 0.28]], [[0.5, 0.28, 0.14], [0.32, 0.15, 0.06], [0.18, 0.07, 0.02]], { bands: 2.4, gasTimeSpeed: 0.16 }),
-  gas('SATURN', 2.8, [[0.9, 0.84, 0.64], [0.8, 0.7, 0.5], [0.64, 0.54, 0.34]], [[0.47, 0.37, 0.21], [0.3, 0.22, 0.11], [0.16, 0.11, 0.05]], { bands: 1.4, ring: true }),
+  withFeatures(
+    gas('JUPITER', 1.5, [[0.9, 0.78, 0.62], [0.82, 0.62, 0.44], [0.68, 0.44, 0.28]], [[0.5, 0.28, 0.14], [0.32, 0.15, 0.06], [0.18, 0.07, 0.02]], { bands: 2.4, gasTimeSpeed: 0.16 }),
+    [
+      {
+        id: 'great-red-spot',
+        label: 'Great Red Spot',
+        fact: 'A storm wider than Earth that has raged for at least 190 years, and possibly since the 1600s.',
+        uv: [0.36, 0.4],
+        radius: [0.17, 0.09],
+        angle: 0.08,
+        color: [0.82, 0.36, 0.22],
+      },
+    ],
+  ),
+  withFeatures(
+    gas('SATURN', 2.8, [[0.9, 0.84, 0.64], [0.8, 0.7, 0.5], [0.64, 0.54, 0.34]], [[0.47, 0.37, 0.21], [0.3, 0.22, 0.11], [0.16, 0.11, 0.05]], { bands: 1.4, ring: true }),
+    [
+      {
+        id: 'saturn-hexagon',
+        label: 'The Hexagon',
+        fact: 'A persistent six-sided jet stream around the north pole, wide enough to fit four Earths.',
+        uv: [0.5, 0.83],
+        radius: [0.13, 0.11],
+        angle: 0,
+        color: [0.26, 0.56, 0.56],
+      },
+    ],
+  ),
   gas('URANUS', 3.3, [[0.68, 0.88, 0.9], [0.52, 0.78, 0.82], [0.36, 0.62, 0.7]], [[0.24, 0.48, 0.58], [0.14, 0.34, 0.44], [0.07, 0.2, 0.3]], { bands: 0.4, gasTimeSpeed: 0.05 }), // near-featureless cyan
   gas('NEPTUNE', 4.1, [[0.3, 0.5, 0.92], [0.2, 0.38, 0.76], [0.12, 0.26, 0.58]], [[0.07, 0.16, 0.42], [0.04, 0.09, 0.28], [0.01, 0.04, 0.15]], { bands: 1.1, gasTimeSpeed: 0.2 }), // fastest winds in the solar system
   gas('HD 189733 B', 5.4, [[0.35, 0.55, 0.95], [0.24, 0.42, 0.82], [0.15, 0.3, 0.65]], [[0.09, 0.19, 0.48], [0.05, 0.11, 0.32], [0.02, 0.05, 0.18]], { bands: 1.8, gasTimeSpeed: 0.26 }), // cobalt blue, molten-glass rain

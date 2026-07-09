@@ -1,27 +1,33 @@
-// Phase 1 card viewer (docs/CARD_SYSTEM_PLAN.md): tap to flip front/back, drag to tilt in 3D.
-// The live 3D object viewer (tap the artwork to explore the body itself) is explicitly Phase 2 -
-// this stays CSS-only, no orbit controls, no fact-chip overlay.
-import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+// Card viewer (docs/CARD_SYSTEM_PLAN.md): tap to flip front/back, drag to tilt in 3D, or hit
+// EXPLORE to open the live Phase 2 object viewer (ObjectViewer.tsx) for the body itself.
+import { lazy, Suspense, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
 import { Sheet } from '../Sheet'
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, collectionNo } from './cardTheme'
 import { CARD_CATALOG, RARITY_LABEL, type CardDefinition } from '../../game/cards/catalog'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
+import type { HoloLightVector } from './HoloOverlay'
+
+const HoloOverlay = lazy(() => import('./HoloOverlay').then((m) => ({ default: m.HoloOverlay })))
 
 interface CardDetailSheetProps {
   card: CardDefinition | null
   owned: OwnedSummary | null
   open: boolean
   onClose: () => void
+  onExplore: () => void
 }
 
 const DRAG_TILT_MAX_DEG = 16
 const CLICK_MOVE_THRESHOLD_PX = 6
 
-export function CardDetailSheet({ card, owned, open, onClose }: CardDetailSheetProps) {
+export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardDetailSheetProps) {
   const [flipped, setFlipped] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const drag = useRef({ active: false, startX: 0, startY: 0, moved: 0 })
+  // Feeds the WebGL holo overlay's light vector from the exact same drag gesture that tilts the
+  // card in CSS - one gesture, two readers, per docs/CARD_SYSTEM_PLAN.md §3's "uRotation reuse".
+  const holoLightRef = useRef<HoloLightVector>({ x: 0, y: 0 })
 
   if (!card) return null
   const color = RARITY_COLOR[card.rarity]
@@ -29,6 +35,8 @@ export function CardDetailSheet({ card, owned, open, onClose }: CardDetailSheetP
 
   const resetTilt = () => {
     if (wrapRef.current) wrapRef.current.style.transform = 'perspective(900px) rotateX(0deg) rotateY(0deg)'
+    holoLightRef.current.x = 0
+    holoLightRef.current.y = 0
   }
 
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -43,6 +51,8 @@ export function CardDetailSheet({ card, owned, open, onClose }: CardDetailSheetP
     const rotY = Math.max(-DRAG_TILT_MAX_DEG, Math.min(DRAG_TILT_MAX_DEG, dx * 0.22))
     const rotX = Math.max(-DRAG_TILT_MAX_DEG, Math.min(DRAG_TILT_MAX_DEG, -dy * 0.22))
     wrapRef.current.style.transform = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg)`
+    holoLightRef.current.x = rotY / DRAG_TILT_MAX_DEG
+    holoLightRef.current.y = -rotX / DRAG_TILT_MAX_DEG
   }
   const onPointerUp = () => {
     const wasClick = drag.current.active && drag.current.moved < CLICK_MOVE_THRESHOLD_PX
@@ -71,9 +81,18 @@ export function CardDetailSheet({ card, owned, open, onClose }: CardDetailSheetP
         <div className={`card-detail-flip ${flipped ? 'card-detail-flip--back' : ''}`} style={{ '--rarity-color': color } as CSSProperties}>
           <div className="card-detail-face card-detail-face--front">
             {locked ? (
-              <div className="card-art card-art-ghost card-detail-art" />
+              <div className="card-detail-art-wrap">
+                <div className="card-art card-art-ghost card-detail-art" />
+              </div>
             ) : (
-              <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
+              <div className="card-detail-art-wrap">
+                <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
+                {owned?.hasHolo && (
+                  <Suspense fallback={null}>
+                    <HoloOverlay rarity={card.rarity} lightRef={holoLightRef} className="card-detail-holo-overlay" />
+                  </Suspense>
+                )}
+              </div>
             )}
             <div className="card-detail-rarity-tag">{RARITY_LABEL[card.rarity]}</div>
             <div className="card-detail-name">{locked ? '???' : card.name}</div>
@@ -86,6 +105,18 @@ export function CardDetailSheet({ card, owned, open, onClose }: CardDetailSheetP
               </div>
             )}
             {!locked && <div className="card-detail-flip-hint">TAP TO FLIP</div>}
+            {!locked && (
+              <button
+                className="card-detail-explore-btn"
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onExplore()
+                }}
+              >
+                EXPLORE
+              </button>
+            )}
           </div>
           <div className="card-detail-face card-detail-face--back">
             {locked ? (

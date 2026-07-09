@@ -33,6 +33,7 @@ import { SettingsSheet } from './sheets/SettingsSheet'
 import { ProfileSheet } from './sheets/ProfileSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
+import { ObjectViewer } from './cards/ObjectViewer'
 import { PackOpenSheet } from './cards/PackOpenSheet'
 import { ShipUnlockToast, type ShipUnlockInfo } from './ShipUnlockToast'
 import './ui.css'
@@ -68,6 +69,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [ownedCards, setOwnedCards] = useState<OwnedCard[]>([])
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
   const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null)
+  const [objectViewerOpen, setObjectViewerOpen] = useState(false)
   const [packSheetOpen, setPackSheetOpen] = useState(false)
   const [toastText, setToastText] = useState<string | null>(null)
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -238,7 +240,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
               : shipUnlock
                 ? 'shipUnlock'
                 : selectedCard
-                  ? 'cardDetail'
+                  ? objectViewerOpen
+                    ? 'objectViewer'
+                    : 'cardDetail'
                   : packSheetOpen
                     ? 'packOpen'
                     : null
@@ -256,6 +260,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
       cardDetail: () => setSelectedCard(null),
+      objectViewer: () => setObjectViewerOpen(false),
       packOpen: () => setPackSheetOpen(false),
     }
     return bindTelegramBackButton(openSheet !== null, () => openSheet && closers[openSheet]())
@@ -362,7 +367,14 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
-      <CardDetailSheet card={selectedCard} owned={selectedCard ? (cardOwnedSummary.get(selectedCard.id) ?? null) : null} open={selectedCard !== null} onClose={() => setSelectedCard(null)} />
+      <CardDetailSheet
+        card={selectedCard}
+        owned={selectedCard ? (cardOwnedSummary.get(selectedCard.id) ?? null) : null}
+        open={selectedCard !== null}
+        onClose={() => setSelectedCard(null)}
+        onExplore={() => setObjectViewerOpen(true)}
+      />
+      <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
       <PackOpenSheet apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={() => setPackSheetOpen(false)} />
     </div>
   )

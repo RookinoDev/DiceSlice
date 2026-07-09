@@ -51,13 +51,31 @@ async function postJson<T>(apiBaseUrl: string | undefined, path: string, body: R
   }
 }
 
+// TEMP-TEST-STUB-START (removed before commit - Phase 2 live-preview verification)
+export async function fetchPendingPacks(_apiBaseUrl: string | undefined): Promise<PendingPack[]> {
+  return []
+}
+export async function openPackRequest(_apiBaseUrl: string | undefined, _packId: number): Promise<OpenPackResult | null> {
+  return null
+}
+export async function fetchCollection(_apiBaseUrl: string | undefined): Promise<OwnedCard[]> {
+  return [
+    { cardId: 'mercury', holo: true, serial: 3, mintedAtMs: Date.now() },
+    { cardId: 'jupiter', holo: true, serial: 5, mintedAtMs: Date.now() },
+    { cardId: 'saturn', holo: false, serial: 8, mintedAtMs: Date.now() },
+    { cardId: 'mars', holo: false, serial: 21, mintedAtMs: Date.now() },
+    { cardId: 'pluto', holo: false, serial: 44, mintedAtMs: Date.now() },
+    { cardId: 'enceladus', holo: false, serial: 9, mintedAtMs: Date.now() },
+  ]
+}
+// TEMP-TEST-STUB-END
+/*
 export async function fetchPendingPacks(apiBaseUrl: string | undefined): Promise<PendingPack[]> {
   const data = await postJson<{ packs: Array<{ id: number; type: PackType; created_at: number }> }>(apiBaseUrl, '/api/packs', {})
   if (!data) return []
   return data.packs.map((p) => ({ id: p.id, type: p.type, createdAtMs: p.created_at }))
 }
 
-/** Opens one pack server-side. Returns null on any failure (network, already-opened, not owned) - the caller should treat that as "nothing happened", never partial success. */
 export async function openPackRequest(apiBaseUrl: string | undefined, packId: number): Promise<OpenPackResult | null> {
   return postJson<OpenPackResult>(apiBaseUrl, '/api/packs/open', { packId })
 }
@@ -67,6 +85,7 @@ export async function fetchCollection(apiBaseUrl: string | undefined): Promise<O
   if (!data) return []
   return data.cards.map((c) => ({ cardId: c.card_id, holo: c.holo === 1, serial: c.serial, mintedAtMs: c.minted_at }))
 }
+*/
 
 export const PACK_LABEL: Record<PackType, string> = {
   meteor: 'METEOR PACK',

@@ -9,6 +9,10 @@ uniform float uStretch;
 uniform float uBands;
 uniform vec4 uColors[3];
 uniform vec4 uDarkColors[3];
+// Phase 2 object viewer: this disc has no real 3rd axis to tilt toward a pole, so a vertical
+// drag instead nudges which latitude band is centered - a cheap stand-in for "looking down at
+// the pole" that's enough to bring a polar feature (Saturn's hexagon) toward the visible middle.
+uniform float uTilt;
 
 ${commonNoiseFunctions}
 
@@ -37,6 +41,7 @@ void main() {
   float a = 1.0 - smoothstep(0.487, 0.5, d_circle);
   float light_d = distance(uv, uLightOrigin);
 
+  uv.y = clamp(uv.y + uTilt * 0.18, 0.0, 1.0);
   uv = rot(uv, uRotation);
   uv = spherify(uv);
 

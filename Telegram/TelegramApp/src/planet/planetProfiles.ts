@@ -32,6 +32,28 @@ function randomCloudStyle() {
   }
 }
 
+/**
+ * A real landmark stamped onto the surface (Jupiter's Great Red Spot, Saturn's hexagon, Mars'
+ * Valles Marineris...) - the "signature features" layer from docs/CARD_SYSTEM_PLAN.md §1. This
+ * renderer is a flat rotating disc wearing a spherify() UV trick, not a true 3D globe (see
+ * PlanetCanvas.tsx), so a feature's placement is authored directly in that same disc-space
+ * "surface" frame rather than real lat/lon: `uv` is where it sits in the pre-rotation surface
+ * texture ((0.5,0.5) = center, ~0.5 radius = limb), exactly the frame `uImpacts` already uses
+ * in PlanetCanvas's impulse() crack-scarring. It rotates with the body for free because the
+ * decal shader samples with the same rot(uv, uRotation) every surface layer already uses.
+ */
+export interface FeatureSpec {
+  id: string
+  label: string
+  fact: string
+  uv: [number, number]
+  /** Ellipse half-extents in disc uv units - a wide/short ellipse reads as a canyon streak (Valles Marineris), a near-circle as a spot (Great Red Spot, Tombaugh Regio). */
+  radius: [number, number]
+  /** Ellipse rotation in radians, for streak-shaped features. */
+  angle: number
+  color: RGB
+}
+
 export interface NoAtmosphereProfile {
   kind: 'noAtmosphere'
   seed: number
@@ -42,6 +64,7 @@ export interface NoAtmosphereProfile {
   terrainSize: number
   craterSize: number
   craterTimeSpeed: number
+  features?: FeatureSpec[]
 }
 
 export interface TerranWetProfile {
@@ -59,6 +82,7 @@ export interface TerranWetProfile {
   cloudStretch: number
   cloudSpeed: number
   cloudCurve: number
+  features?: FeatureSpec[]
 }
 
 export interface GasGiantProfile {
@@ -78,6 +102,7 @@ export interface GasGiantProfile {
   /** Ring palette override - lets a black hole pair a near-black body with a glowing accretion disk. Defaults to the body colors. */
   ringColors?: RGB[]
   ringDarkColors?: RGB[]
+  features?: FeatureSpec[]
 }
 
 /** A surfaceless wisp: stacked cloud shells with nothing underneath (nebulae, supernova remnants). */
@@ -94,6 +119,7 @@ export interface NebulaProfile {
   innerCover: number
   outerCover: number
   cloudSize: number
+  features?: FeatureSpec[]
 }
 
 export interface IceWorldProfile {
@@ -110,6 +136,7 @@ export interface IceWorldProfile {
   cloudStretch: number
   cloudSpeed: number
   cloudCurve: number
+  features?: FeatureSpec[]
 }
 
 export interface LavaWorldProfile {
@@ -125,6 +152,7 @@ export interface LavaWorldProfile {
   craterTimeSpeed: number
   riverCutoff: number
   lavaTimeSpeed: number
+  features?: FeatureSpec[]
 }
 
 export interface AsteroidProfile {
@@ -134,6 +162,7 @@ export interface AsteroidProfile {
   rotationRate: number
   colors: RGB[]
   size: number
+  features?: FeatureSpec[]
 }
 
 export type PlanetProfile = NoAtmosphereProfile | TerranWetProfile | GasGiantProfile | IceWorldProfile | LavaWorldProfile | AsteroidProfile | NebulaProfile

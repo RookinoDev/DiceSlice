@@ -2496,8 +2496,18 @@
   position: absolute;
   inset: 0;
   border-radius: 14px;
-  background: linear-gradient(115deg, transparent 20%, rgba(255, 255, 255, 0.35) 40%, transparent 60%);
-  background-size: 200% 200%;
+  background: linear-gradient(
+    115deg,
+    transparent 12%,
+    rgba(255, 110, 110, 0.4) 24%,
+    rgba(255, 210, 90, 0.4) 32%,
+    rgba(130, 255, 150, 0.4) 40%,
+    rgba(100, 210, 255, 0.4) 48%,
+    rgba(200, 130, 255, 0.4) 56%,
+    transparent 70%
+  );
+  background-size: 260% 260%;
+  mix-blend-mode: screen;
   animation: card-holo-sheen 3.2s ease-in-out infinite;
   pointer-events: none;
 }
@@ -2607,11 +2617,23 @@
   overflow-y: auto;
   align-items: stretch;
 }
-.card-detail-art {
+.card-detail-art-wrap {
+  position: relative;
   width: 100%;
   flex: 1;
   min-height: 0;
   margin-bottom: 10px;
+}
+.card-detail-art {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.card-detail-holo-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: 10px;
 }
 .card-detail-rarity-tag {
   align-self: flex-start;
@@ -2651,6 +2673,20 @@
   font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--palette-text-dimmer);
+}
+.card-detail-explore-btn {
+  position: absolute;
+  right: 14px;
+  bottom: 54px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--rarity-color, var(--palette-cyan-label)) 60%, transparent);
+  background: color-mix(in srgb, var(--palette-sheet) 70%, black 30%);
+  color: var(--rarity-color, var(--palette-cyan-label));
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  backdrop-filter: blur(4px);
 }
 .card-detail-locked-body {
   margin: auto;
@@ -2849,6 +2885,129 @@
   margin-top: 8px;
 }
 
+/* Phase 2: live object viewer (ObjectViewer.tsx) - orbit/pinch canvas, fact-chip pins, SCAN reveal. */
+.object-viewer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.object-viewer-canvas-box {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 16px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, rgba(255, 255, 255, 0.04), transparent 70%);
+  touch-action: none;
+}
+.object-viewer-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.object-viewer-hint {
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  color: var(--palette-text-dimmer);
+}
+.object-viewer-chip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+.object-viewer-chip-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--palette-cyan-label);
+  box-shadow: 0 0 0 4px rgba(67, 221, 238, 0.25), 0 0 10px rgba(67, 221, 238, 0.8);
+  animation: object-viewer-chip-pulse 1.8s ease-in-out infinite;
+}
+.object-viewer-chip--open .object-viewer-chip-dot {
+  background: #ffb238;
+  box-shadow: 0 0 0 4px rgba(255, 178, 56, 0.3), 0 0 12px rgba(255, 178, 56, 0.9);
+}
+@keyframes object-viewer-chip-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
+.object-viewer-fact-bubble {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.object-viewer-fact-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: #ffb238;
+  margin-bottom: 4px;
+}
+.object-viewer-fact-text {
+  font-size: 12.5px;
+  color: var(--palette-text-secondary);
+  line-height: 1.5;
+}
+.object-viewer-scan-btn {
+  align-self: center;
+  padding: 8px 22px;
+  border-radius: 999px;
+  border: 1px solid var(--palette-cyan-label);
+  background: transparent;
+  color: var(--palette-cyan-label);
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+}
+.object-viewer-scan-btn--active {
+  background: color-mix(in srgb, var(--palette-cyan-label) 20%, transparent);
+}
+.object-viewer-scan-sweep {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, rgba(67, 221, 238, 0.35) 48%, transparent 100%);
+  background-size: 100% 300%;
+  animation: object-viewer-scan-sweep-move 1.6s linear infinite;
+  pointer-events: none;
+}
+@keyframes object-viewer-scan-sweep-move {
+  0% { background-position: 0 -100%; }
+  100% { background-position: 0 200%; }
+}
+.object-viewer-scan-table {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.object-viewer-scan-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.object-viewer-scan-row span:first-child {
+  color: var(--palette-text-dim);
+}
+.object-viewer-scan-row span:last-child {
+  font-family: var(--font-display);
+  font-weight: 600;
+  color: var(--palette-cyan-label);
+  font-variant-numeric: tabular-nums;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .card-grid-item--holo::after {
     animation: none;
@@ -2857,5 +3016,11 @@
   .card-detail-flip,
   .pack-reveal-card-inner {
     transition: none;
+  }
+  .object-viewer-chip-dot {
+    animation: none;
+  }
+  .object-viewer-scan-sweep {
+    animation: none;
   }
 }

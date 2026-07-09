@@ -13,6 +13,7 @@ import { planetRingFragmentShader } from './shaders/planetRing'
 import { lavaRiversFragmentShader } from './shaders/lavaRivers'
 import { asteroidFragmentShader } from './shaders/asteroid'
 import { planetCracksFragmentShader, MAX_CRACK_IMPACTS } from './shaders/planetCracks'
+import { featureDecalFragmentShader, MAX_FEATURES } from './shaders/featureDecal'
 import { RING_SCALE, planetMaxScale, type PlanetProfile } from './planetProfiles'
 import type { RGB } from './themes'
 
@@ -185,6 +186,7 @@ function buildLayers(profile: PlanetProfile): LayerSpec[] {
         uBands: { value: profile.bands },
         uColors: { value: colorsToVec4(profile.lightColors) },
         uDarkColors: { value: colorsToVec4(profile.darkColors) },
+        uTilt: { value: 0 },
       },
       timeRate: TIME_RATE_GAS,
       renderOrder: 0,
@@ -315,10 +317,49 @@ function buildCrackLayer(profile: PlanetProfile): LayerSpec {
   }
 }
 
+// Signature Features (#1 in docs/CARD_SYSTEM_PLAN.md): stamps up to MAX_FEATURES real landmarks
+// on top of the surface. Rendered above every base layer but below the crack overlay (damage
+// scars should read as sitting on top of, not under, a storm/canyon).
+function buildFeatureLayer(profile: PlanetProfile, baseLayers: LayerSpec[]): LayerSpec | null {
+  const features = profile.features
+  if (!features || features.length === 0) return null
+  const slots = Array.from({ length: MAX_FEATURES }, (_, i) => features[i] ?? null)
+  const renderOrder = baseLayers.reduce((max, l) => Math.max(max, l.renderOrder), 0) + 0.5
+  return {
+    fragmentShader: featureDecalFragmentShader,
+    uniforms: {
+      uRotation: { value: 0 },
+      uLightOrigin: { value: new Vector2(0.39, 0.39) },
+      uTimeSpeed: { value: 0.2 },
+      uSize: { value: 8 },
+      uSeed: { value: profile.seed },
+      uPlanetTime: { value: 0 },
+      uRandMod: { value: new Vector2(1, 1) },
+      uFeatureUv: { value: slots.map((f) => (f ? new Vector2(f.uv[0], f.uv[1]) : new Vector2(-10, -10))) },
+      uFeatureRadius: { value: slots.map((f) => (f ? new Vector2(f.radius[0], f.radius[1]) : new Vector2(0.001, 0.001))) },
+      uFeatureAngle: { value: slots.map((f) => f?.angle ?? 0) },
+      uFeatureColor: { value: slots.map((f) => (f ? new Vector4(f.color[0], f.color[1], f.color[2], 1) : new Vector4(0, 0, 0, 0))) },
+      uFeatureCount: { value: features.length },
+    },
+    timeRate: TIME_RATE_BASE,
+    renderOrder,
+  }
+}
+
 /** Imperative handle for hit-reaction physics - see PlanetCanvas's onReady prop. */
 export interface PlanetImpulseApi {
   /** Push the planet away from a tap/hit at (x,y) canvas-relative px. strength ~0.02 (light tap) to ~0.15 (big hit). */
   impulse(x: number, y: number, strength: number): void
+  /** Adds directly to the current spin angle (radians) - for 1:1 drag tracking in the Phase 2 object viewer, bypassing the hit-reaction spring entirely. */
+  addRotation(deltaRad: number): void
+  /** Gives the existing hit-reaction rotation decay an angular-velocity kick, for inertia coast after a drag release. */
+  flingRotation(angularVelocity: number): void
+  /** Gas giants only (silently ignored elsewhere): nudges the sampled latitude band, approximating a look toward a pole. Accumulates, caller should clamp to a sane range (e.g. -1..1). */
+  addTilt(deltaRad: number): void
+  /** Orthographic camera zoom for pinch-to-dolly. 1 = default framing. */
+  setZoom(zoom: number): void
+  /** Current spin angle (radians) - lets a caller (the object viewer's fact-chip pins) project a feature's stored surface position to its current screen position every frame without this component re-rendering. */
+  getRotation(): number
 }
 
 // Underdamped spring constants for the displacement/rotation kick - SPRING_K pulls the
@@ -355,6 +396,8 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
 
     const scene = new Scene()
     const layers = buildLayers(profile)
+    const featureLayer = buildFeatureLayer(profile, layers)
+    if (featureLayer) layers.push(featureLayer)
     if (profile.kind !== 'gasGiant' && profile.kind !== 'nebula') layers.push(buildCrackLayer(profile))
     const crackUniforms = layers.find((l) => l.isCracks)?.uniforms ?? null
     // Widen the frustum to the largest layer scale so a gas giant's ring is captured in full
@@ -399,6 +442,10 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
     let rotationKickVel = 0
     let rotation = Math.random() * Math.PI * 2
     let impactCursor = 0
+    // Object-viewer drag state (Phase 2): userTilt drives gasLayers' uTilt uniform, zoom the
+    // orthographic camera's pinch-to-dolly. Both no-ops unless the viewer's controller calls them.
+    let userTilt = 0
+    let zoom = 1
 
     onReady?.({
       impulse(px, py, strength) {
@@ -427,6 +474,23 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
           impactCursor++
           crackUniforms.uImpactCount.value = Math.min(impactCursor, MAX_CRACK_IMPACTS)
         }
+      },
+      addRotation(deltaRad) {
+        rotation += deltaRad
+      },
+      flingRotation(angularVelocity) {
+        rotationKickVel += angularVelocity
+      },
+      addTilt(deltaRad) {
+        userTilt = Math.max(-1, Math.min(1, userTilt + deltaRad))
+      },
+      setZoom(z) {
+        zoom = z
+        camera.zoom = zoom
+        camera.updateProjectionMatrix()
+      },
+      getRotation() {
+        return rotation
       },
     })
 
@@ -459,6 +523,7 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
         if (uniforms.uRotation) uniforms.uRotation.value = rotation + (layers[i].rotationOffset ?? 0)
         if (uniforms.uPlanetTime) uniforms.uPlanetTime.value = timeAccum[i]
         if (uniforms.uHpFraction) uniforms.uHpFraction.value = hpNow
+        if (uniforms.uTilt) uniforms.uTilt.value = userTilt
       })
 
       renderer.render(scene, camera)
