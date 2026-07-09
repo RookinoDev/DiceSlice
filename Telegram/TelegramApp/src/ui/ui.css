@@ -2702,10 +2702,98 @@
 }
 
 /* -- Card detail sheet: flip + drag tilt -- */
+.card-detail-stage {
+  position: relative;
+}
 .card-detail-tilt {
   perspective: 900px;
-  transition: transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* NO transform transition here: the rAF spring in CardDetailSheet.tsx owns this transform
+     every frame - a CSS transition would fight it and double-animate. */
   touch-action: none;
+}
+
+/* Per-variant treatments on the focused card (holo+ additionally gets the WebGL overlay). */
+.card-detail-flip--foil .card-detail-art-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(115deg, transparent 30%, rgba(210, 225, 255, 0.35) 48%, transparent 62%);
+  background-size: 240% 240%;
+  animation: card-holo-sheen 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.card-detail-flip--negative .card-detail-art-wrap {
+  filter: invert(0.88) hue-rotate(180deg);
+}
+.card-detail-flip--fullart .card-detail-art-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-shadow: inset 0 0 34px color-mix(in srgb, var(--rarity-color) 75%, transparent);
+  pointer-events: none;
+}
+.card-detail-flip--polychrome .card-detail-art-wrap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: conic-gradient(from 0deg, rgba(255, 110, 110, 0.3), rgba(255, 210, 90, 0.3), rgba(130, 255, 150, 0.3), rgba(100, 210, 255, 0.3), rgba(200, 130, 255, 0.3), rgba(255, 110, 110, 0.3));
+  mix-blend-mode: screen;
+  animation: card-holo-sheen 2.4s linear infinite;
+  pointer-events: none;
+}
+
+/* Rare-card-specific extras: legendary edge-chase, ultra idle sparkles. */
+.card-detail-flip--legendary {
+  box-shadow: 0 0 26px color-mix(in srgb, var(--rarity-color) 55%, transparent);
+  animation: card-edge-pulse 2.2s ease-in-out infinite;
+}
+.card-detail-flip--ultra {
+  box-shadow: 0 0 32px color-mix(in srgb, var(--rarity-color) 70%, transparent);
+  animation: card-edge-pulse 1.6s ease-in-out infinite;
+}
+.card-detail-flip--ultra .card-detail-face--front::before {
+  content: '✦ ✧ ✦';
+  position: absolute;
+  top: -14px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 10px;
+  color: var(--palette-gold-label);
+  animation: ultra-sparkle-drift 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes card-edge-pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.18);
+  }
+}
+@keyframes ultra-sparkle-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-detail-flip--foil .card-detail-art-wrap::after,
+  .card-detail-flip--polychrome .card-detail-art-wrap::after,
+  .card-detail-flip--legendary,
+  .card-detail-flip--ultra,
+  .card-detail-flip--ultra .card-detail-face--front::before {
+    animation: none;
+  }
 }
 .card-detail-flip {
   position: relative;
