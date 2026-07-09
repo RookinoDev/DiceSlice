@@ -9,7 +9,7 @@
 // one ship can render behind the sphere (z-index -1) while another renders in front (z-index 1)
 // of that SAME sphere, with no wrapper tricks. Never add z-index/transform/filter/opacity to the
 // root layer element itself or this breaks (it would trap children in its own context instead).
-import { useEffect, useMemo, useRef, type CSSProperties, type RefObject } from 'react'
+import { useEffect, useRef, type CSSProperties, type RefObject } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import type { PlanetImpulseApi } from '../../planet/PlanetCanvas'
 import { projectileSpecForShip, type FleetProjectileSpec } from './fleetProjectileSpecs'
@@ -118,7 +118,11 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   const lastFleetShakeRef = useRef(0)
   const reducedMotionRef = useRef(typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
 
-  const visibleIndices = useMemo(() => computeVisibleIndices(s), [s])
+  // Deliberately NOT memoized on `s` - the GameSession reference never changes for the life of
+  // the app, so a `useMemo(..., [s])` would freeze at whatever was owned on first mount and
+  // never notice later purchases. Recomputing is cheap (scans at most 19 booleans), and this
+  // component already re-renders every game tick via CombatScreen, so nothing is lost.
+  const visibleIndices = computeVisibleIndices(s)
   const visibleKey = visibleIndices.join(',')
 
   // Keep shipsRef in sync with which ships are currently visible (rare: only on purchase).
@@ -155,15 +159,21 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   }, [])
 
   // Track box size via ResizeObserver (matches PlanetCanvas's own pattern) - avoids
-  // getBoundingClientRect() every frame.
+  // getBoundingClientRect() every frame. Only ever overwrite boxSizeRef with a REAL (nonzero)
+  // measurement: some layout timing paths (container-query ancestors settling, a viewport unit
+  // not yet resolved on first paint) can report a transient 0x0 - if that briefly happens after
+  // we already had a good reading, keep the good one instead of snapping ships to nothing.
   useEffect(() => {
     const el = rootElRef.current
     if (!el) return
-    const ro = new ResizeObserver(() => {
-      boxSizeRef.current = { w: el.clientWidth, h: el.clientHeight }
-    })
+    const measure = () => {
+      const w = el.clientWidth
+      const h = el.clientHeight
+      if (w > 0 && h > 0) boxSizeRef.current = { w, h }
+    }
+    const ro = new ResizeObserver(measure)
     ro.observe(el)
-    boxSizeRef.current = { w: el.clientWidth, h: el.clientHeight }
+    measure()
     return () => ro.disconnect()
   }, [])
 
@@ -185,13 +195,17 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
       const flybyDt = (now - flybyStartRef.current) / 1000
       const flyby = !reducedMotionRef.current && flybyDt >= 0 && flybyDt < FLYBY_DURATION_S ? 1 + 1.8 * Math.exp(-flybyDt / 0.18) : 1
 
-      const { w, h } = boxSizeRef.current
+      // boxSizeRef only ever holds a real (nonzero) ResizeObserver measurement (see that effect),
+      // but nothing guarantees one has landed yet - fall back to a viewport-derived guess so the
+      // fleet always animates from frame one instead of staying frozen until (or if) a real
+      // measurement ever arrives. Any real measurement immediately takes over once it lands.
+      const { w: measuredW, h: measuredH } = boxSizeRef.current
+      const haveMeasurement = measuredW > 0 && measuredH > 0
+      const fallback = Math.min(window.innerWidth, window.innerHeight) * 0.7
+      const w = haveMeasurement ? measuredW : fallback
+      const h = haveMeasurement ? measuredH : fallback
       const boxSize = Math.min(w, h)
 
-      // The wrap hasn't been laid out yet (first frame(s) before ResizeObserver reports a real
-      // size, or a transient 0-height moment) - skip repositioning entirely rather than collapse
-      // every ship to a (0,0)-ish point. Ships simply hold their last good position/style (or, on
-      // a true first frame, their CSS default) until a real measurement arrives.
       if (boxSize > 0) {
         const half = (boxSize * planetScaleRef.current) / 2
 
