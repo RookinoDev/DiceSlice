@@ -139,6 +139,15 @@ export function NavPrestigeIcon({ color, size = 20 }: IconProps) {
   )
 }
 
+export function NavCardsIcon({ color, size = 20 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="3" y="5" width="13" height="17" rx="2" transform="rotate(-8 3 5)" stroke={color} strokeWidth="1.8" />
+      <rect x="8" y="4" width="13" height="17" rx="2" fill={color} opacity="0.15" stroke={color} strokeWidth="1.8" />
+    </svg>
+  )
+}
+
 // -- Skill glyphs (Overdrive, Meteor, FleetSurge/BattleCry, Golden/Midas, DroneSwarm) --
 export function SkillOverdriveIcon({ color, size = 22 }: IconProps) {
   return (

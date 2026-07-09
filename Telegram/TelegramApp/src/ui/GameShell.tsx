@@ -1,5 +1,5 @@
 // Ported from GamePhone.dc.html's app shell + its real toast/celebration state machine.
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { BigNumber } from '../game/core/BigNumber'
 import type { GameSession, DailyPreview } from '../game/gameplay/GameSession'
 import { buildMainViewModel } from '../game/ui/MainPresenter'
@@ -9,6 +9,9 @@ import type { PurchaseGrant } from '../game/monetization/purchases'
 import { audio } from '../game/audio/AudioManager'
 import { bindTelegramBackButton, getStartParam, getTelegramUser, hapticSuccess } from '../telegram'
 import { fetchPublicProfile, type PublicProfile } from '../game/profileApi'
+import { fetchCollection, fetchPendingPacks, type OpenPackResult, type OwnedCard, type PendingPack } from '../game/cards/cardsApi'
+import { summarizeCollection } from '../game/cards/collectionSummary'
+import type { CardDefinition } from '../game/cards/catalog'
 import { useScreenShake } from './useScreenShake'
 import { useParticles } from './combatFx/useParticles'
 import { ParticleLayer } from './combatFx/ParticleLayer'
@@ -22,12 +25,15 @@ import { CombatScreen } from './screens/CombatScreen'
 import { FleetScreen } from './screens/FleetScreen'
 import { ArtifactsScreen } from './screens/ArtifactsScreen'
 import { PrestigeScreen } from './screens/PrestigeScreen'
+import { CardsScreen } from './screens/CardsScreen'
 import { PrestigeConfirmSheet } from './sheets/PrestigeConfirmSheet'
 import { MissionsSheet } from './sheets/MissionsSheet'
 import { DailyRewardSheet } from './sheets/DailyRewardSheet'
 import { SettingsSheet } from './sheets/SettingsSheet'
 import { ProfileSheet } from './sheets/ProfileSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
+import { CardDetailSheet } from './cards/CardDetailSheet'
+import { PackOpenSheet } from './cards/PackOpenSheet'
 import { ShipUnlockToast, type ShipUnlockInfo } from './ShipUnlockToast'
 import './ui.css'
 
@@ -59,6 +65,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
   const [shipUnlock, setShipUnlock] = useState<ShipUnlockInfo | null>(null)
+  const [ownedCards, setOwnedCards] = useState<OwnedCard[]>([])
+  const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
+  const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null)
+  const [packSheetOpen, setPackSheetOpen] = useState(false)
   const [toastText, setToastText] = useState<string | null>(null)
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const { ref: shellRef, triggerShake } = useScreenShake<HTMLDivElement>()
@@ -227,7 +237,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
               ? 'offline'
               : shipUnlock
                 ? 'shipUnlock'
-                : null
+                : selectedCard
+                  ? 'cardDetail'
+                  : packSheetOpen
+                    ? 'packOpen'
+                    : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
@@ -241,9 +255,34 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       },
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
+      cardDetail: () => setSelectedCard(null),
+      packOpen: () => setPackSheetOpen(false),
     }
     return bindTelegramBackButton(openSheet !== null, () => openSheet && closers[openSheet]())
   }, [openSheet])
+
+  // Card packs + collection: fetched on mount and whenever the app regains foreground (a boss
+  // kill's pack grant happens server-side during the next cloud-save sync, which may complete
+  // while this tab is backgrounded).
+  const refreshCards = () => {
+    const apiUrl = import.meta.env.VITE_API_URL
+    fetchCollection(apiUrl).then(setOwnedCards)
+    fetchPendingPacks(apiUrl).then(setPendingPacks)
+  }
+  useEffect(() => {
+    refreshCards()
+    const onVisibilityChange = () => {
+      if (!document.hidden) refreshCards()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', onVisibilityChange)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handlePackOpened = (packId: number, result: OpenPackResult) => {
+    setPendingPacks((prev) => prev.filter((p) => p.id !== packId))
+    setOwnedCards((prev) => [...prev, ...result.cards.map((c) => ({ cardId: c.cardId, holo: c.holo, serial: c.serial, mintedAtMs: Date.now() }))])
+  }
 
   // Profile deep link ("u_<id>" start param): open that player's profile on launch.
   // Falls back silently if the profile doesn't exist or the API is unreachable.
@@ -264,6 +303,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   // Boss Planet Takes Over the Screen: dim/recede the surrounding chrome while a boss fight is
   // live and the player is actually looking at it, so attention stays on the encounter.
   const bossTakeover = vm.bossActive && tab === 'combat'
+
+  // Progressive disclosure, matching Fleet/Artifacts/Prestige: hidden until there's something
+  // to look at (an owned card or a pack waiting), not from the very first launch.
+  const showCards = ownedCards.length > 0 || pendingPacks.length > 0
+  const cardOwnedSummary = useMemo(() => summarizeCollection(ownedCards), [ownedCards])
 
   return (
     <div ref={shellRef} className={`game-shell ${bossTakeover ? 'game-shell--boss-focus' : ''} ${returningBoost ? 'game-shell--returning' : ''}`}>
@@ -286,9 +330,21 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         {tab === 'fleet' && vm.showFleet && <FleetScreen session={session} onToast={showToast} />}
         {tab === 'artifacts' && vm.showArtifacts && <ArtifactsScreen session={session} onToast={showToast} />}
         {tab === 'prestige' && vm.showPrestige && <PrestigeScreen session={session} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} />}
+        {tab === 'cards' && showCards && (
+          <CardsScreen ownedCards={ownedCards} pendingPackCount={pendingPacks.length} onSelectCard={setSelectedCard} onOpenPacks={() => setPackSheetOpen(true)} />
+        )}
       </div>
 
-      <BottomNav current={tab} onSelect={setTab} showFleet={vm.showFleet} showArtifacts={vm.showArtifacts} showPrestige={vm.showPrestige} prestigeReady={vm.canPrestige} />
+      <BottomNav
+        current={tab}
+        onSelect={setTab}
+        showFleet={vm.showFleet}
+        showArtifacts={vm.showArtifacts}
+        showPrestige={vm.showPrestige}
+        prestigeReady={vm.canPrestige}
+        showCards={showCards}
+        cardsReady={pendingPacks.length > 0}
+      />
       <ParticleLayer containerRef={rewardParticlesRef} className="fx-particle-layer--shell" />
 
       <PrestigeConfirmSheet session={session} open={prestigeConfirmOpen} onClose={() => setPrestigeConfirmOpen(false)} onPrestiged={handlePrestiged} />
@@ -306,6 +362,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
+      <CardDetailSheet card={selectedCard} owned={selectedCard ? (cardOwnedSummary.get(selectedCard.id) ?? null) : null} open={selectedCard !== null} onClose={() => setSelectedCard(null)} />
+      <PackOpenSheet apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={() => setPackSheetOpen(false)} />
     </div>
   )
 }

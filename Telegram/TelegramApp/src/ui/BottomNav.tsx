@@ -1,9 +1,9 @@
 // Ported from GamePhone.dc.html's bottom navigation bar.
 import type { ReactElement } from 'react'
 import { audio } from '../game/audio/AudioManager'
-import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavPrestigeIcon } from './icons'
+import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavPrestigeIcon, NavCardsIcon } from './icons'
 
-export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'prestige'
+export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'prestige' | 'cards'
 
 const DIM = '#5C6480'
 const ACTIVE_COLORS: Record<NavTab, string> = {
@@ -11,6 +11,7 @@ const ACTIVE_COLORS: Record<NavTab, string> = {
   fleet: '#43DDEE',
   artifacts: '#F49CFF',
   prestige: '#E24FFF',
+  cards: '#FFD873',
 }
 
 const ICONS: Record<NavTab, (props: { color: string }) => ReactElement> = {
@@ -18,6 +19,7 @@ const ICONS: Record<NavTab, (props: { color: string }) => ReactElement> = {
   fleet: NavFleetIcon,
   artifacts: NavArtifactsIcon,
   prestige: NavPrestigeIcon,
+  cards: NavCardsIcon,
 }
 
 interface TabSpec {
@@ -34,13 +36,16 @@ interface BottomNavProps {
   showArtifacts: boolean
   showPrestige: boolean
   prestigeReady: boolean
+  showCards: boolean
+  cardsReady: boolean
 }
 
-export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPrestige, prestigeReady }: BottomNavProps) {
+export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPrestige, prestigeReady, showCards, cardsReady }: BottomNavProps) {
   const tabs: TabSpec[] = [
     { tab: 'combat', label: 'Combat', visible: true },
     { tab: 'fleet', label: 'Fleet', visible: showFleet },
     { tab: 'artifacts', label: 'Artifacts', visible: showArtifacts },
+    { tab: 'cards', label: 'Cards', visible: showCards, dot: cardsReady },
     { tab: 'prestige', label: 'Prestige', visible: showPrestige, dot: prestigeReady },
   ]
 

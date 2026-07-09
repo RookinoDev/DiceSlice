@@ -118,3 +118,12 @@ export function realPlanetForStage(stage: number, bossInterval: number): RealPla
   const bossesBefore = bossInterval > 0 ? Math.floor((s - 1) / bossInterval) : 0
   return ALL_REGULAR[(s - 1 - bossesBefore) % ALL_REGULAR.length]
 }
+
+// Name -> profile, over the 66 hand-tuned objects only (the generated extension isn't part of
+// Set 1's card catalog - see game/cards/catalog.ts, whose `name` field must match one of these).
+const byName = new Map<string, RealPlanet>([...REGULAR_PLANETS, ...BOSS_PLANETS].map((p) => [p.name, p]))
+
+/** The live shader profile for a card's artwork, looked up by its exact catalog name. */
+export function realPlanetByName(name: string): RealPlanet | undefined {
+  return byName.get(name)
+}
