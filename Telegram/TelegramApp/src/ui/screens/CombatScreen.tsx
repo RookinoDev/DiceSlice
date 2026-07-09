@@ -22,6 +22,7 @@ import { useParticles } from '../combatFx/useParticles'
 import { ParticleLayer } from '../combatFx/ParticleLayer'
 import { registerLandmark } from '../combatFx/landmarks'
 import { impactMaterialFor } from '../planetImpactMaterial'
+import { FleetSiegeOrbit } from '../fleetSiege/FleetSiegeOrbit'
 
 // Three.js + the shader modules are ~600KB - split into their own chunk so the game shell
 // (buttons, screens, sheets) is interactive before that finishes downloading.
@@ -304,6 +305,16 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
             ×{tapStreak} COMBO
           </div>
         )}
+        <FleetSiegeOrbit
+          session={s}
+          planetRef={planetRef}
+          impulseApiRef={impulseApiRef}
+          triggerShake={triggerShake}
+          planetScale={planetScale}
+          bossActive={vm.bossActive}
+          bossSecondsLeft={vm.bossSecondsLeft}
+          bossTimerSeconds={s.bossTimerSeconds}
+        />
         <button
           ref={planetRef}
           className="combat-planet"
