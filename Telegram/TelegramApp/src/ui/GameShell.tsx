@@ -7,7 +7,7 @@ import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import type { OfflineReport } from '../game/useGameSession'
 import type { PurchaseGrant } from '../game/monetization/purchases'
 import { audio } from '../game/audio/AudioManager'
-import { getStartParam, getTelegramUser, hapticSuccess, useTelegramBackButton } from '../telegram'
+import { bindTelegramBackButton, getStartParam, getTelegramUser, hapticSuccess } from '../telegram'
 import { fetchPublicProfile, type PublicProfile } from '../game/profileApi'
 import { useScreenShake } from './useScreenShake'
 import { useParticles } from './combatFx/useParticles'
@@ -242,7 +242,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
     }
-    return useTelegramBackButton(openSheet !== null, () => openSheet && closers[openSheet]())
+    return bindTelegramBackButton(openSheet !== null, () => openSheet && closers[openSheet]())
   }, [openSheet])
 
   // Profile deep link ("u_<id>" start param): open that player's profile on launch.

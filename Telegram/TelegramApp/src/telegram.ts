@@ -135,8 +135,14 @@ export function hapticSuccess(): void {
 /**
  * Shows Telegram's native BackButton while active and routes its click to `onBack`.
  * Returns a cleanup function. No-ops outside Telegram.
+ *
+ * Despite the shape (imperative side effect + cleanup), this is a plain function, not a React
+ * hook - it calls no hooks of its own, so it's safe to invoke from inside a useEffect callback
+ * (as GameShell.tsx does, to react to a derived value). It was previously named
+ * `useTelegramBackButton`, which made ESLint's rules-of-hooks check (name-pattern based) flag
+ * that call as a violation even though no actual hook-order rule was being broken.
  */
-export function useTelegramBackButton(active: boolean, onBack: () => void): () => void {
+export function bindTelegramBackButton(active: boolean, onBack: () => void): () => void {
   const backButton = cachedWebApp?.BackButton
   if (!backButton) return () => {}
 

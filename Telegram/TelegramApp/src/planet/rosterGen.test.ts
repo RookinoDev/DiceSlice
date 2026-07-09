@@ -19,19 +19,27 @@ describe('generated roster', () => {
     expect(GENERATED_BOSSES.length).toBeGreaterThan(200)
   })
 
-  it('every entry maps to a known shader kind with a sane seed and 0..1 colors', () => {
-    const kinds = new Set(['noAtmosphere', 'terranWet', 'gasGiant', 'nebula', 'iceWorld', 'lavaWorld', 'asteroid'])
-    for (const p of [...GENERATED_REGULAR, ...GENERATED_BOSSES]) {
-      expect(kinds.has(p.profile.kind), `${p.name}: kind ${p.profile.kind}`).toBe(true)
-      expect(p.profile.seed).toBeGreaterThanOrEqual(1)
-      expect(p.profile.seed).toBeLessThan(10)
-      for (const c of allColors(p.profile as unknown as Record<string, unknown>)) {
-        expect(c, `${p.name}: color component out of range`).toBeGreaterThanOrEqual(0)
-        expect(c, `${p.name}: color component out of range`).toBeLessThanOrEqual(1)
+  // ~5,800 objects x 4 assertions each - comfortably under 5s on CI, but this many individual
+  // expect() calls (each building a custom failure message) can crawl past the default 5000ms
+  // timeout on a loaded dev machine. A generous fixed timeout, not a perf fix: the assertions
+  // themselves are cheap: only expect()'s own per-call bookkeeping is what adds up here.
+  it(
+    'every entry maps to a known shader kind with a sane seed and 0..1 colors',
+    () => {
+      const kinds = new Set(['noAtmosphere', 'terranWet', 'gasGiant', 'nebula', 'iceWorld', 'lavaWorld', 'asteroid'])
+      for (const p of [...GENERATED_REGULAR, ...GENERATED_BOSSES]) {
+        expect(kinds.has(p.profile.kind), `${p.name}: kind ${p.profile.kind}`).toBe(true)
+        expect(p.profile.seed).toBeGreaterThanOrEqual(1)
+        expect(p.profile.seed).toBeLessThan(10)
+        for (const c of allColors(p.profile as unknown as Record<string, unknown>)) {
+          expect(c, `${p.name}: color component out of range`).toBeGreaterThanOrEqual(0)
+          expect(c, `${p.name}: color component out of range`).toBeLessThanOrEqual(1)
+        }
+        expect(Number.isFinite(planetMaxScale(p.profile)), `${p.name}: planetMaxScale`).toBe(true)
       }
-      expect(Number.isFinite(planetMaxScale(p.profile)), `${p.name}: planetMaxScale`).toBe(true)
-    }
-  })
+    },
+    20000,
+  )
 
   it('never collides with a hand-tuned name', () => {
     const hand = new Set([...REGULAR_PLANETS, ...BOSS_PLANETS].map((p) => p.name))
