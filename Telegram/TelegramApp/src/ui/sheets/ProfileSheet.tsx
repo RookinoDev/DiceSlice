@@ -4,10 +4,13 @@
 // docs/CARD_SYSTEM_PLAN.md), so the layout leaves the bottom section free.
 import { BigNumber } from '../../game/core/BigNumber'
 import type { GameSession } from '../../game/gameplay/GameSession'
-import type { PublicProfile } from '../../game/profileApi'
+import type { PublicProfile, ShowcaseEntry } from '../../game/profileApi'
+import type { OwnedCard } from '../../game/cards/cardsApi'
+import type { CardDefinition } from '../../game/cards/catalog'
 import { getTelegramUser, shareViaTelegram, hapticAction } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
 import { Sheet } from '../Sheet'
+import { ShowcaseEditor, ShowcaseView } from '../cards/ShowcaseEditor'
 
 const BOT_LINK = 'https://t.me/StellarBreakerBot'
 
@@ -17,6 +20,11 @@ interface ProfileSheetProps {
   onClose: () => void
   /** When set, shows this player instead of the local one (visitor mode - no share button). */
   visitor?: PublicProfile | null
+  apiBaseUrl: string | undefined
+  ownedCards: OwnedCard[]
+  showcase: ShowcaseEntry[]
+  onShowcaseChange: (next: ShowcaseEntry[]) => void
+  onInspectCard: (card: CardDefinition) => void
 }
 
 interface ProfileView {
@@ -68,7 +76,7 @@ function sinceText(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
-export function ProfileSheet({ session, open, onClose, visitor }: ProfileSheetProps) {
+export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, ownedCards, showcase, onShowcaseChange, onInspectCard }: ProfileSheetProps) {
   const v = visitor ? fromPublic(visitor) : fromSession(session)
 
   const stats: Array<{ label: string; value: string; accent?: 'gold' | 'cyan' | 'magenta' }> = [
@@ -112,6 +120,12 @@ export function ProfileSheet({ session, open, onClose, visitor }: ProfileSheetPr
           </div>
         ))}
       </div>
+
+      {visitor ? (
+        <ShowcaseView showcase={visitor.showcase ?? []} onInspect={onInspectCard} />
+      ) : (
+        <ShowcaseEditor apiBaseUrl={apiBaseUrl} ownedCards={ownedCards} showcase={showcase} onChange={onShowcaseChange} onInspect={onInspectCard} />
+      )}
 
       {!visitor && (
         <button className="profile-share-btn" onClick={share}>

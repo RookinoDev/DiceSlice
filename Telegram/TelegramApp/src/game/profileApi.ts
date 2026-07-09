@@ -2,6 +2,12 @@
 // Profiles are built server-side from cloud-save syncs, so they may lag live play slightly.
 import type { BigNumberData } from './core/BigNumber'
 import type { LifetimeStats } from './gameplay/LifetimeStats'
+import type { CardVariant } from './cards/variants'
+
+export interface ShowcaseEntry {
+  cardId: string
+  variant: CardVariant
+}
 
 export interface PublicProfile {
   userId: number
@@ -13,6 +19,8 @@ export interface PublicProfile {
   relics: BigNumberData | null
   dailyStreak: number | null
   stats: LifetimeStats | null
+  /** Ordered card showcase (owned cardId+variant pairs, server-validated). */
+  showcase?: ShowcaseEntry[]
 }
 
 export async function fetchPublicProfile(apiBaseUrl: string | undefined, userId: number): Promise<PublicProfile | null> {

@@ -8,7 +8,7 @@ import type { OfflineReport } from '../game/useGameSession'
 import type { PurchaseGrant } from '../game/monetization/purchases'
 import { audio } from '../game/audio/AudioManager'
 import { bindTelegramBackButton, getStartParam, getTelegramUser, hapticSuccess } from '../telegram'
-import { fetchPublicProfile, type PublicProfile } from '../game/profileApi'
+import { fetchPublicProfile, type PublicProfile, type ShowcaseEntry } from '../game/profileApi'
 import { fetchCollection, fetchPendingPacks, type OpenPackResult, type OwnedCard, type PendingPack } from '../game/cards/cardsApi'
 import { summarizeCollection } from '../game/cards/collectionSummary'
 import type { CardDefinition } from '../game/cards/catalog'
@@ -68,6 +68,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [shipUnlock, setShipUnlock] = useState<ShipUnlockInfo | null>(null)
   const [ownedCards, setOwnedCards] = useState<OwnedCard[]>([])
   const [dust, setDust] = useState(0)
+  const [myShowcase, setMyShowcase] = useState<ShowcaseEntry[]>([])
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
   const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null)
   const [objectViewerOpen, setObjectViewerOpen] = useState(false)
@@ -280,6 +281,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   }
   useEffect(() => {
     refreshCards()
+    // The player's own showcase lives server-side (visitors read it from the same profile).
+    const ownId = getTelegramUser()?.id
+    if (ownId) fetchPublicProfile(import.meta.env.VITE_API_URL, ownId).then((p) => setMyShowcase(p?.showcase ?? []))
     const onVisibilityChange = () => {
       if (!document.hidden) refreshCards()
     }
@@ -365,6 +369,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         session={session}
         open={profileOpen}
         visitor={visitorProfile}
+        apiBaseUrl={import.meta.env.VITE_API_URL}
+        ownedCards={ownedCards}
+        showcase={myShowcase}
+        onShowcaseChange={setMyShowcase}
+        onInspectCard={setSelectedCard}
         onClose={() => {
           setProfileOpen(false)
           setVisitorProfile(null)

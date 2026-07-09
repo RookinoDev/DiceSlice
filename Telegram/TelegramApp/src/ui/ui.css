@@ -3166,6 +3166,116 @@
   }
 }
 
+/* -- Profile card showcase -- */
+.profile-section-label {
+  margin: 14px 0 8px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--palette-text-dim);
+}
+.showcase-slots {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.showcase-slot {
+  position: relative;
+  aspect-ratio: 0.72;
+  padding: 4px;
+  border: 1px solid var(--rarity-color, rgba(255, 255, 255, 0.14));
+  border-radius: 10px;
+  background: var(--palette-sheet-row);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--rarity-color, transparent) 35%, transparent);
+  cursor: pointer;
+  overflow: hidden;
+}
+.showcase-slot--active {
+  outline: 2px solid var(--palette-cyan);
+  outline-offset: 1px;
+}
+.showcase-slot-art {
+  width: 100%;
+  height: 100%;
+}
+.showcase-slot-variant {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 1px 0;
+  background: rgba(0, 0, 0, 0.6);
+  font-family: var(--font-display);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--palette-gold-label);
+  text-align: center;
+}
+.showcase-slot-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 22px;
+  color: var(--palette-text-dim);
+}
+.showcase-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.showcase-actions button {
+  flex: 1;
+  padding: 7px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--palette-text-secondary);
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+.showcase-actions button:disabled {
+  opacity: 0.35;
+}
+.showcase-picker {
+  margin-top: 8px;
+}
+.showcase-picker-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.showcase-picker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  cursor: pointer;
+}
+.showcase-picker-name {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+}
+.showcase-picker-meta {
+  font-size: 9px;
+  color: var(--palette-text-dim);
+  white-space: nowrap;
+}
+
 /* -- Pack opening reveal -- */
 .pack-reveal-grid {
   display: grid;
