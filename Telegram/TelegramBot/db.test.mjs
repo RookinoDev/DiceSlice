@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 // Point db.mjs at a throwaway file before it opens its connection (module-load time).
 process.env.SQLITE_PATH = join(mkdtempSync(join(tmpdir(), 'sb-db-test-')), 'test.db')
-const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, grantPacksFromSave, listUnopenedPacks, openPack, getCollection } = await import('./db.mjs')
+const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, grantPacksFromSave, listUnopenedPacks, openPack, getCollection, getDust, refineInstances, craftCard, setShowcase } = await import('./db.mjs')
 
 test('getSave returns null for a user who never synced', () => {
   assert.equal(getSave(111), null)
@@ -98,4 +98,87 @@ test('claimPurchases grants each recorded purchase exactly once', () => {
   const first = claimPurchases(666)
   assert.deepEqual(first, [{ item: 'stardust_pack_500' }, { item: 'stardust_pack_500' }])
   assert.deepEqual(claimPurchases(666), [])
+})
+
+test('minted cards carry a variant and getCollection exposes it', () => {
+  grantPacksFromSave(800, { version: 1, highestStage: 10, stats: { bossesDefeated: 1, deepestStage: 10 } })
+  const [pack] = listUnopenedPacks(800)
+  const { cards } = openPack(800, pack.id)
+  for (const c of cards) assert.ok(typeof c.variant === 'string' && c.variant.length > 0)
+  for (const row of getCollection(800)) assert.ok(typeof row.variant === 'string')
+})
+
+// Duplicates are RARE now (5,890-card pool + new-card weighting) - to test the dupe economy,
+// flood the smallest pool: singularity packs (deepest stage 145) guarantee a legendary from a
+// ~77-card pool, so ~180 legendary pulls exhaust it and must dupe.
+function grantManyPacks(userId, waves = 3) {
+  for (let w = 1; w <= waves; w++) {
+    grantPacksFromSave(userId, { version: 1, highestStage: 145, stats: { bossesDefeated: w * 20, deepestStage: 145 } })
+    for (const pack of listUnopenedPacks(userId)) openPack(userId, pack.id)
+  }
+}
+
+test('refine converts dupes to dust but never the last copy of a card', () => {
+  grantManyPacks(900)
+  const owned = getCollection(900)
+  const byCard = new Map()
+  for (const row of owned) {
+    if (!byCard.has(row.card_id)) byCard.set(row.card_id, [])
+    byCard.get(row.card_id).push(row)
+  }
+  const dupeGroup = [...byCard.values()].find((rows) => rows.length >= 2)
+  assert.ok(dupeGroup, 'expected at least one duplicate after flooding the legendary pool')
+
+  // Refining one of N>=2 copies works and pays dust...
+  const before = getDust(900)
+  const result = refineInstances(900, [dupeGroup[0].id])
+  assert.ok(result)
+  assert.ok(result.dust > before)
+  assert.equal(getCollection(900).length, owned.length - 1)
+
+  // ...but refining ALL copies of one card is refused outright (all-or-nothing).
+  const single = [...byCard.values()].find((rows) => rows.length === 1)
+  assert.ok(single)
+  assert.equal(refineInstances(900, [single[0].id]), null)
+  // Foreign instances are refused too.
+  assert.equal(refineInstances(901, [dupeGroup[1].id]), null)
+})
+
+test('craft mints a chosen card + variant for dust, refusing when broke', () => {
+  assert.equal(craftCard(1000, 'mercury', 'foil'), null) // 0 dust
+
+  // Fund user 1000 with dust by refining dupes.
+  grantManyPacks(1000)
+  const byCard = new Map()
+  for (const row of getCollection(1000)) {
+    if (!byCard.has(row.card_id)) byCard.set(row.card_id, [])
+    byCard.get(row.card_id).push(row)
+  }
+  const spare = [...byCard.values()].filter((rows) => rows.length >= 2).flatMap((rows) => rows.slice(1).map((r) => r.id))
+  assert.ok(spare.length > 0)
+  refineInstances(1000, spare)
+
+  if (getDust(1000) >= 20) {
+    // Crafting a common standard costs 5*4=20 dust.
+    const commonCard = craftCard(1000, 'phobos', 'standard')
+    assert.ok(commonCard)
+    assert.equal(commonCard.variant, 'standard')
+    assert.ok(getCollection(1000).some((r) => r.card_id === 'phobos'))
+  }
+  assert.equal(craftCard(1000, 'not-a-card', 'standard'), null)
+  assert.equal(craftCard(1000, 'mercury', 'chrome'), null) // unknown variant
+})
+
+test('showcase stores only owned (card, variant) pairs and round-trips via profile', () => {
+  grantPacksFromSave(1100, { version: 1, highestStage: 10, stats: { bossesDefeated: 1, deepestStage: 10 } })
+  const [pack] = listUnopenedPacks(1100)
+  const { cards } = openPack(1100, pack.id)
+  const mine = cards.map((c) => ({ cardId: c.cardId, variant: c.variant }))
+
+  assert.equal(setShowcase(1100, mine.slice(0, 3)), true)
+  upsertProfile(1100, { firstName: 'T', username: 't', photoUrl: null })
+  assert.deepEqual(JSON.parse(getProfile(1100).showcase), mine.slice(0, 3))
+
+  assert.equal(setShowcase(1100, [{ cardId: 'earth', variant: 'polychrome' }]), false) // not owned
+  assert.equal(setShowcase(1100, Array(9).fill(mine[0])), false) // over the cap
 })

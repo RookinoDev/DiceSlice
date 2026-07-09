@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
-import { claimPurchases, getCollection, getProfile, getSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, upsertProfile } from './db.mjs'
+import { claimPurchases, craftCard, getCollection, getDust, getProfile, getSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, refineInstances, setShowcase, upsertProfile } from './db.mjs'
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/stellar-breaker\.pages\.dev$/,
@@ -58,6 +58,12 @@ function publicProfilePayload(row) {
   } catch {
     save = null
   }
+  let showcase = []
+  try {
+    showcase = row.showcase ? JSON.parse(row.showcase) : []
+  } catch {
+    showcase = []
+  }
   return {
     userId: row.telegram_user_id,
     firstName: row.first_name,
@@ -68,6 +74,7 @@ function publicProfilePayload(row) {
     relics: save?.relics ?? null,
     dailyStreak: save?.dailyStreak ?? null,
     stats: save?.stats ?? null,
+    showcase,
   }
 }
 
@@ -165,9 +172,64 @@ export function startServer(botToken, port) {
         const body = await readJsonBody(req)
         const userId = requireUser(body, res, botToken)
         if (userId === null) return
-        sendJson(res, 200, { cards: getCollection(userId) })
+        sendJson(res, 200, { cards: getCollection(userId), dust: getDust(userId) })
       } catch (e) {
         console.error('[server] collection error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Duplicate economy: refine dupes into dust, craft chosen cards/variants from dust.
+    if (req.method === 'POST' && req.url === '/api/cards/refine') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        const result = refineInstances(userId, body.instanceIds)
+        if (!result) {
+          sendJson(res, 400, { error: 'not refinable' })
+          return
+        }
+        sendJson(res, 200, result)
+      } catch (e) {
+        console.error('[server] refine error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    if (req.method === 'POST' && req.url === '/api/cards/craft') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        const result = craftCard(userId, String(body.cardId ?? ''), String(body.variant ?? 'standard'))
+        if (!result) {
+          sendJson(res, 400, { error: 'cannot craft' })
+          return
+        }
+        sendJson(res, 200, result)
+      } catch (e) {
+        console.error('[server] craft error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Profile showcase: an ordered list of owned (cardId, variant) pairs, public via /api/profile.
+    if (req.method === 'POST' && req.url === '/api/showcase') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        if (!setShowcase(userId, body.cards)) {
+          sendJson(res, 400, { error: 'invalid showcase' })
+          return
+        }
+        sendJson(res, 200, { ok: true })
+      } catch (e) {
+        console.error('[server] showcase error:', e)
         sendJson(res, 400, { error: 'bad request' })
       }
       return

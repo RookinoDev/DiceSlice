@@ -79,6 +79,38 @@ db.exec(`
   )
 `)
 
+// --- Cards v2 migration: 6-variant model, boss-quality packs, dust, showcase ---
+// (holo INTEGER stays as a legacy column, kept in sync for any stale clients; the
+// variant TEXT column is the source of truth from here on.)
+function hasColumn(table, column) {
+  return db.prepare(`SELECT 1 AS x FROM pragma_table_info('${table}') WHERE name = ?`).get(column) !== undefined
+}
+
+if (!hasColumn('card_instances', 'variant')) {
+  db.exec(`
+    ALTER TABLE card_instances ADD COLUMN variant TEXT NOT NULL DEFAULT 'standard';
+    UPDATE card_instances SET variant = 'holo' WHERE holo = 1;
+    DROP INDEX IF EXISTS ux_card_mint;
+  `)
+}
+db.exec(`
+  CREATE UNIQUE INDEX IF NOT EXISTS ux_card_mint_variant ON card_instances(card_id, variant, serial);
+  CREATE TABLE IF NOT EXISTS card_counters_v (
+    card_id TEXT NOT NULL,
+    variant TEXT NOT NULL,
+    next_serial INTEGER NOT NULL,
+    PRIMARY KEY (card_id, variant)
+  )
+`)
+// One-time carry-over of serial counters from the holo-boolean era.
+db.exec(`
+  INSERT OR IGNORE INTO card_counters_v (card_id, variant, next_serial)
+  SELECT card_id, CASE holo WHEN 1 THEN 'holo' ELSE 'standard' END, next_serial FROM card_counters
+`)
+if (!hasColumn('packs', 'quality')) db.exec(`ALTER TABLE packs ADD COLUMN quality REAL NOT NULL DEFAULT 0`)
+if (!hasColumn('pack_progress', 'dust')) db.exec(`ALTER TABLE pack_progress ADD COLUMN dust INTEGER NOT NULL DEFAULT 0`)
+if (!hasColumn('profiles', 'showcase')) db.exec(`ALTER TABLE profiles ADD COLUMN showcase TEXT`)
+
 /** Upsert the player's public identity (from Telegram-signed initData). Keeps first_synced_at. */
 export function upsertProfile(telegramUserId, { firstName, username, photoUrl }) {
   const now = Date.now()
@@ -95,7 +127,7 @@ export function upsertProfile(telegramUserId, { firstName, username, photoUrl })
 export function getProfile(telegramUserId) {
   const row = db
     .prepare(
-      `SELECT p.telegram_user_id, p.first_name, p.username, p.photo_url, p.first_synced_at, s.save_json
+      `SELECT p.telegram_user_id, p.first_name, p.username, p.photo_url, p.first_synced_at, p.showcase, s.save_json
        FROM profiles p LEFT JOIN saves s ON s.telegram_user_id = p.telegram_user_id
        WHERE p.telegram_user_id = ?`,
     )
@@ -118,7 +150,26 @@ export function getSave(telegramUserId) {
 }
 
 // --- Card packs ---
-import { packTypeForBossStage, rollPack } from './cards.mjs'
+import { CARD_POOL, craftCost, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER } from './cards.mjs'
+
+const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
+
+/** Mint one instance inside an open transaction: assigns the next serial for (card, variant). */
+function mintInstance(telegramUserId, cardId, variant, source, now) {
+  db.prepare('INSERT OR IGNORE INTO card_counters_v (card_id, variant, next_serial) VALUES (?, ?, 1)').run(cardId, variant)
+  const { next_serial } = db.prepare('SELECT next_serial FROM card_counters_v WHERE card_id = ? AND variant = ?').get(cardId, variant)
+  db.prepare('UPDATE card_counters_v SET next_serial = next_serial + 1 WHERE card_id = ? AND variant = ?').run(cardId, variant)
+  db.prepare('INSERT INTO card_instances (telegram_user_id, card_id, holo, variant, serial, source, minted_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+    telegramUserId,
+    cardId,
+    variant === 'holo' ? 1 : 0,
+    variant,
+    next_serial,
+    source,
+    now,
+  )
+  return next_serial
+}
 
 /** Cap on packs granted per single save sync - a sanity brake, not a balance knob. */
 const MAX_PACKS_PER_SYNC = 20
@@ -145,8 +196,9 @@ export function grantPacksFromSave(telegramUserId, save) {
       return 0
     }
     const type = packTypeForBossStage(deepest)
-    const insert = db.prepare('INSERT INTO packs (telegram_user_id, type, created_at) VALUES (?, ?, ?)')
-    for (let i = 0; i < delta; i++) insert.run(telegramUserId, type, now)
+    const quality = packQualityForStage(deepest)
+    const insert = db.prepare('INSERT INTO packs (telegram_user_id, type, created_at, quality) VALUES (?, ?, ?, ?)')
+    for (let i = 0; i < delta; i++) insert.run(telegramUserId, type, now, quality)
     db.prepare('UPDATE pack_progress SET bosses_granted = bosses_granted + ? WHERE telegram_user_id = ?').run(delta, telegramUserId)
     db.exec('COMMIT')
     return delta
@@ -169,7 +221,7 @@ export function openPack(telegramUserId, packId) {
   const now = Date.now()
   db.exec('BEGIN IMMEDIATE')
   try {
-    const pack = db.prepare('SELECT id, type FROM packs WHERE id = ? AND telegram_user_id = ? AND opened_at IS NULL').get(packId, telegramUserId)
+    const pack = db.prepare('SELECT id, type, quality FROM packs WHERE id = ? AND telegram_user_id = ? AND opened_at IS NULL').get(packId, telegramUserId)
     if (!pack) {
       db.exec('COMMIT')
       return null
@@ -177,21 +229,13 @@ export function openPack(telegramUserId, packId) {
 
     db.prepare('INSERT OR IGNORE INTO pack_progress (telegram_user_id) VALUES (?)').run(telegramUserId)
     const progress = db.prepare('SELECT since_epic, since_legendary FROM pack_progress WHERE telegram_user_id = ?').get(telegramUserId)
-    const { cards, pity } = rollPack(pack.type, { sinceEpic: progress.since_epic, sinceLegendary: progress.since_legendary })
+    // New-card weighting needs the owned set; boss quality tilts the slot table (see cards.mjs).
+    const ownedIds = new Set(db.prepare('SELECT DISTINCT card_id FROM card_instances WHERE telegram_user_id = ?').all(telegramUserId).map((r) => r.card_id))
+    const { cards, pity } = rollPack(pack.type, { sinceEpic: progress.since_epic, sinceLegendary: progress.since_legendary }, ownedIds, pack.quality ?? 0)
 
-    const minted = cards.map(({ cardId, rarity, holo }) => {
-      db.prepare('INSERT OR IGNORE INTO card_counters (card_id, holo, next_serial) VALUES (?, ?, 1)').run(cardId, holo ? 1 : 0)
-      const { next_serial } = db.prepare('SELECT next_serial FROM card_counters WHERE card_id = ? AND holo = ?').get(cardId, holo ? 1 : 0)
-      db.prepare('UPDATE card_counters SET next_serial = next_serial + 1 WHERE card_id = ? AND holo = ?').run(cardId, holo ? 1 : 0)
-      db.prepare('INSERT INTO card_instances (telegram_user_id, card_id, holo, serial, source, minted_at) VALUES (?, ?, ?, ?, ?, ?)').run(
-        telegramUserId,
-        cardId,
-        holo ? 1 : 0,
-        next_serial,
-        `pack:${pack.type}`,
-        now,
-      )
-      return { cardId, rarity, holo, serial: next_serial }
+    const minted = cards.map(({ cardId, rarity, variant }) => {
+      const serial = mintInstance(telegramUserId, cardId, variant, `pack:${pack.type}`, now)
+      return { cardId, rarity, variant, holo: variant === 'holo', serial, isNew: !ownedIds.has(cardId) }
     })
 
     db.prepare('UPDATE packs SET opened_at = ? WHERE id = ?').run(now, pack.id)
@@ -206,7 +250,106 @@ export function openPack(telegramUserId, packId) {
 
 /** Everything the user owns: one row per instance (client groups by card). */
 export function getCollection(telegramUserId) {
-  return db.prepare('SELECT card_id, holo, serial, minted_at FROM card_instances WHERE telegram_user_id = ? ORDER BY id').all(telegramUserId)
+  return db.prepare('SELECT id, card_id, variant, serial, minted_at FROM card_instances WHERE telegram_user_id = ? ORDER BY id').all(telegramUserId)
+}
+
+/** The user's Prism Dust balance (duplicate-refine currency). */
+export function getDust(telegramUserId) {
+  const row = db.prepare('SELECT dust FROM pack_progress WHERE telegram_user_id = ?').get(telegramUserId)
+  return row ? row.dust : 0
+}
+
+/**
+ * Refines (destroys) owned duplicate instances into dust. Duplicates only: an instance is
+ * refinable only while the user owns MORE THAN ONE instance of that base card, and the last
+ * remaining copy can never be refined - refining can't punch a hole in the collection.
+ * Returns { refined, dust } or null when any id is invalid/not refinable (all-or-nothing).
+ */
+export function refineInstances(telegramUserId, instanceIds) {
+  if (!Array.isArray(instanceIds) || instanceIds.length === 0 || instanceIds.length > 200) return null
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    const rows = instanceIds.map((id) => db.prepare('SELECT id, card_id, variant FROM card_instances WHERE id = ? AND telegram_user_id = ?').get(id, telegramUserId))
+    if (rows.some((r) => r === undefined) || new Set(instanceIds).size !== instanceIds.length) {
+      db.exec('ROLLBACK')
+      return null
+    }
+    // Per base card: refining N instances requires owning at least N+1 of it.
+    const perCard = new Map()
+    for (const r of rows) perCard.set(r.card_id, (perCard.get(r.card_id) ?? 0) + 1)
+    for (const [cardId, n] of perCard) {
+      const { c } = db.prepare('SELECT COUNT(*) AS c FROM card_instances WHERE telegram_user_id = ? AND card_id = ?').get(telegramUserId, cardId)
+      if (c <= n) {
+        db.exec('ROLLBACK')
+        return null
+      }
+    }
+    let gained = 0
+    for (const r of rows) {
+      const rarity = POOL_BY_ID.get(r.card_id)?.rarity ?? 'common'
+      gained += refineValue(rarity, r.variant)
+      db.prepare('DELETE FROM card_instances WHERE id = ?').run(r.id)
+    }
+    db.prepare('INSERT OR IGNORE INTO pack_progress (telegram_user_id) VALUES (?)').run(telegramUserId)
+    db.prepare('UPDATE pack_progress SET dust = dust + ? WHERE telegram_user_id = ?').run(gained, telegramUserId)
+    const dust = db.prepare('SELECT dust FROM pack_progress WHERE telegram_user_id = ?').get(telegramUserId).dust
+    db.exec('COMMIT')
+    return { refined: rows.length, gained, dust }
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+/**
+ * Crafts a chosen card (any variant) for dust - deterministic bad-luck protection plus the
+ * duplicate-progression path to special variants. Returns the minted card or null
+ * (unknown card / bad variant / insufficient dust).
+ */
+export function craftCard(telegramUserId, cardId, variant) {
+  const def = POOL_BY_ID.get(cardId)
+  if (!def || !VARIANT_ORDER.includes(variant)) return null
+  const cost = craftCost(def.rarity, variant)
+  const now = Date.now()
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.prepare('INSERT OR IGNORE INTO pack_progress (telegram_user_id) VALUES (?)').run(telegramUserId)
+    const { dust } = db.prepare('SELECT dust FROM pack_progress WHERE telegram_user_id = ?').get(telegramUserId)
+    if (dust < cost) {
+      db.exec('ROLLBACK')
+      return null
+    }
+    db.prepare('UPDATE pack_progress SET dust = dust - ? WHERE telegram_user_id = ?').run(cost, telegramUserId)
+    const serial = mintInstance(telegramUserId, cardId, variant, 'craft', now)
+    const remaining = db.prepare('SELECT dust FROM pack_progress WHERE telegram_user_id = ?').get(telegramUserId).dust
+    db.exec('COMMIT')
+    return { cardId, rarity: def.rarity, variant, serial, cost, dust: remaining }
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+const SHOWCASE_MAX = 8
+
+/**
+ * Saves the profile showcase: an ordered list of up to 8 owned (cardId, variant) pairs.
+ * Returns false when any entry isn't owned in that exact variant.
+ */
+export function setShowcase(telegramUserId, cards) {
+  if (!Array.isArray(cards) || cards.length > SHOWCASE_MAX) return false
+  const owned = db.prepare('SELECT 1 AS x FROM card_instances WHERE telegram_user_id = ? AND card_id = ? AND variant = ? LIMIT 1')
+  for (const c of cards) {
+    if (!c || typeof c.cardId !== 'string' || !VARIANT_ORDER.includes(c.variant)) return false
+    if (owned.get(telegramUserId, c.cardId, c.variant) === undefined) return false
+  }
+  const json = JSON.stringify(cards.map((c) => ({ cardId: c.cardId, variant: c.variant })))
+  const now = Date.now()
+  db.prepare(`
+    INSERT INTO profiles (telegram_user_id, showcase, first_synced_at, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(telegram_user_id) DO UPDATE SET showcase = excluded.showcase, updated_at = excluded.updated_at
+  `).run(telegramUserId, json, now, now)
+  return true
 }
 
 export function recordPurchase(telegramUserId, item) {
