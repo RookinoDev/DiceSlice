@@ -144,6 +144,10 @@ function getClips(): Record<string, Clip> {
     overdriveGo: twoTone(1100, 1650, 0.08), // "OVERDRIVE" text landing
     overdriveEnd: boom(0.35), // final-blast on natural expiry
     packTear: noise(0.24, 1.3), // foil-wrapper rip for the pack-opening ceremony
+    packBurst: boom(0.5), // the wrapper explodes
+    dealWhoosh: sweep(300, 950, 0.11), // a card flying into position
+    cardLift: tone(1250, 0.035), // picking a card up off the stack
+    cardLand: tone(190, 0.07), // the card thumping back down
   }
   for (let tier = 1; tier <= COMBO_TIER_CLIPS; tier++) {
     // ~12% frequency step per tier - a pleasant ascending run, not a harsh chromatic climb.
@@ -208,6 +212,10 @@ export const audio = {
   overdriveGo: () => play('overdriveGo', 0.55),
   overdriveEnd: () => play('overdriveEnd', 0.5),
   packTear: () => play('packTear', 0.5),
+  packBurst: () => play('packBurst', 0.65),
+  dealWhoosh: () => play('dealWhoosh', 0.3),
+  cardLift: () => play('cardLift', 0.3),
+  cardLand: () => play('cardLand', 0.4),
   /** Hushes every non-finisher sound for `ms` - call right before a finisher clip for a beat of silence first. */
   silence: (ms: number) => {
     silencedUntil = performance.now() + ms

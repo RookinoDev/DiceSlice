@@ -34,7 +34,7 @@ import { ProfileSheet } from './sheets/ProfileSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
 import { ObjectViewer } from './cards/ObjectViewer'
-import { PackOpenSheet } from './cards/PackOpenSheet'
+import { PackOpeningOverlay } from './cards/PackOpeningOverlay'
 import { ShipUnlockToast, type ShipUnlockInfo } from './ShipUnlockToast'
 import './ui.css'
 
@@ -389,7 +389,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         onExplore={() => setObjectViewerOpen(true)}
       />
       <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
-      <PackOpenSheet apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={() => setPackSheetOpen(false)} />
+      <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={() => setPackSheetOpen(false)} />
     </div>
   )
 }

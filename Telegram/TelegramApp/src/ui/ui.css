@@ -3166,6 +3166,461 @@
   }
 }
 
+/* -- Pack-opening overlay (fullscreen ceremony) -- */
+.pack-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse 90% 60% at 50% 38%, rgba(30, 38, 66, 0.9), rgba(6, 8, 16, 0.98) 75%),
+    #05070f;
+  animation: pack-overlay-in 0.25s ease-out;
+}
+@keyframes pack-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+.pack-overlay--shake {
+  animation: pack-overlay-shake 0.4s ease-out;
+}
+@keyframes pack-overlay-shake {
+  0% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(-7px, 5px);
+  }
+  40% {
+    transform: translate(6px, -4px);
+  }
+  60% {
+    transform: translate(-4px, 3px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+.pack-overlay-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, 0.85);
+  transition: box-shadow 0.5s ease;
+}
+/* When the NEXT hidden card is epic+, the whole room darkens - players learn to fear/love it. */
+.pack-overlay-vignette--charged {
+  box-shadow: inset 0 0 140px rgba(0, 0, 0, 0.98);
+}
+.pack-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--tg-safe-top) + 14px) 18px 10px;
+}
+.pack-overlay-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  color: var(--palette-gold-label);
+}
+.pack-overlay-count {
+  color: var(--palette-text-dim);
+  font-size: 11px;
+}
+.pack-overlay-close {
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--palette-text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+}
+.pack-overlay-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.pack-overlay-hint {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--palette-text-dim);
+  animation: pack-hint-breathe 2s ease-in-out infinite;
+}
+.pack-overlay-hint--low {
+  position: absolute;
+  bottom: calc(var(--tg-safe-bottom, 0px) + 26px);
+}
+@keyframes pack-hint-breathe {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.pack-overlay-empty {
+  color: var(--palette-text-secondary);
+  font-size: 13px;
+  padding: 0 30px;
+  text-align: center;
+}
+
+/* The wrapper: floats when idle, shakes harder as the tear progresses (--tear 0..1). */
+.pack-wrapper {
+  border: none;
+  background: none;
+  cursor: pointer;
+  touch-action: none;
+  animation: pack-idle-float 3.2s ease-in-out infinite;
+  filter: drop-shadow(0 0 26px color-mix(in srgb, var(--pack-glow) 45%, transparent));
+}
+@keyframes pack-idle-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(-11px) rotate(1.5deg);
+  }
+}
+.pack-wrapper--tearing {
+  animation: pack-tear-shake 0.12s linear infinite;
+  filter: drop-shadow(0 0 calc(26px + var(--tear) * 44px) color-mix(in srgb, var(--pack-glow) 75%, transparent));
+}
+@keyframes pack-tear-shake {
+  0%,
+  100% {
+    transform: translate(calc(var(--tear) * -5px), 0) rotate(calc(var(--tear) * -3deg)) scale(calc(1 + var(--tear) * 0.08));
+  }
+  50% {
+    transform: translate(calc(var(--tear) * 5px), calc(var(--tear) * -3px)) rotate(calc(var(--tear) * 3deg)) scale(calc(1 + var(--tear) * 0.08));
+  }
+}
+.pack-wrapper-body {
+  position: relative;
+  width: 190px;
+  height: 265px;
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.12) 0%, transparent 38%),
+    linear-gradient(135deg, #232c4e, #141a33 55%, #1c2444);
+  border: 1px solid color-mix(in srgb, var(--pack-glow) 55%, transparent);
+  overflow: hidden;
+}
+.pack-wrapper-body::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.14) 48%, transparent 62%);
+  background-size: 240% 240%;
+  animation: card-holo-sheen 3s ease-in-out infinite;
+}
+.pack-wrapper-seam {
+  position: absolute;
+  top: 26px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.35) 0 6px, transparent 6px 12px);
+  /* The seam visibly rips as --tear grows. */
+  clip-path: inset(0 calc((1 - var(--tear, 0)) * 100%) 0 0);
+  box-shadow: 0 0 10px var(--pack-glow);
+}
+.pack-wrapper-emblem {
+  font-size: 44px;
+  color: var(--pack-glow);
+  text-shadow: 0 0 22px var(--pack-glow);
+}
+.pack-wrapper-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--palette-text-primary);
+}
+
+/* Burst: flash + shockwave when the wrapper gives way. */
+.pack-burst-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 240, 200, 0.9), transparent 55%);
+  animation: pack-burst-flash 0.45s ease-out forwards;
+}
+@keyframes pack-burst-flash {
+  0% {
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.pack-burst-ring {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 220, 140, 0.9);
+  animation: pack-burst-ring 0.55s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+}
+@keyframes pack-burst-ring {
+  0% {
+    transform: scale(0.4);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(7);
+    opacity: 0;
+  }
+}
+
+/* The dealt pile. Cards fly in face-down with per-card rotation, then idle-drift forever. */
+.pack-table {
+  position: relative;
+  width: min(72vw, 235px);
+  aspect-ratio: 0.7;
+}
+.pack-card {
+  position: absolute;
+  inset: 0;
+  transform: translateY(var(--stack-y)) rotate(var(--stack-rot));
+  perspective: 750px;
+  animation: pack-card-drift 3.6s ease-in-out infinite;
+  animation-delay: var(--drift-delay);
+}
+@keyframes pack-card-drift {
+  0%,
+  100% {
+    transform: translateY(var(--stack-y)) rotate(var(--stack-rot));
+  }
+  50% {
+    transform: translateY(calc(var(--stack-y) - 5px)) rotate(calc(var(--stack-rot) + 0.8deg));
+  }
+}
+.pack-card--dealing {
+  animation: pack-card-deal 0.5s cubic-bezier(0.2, 1.25, 0.4, 1) both, pack-card-drift 3.6s ease-in-out infinite;
+  animation-delay: var(--deal-delay), calc(var(--deal-delay) + 500ms);
+}
+@keyframes pack-card-deal {
+  0% {
+    transform: translateY(-46vh) rotate(calc(var(--stack-rot) * 5)) scale(0.5);
+    opacity: 0;
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(var(--stack-y)) rotate(var(--stack-rot)) scale(1);
+  }
+}
+/* Lift: the top card rises toward the player before flipping (Balatro pick-up feel). */
+.pack-card--lifting {
+  animation: none;
+  transform: translateY(calc(var(--stack-y) - 16px)) rotate(0deg) scale(1.07);
+  transition: transform 0.16s cubic-bezier(0.2, 0.9, 0.3, 1.4);
+  z-index: 50 !important;
+}
+.pack-card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.3, 1.1, 0.35, 1);
+}
+.pack-card--revealed .pack-card-inner {
+  transform: rotateY(180deg);
+}
+.pack-card--revealed {
+  animation: pack-card-land 0.5s cubic-bezier(0.2, 1.5, 0.4, 1), pack-card-drift 3.6s ease-in-out 0.5s infinite;
+}
+@keyframes pack-card-land {
+  0% {
+    transform: translateY(calc(var(--stack-y) - 16px)) scale(1.07);
+  }
+  55% {
+    transform: translateY(var(--stack-y)) scale(0.965);
+  }
+  78% {
+    transform: translateY(var(--stack-y)) scale(1.02);
+  }
+  100% {
+    transform: translateY(var(--stack-y)) scale(1);
+  }
+}
+.pack-card-back,
+.pack-card-front {
+  position: absolute;
+  inset: 0;
+  border-radius: 15px;
+  backface-visibility: hidden;
+}
+.pack-card-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(67, 221, 238, 0.1), transparent 55%),
+    linear-gradient(135deg, var(--palette-panel), #10152b);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.pack-card-back-emblem {
+  font-size: 34px;
+  color: rgba(255, 255, 255, 0.22);
+}
+/* The rarity TELL: the top hidden card leaks its rarity as a pulsing edge glow. */
+.pack-card--top .pack-card-back {
+  box-shadow: 0 0 26px color-mix(in srgb, var(--rarity-color) 60%, transparent);
+  border-color: color-mix(in srgb, var(--rarity-color) 70%, transparent);
+  animation: card-edge-pulse 1.3s ease-in-out infinite;
+}
+.pack-card-front {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px;
+  border: 2px solid var(--rarity-color, rgba(255, 255, 255, 0.15));
+  background: var(--palette-sheet);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--rarity-color, transparent) 60%, transparent);
+}
+
+/* Recap: best pull enthroned, the rest pop in under it. */
+.pack-overlay-stage--recap {
+  justify-content: center;
+  gap: 14px;
+  padding: 0 20px calc(var(--tg-safe-bottom, 0px) + 12px);
+}
+.pack-recap-best {
+  position: relative;
+  width: min(46vw, 165px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 10px 10px;
+  border: 2px solid var(--rarity-color);
+  border-radius: 16px;
+  background: var(--palette-sheet-row);
+  box-shadow: 0 0 32px color-mix(in srgb, var(--rarity-color) 65%, transparent);
+  animation: recap-best-in 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both, card-edge-pulse 2s ease-in-out 0.6s infinite;
+}
+@keyframes recap-best-in {
+  0% {
+    transform: scale(0.4) rotate(-6deg);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+.pack-recap-best-crown {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--palette-gold-light);
+  color: #241300;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  white-space: nowrap;
+}
+.pack-recap-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.pack-recap-mini {
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 4px;
+  border: 1px solid var(--rarity-color);
+  border-radius: 10px;
+  background: var(--palette-sheet-row);
+  animation: recap-mini-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: calc(var(--pop-delay) + 250ms);
+}
+@keyframes recap-mini-pop {
+  0% {
+    transform: scale(0.3) translateY(14px);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+.pack-recap-mini-name {
+  font-family: var(--font-display);
+  font-size: 7.5px;
+  font-weight: 600;
+  color: var(--palette-text-secondary);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pack-overlay-continue {
+  width: min(80vw, 320px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pack-overlay,
+  .pack-overlay--shake,
+  .pack-overlay-hint,
+  .pack-wrapper,
+  .pack-wrapper--tearing,
+  .pack-wrapper-body::after,
+  .pack-burst-flash,
+  .pack-burst-ring,
+  .pack-card,
+  .pack-card--dealing,
+  .pack-card--revealed,
+  .pack-card--top .pack-card-back,
+  .pack-recap-best,
+  .pack-recap-mini {
+    animation: none;
+  }
+  .pack-card--dealing {
+    opacity: 1;
+  }
+  .pack-recap-mini,
+  .pack-recap-best {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* -- Profile card showcase -- */
 .profile-section-label {
   margin: 14px 0 8px;
