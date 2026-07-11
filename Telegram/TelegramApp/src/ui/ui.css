@@ -4020,8 +4020,13 @@
   color: var(--palette-text-secondary);
   line-height: 1.5;
 }
-.object-viewer-scan-btn {
-  align-self: center;
+.object-viewer-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.object-viewer-scan-btn,
+.object-viewer-reset-btn {
   padding: 8px 22px;
   border-radius: 999px;
   border: 1px solid var(--palette-cyan-label);
@@ -4030,6 +4035,13 @@
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 0.14em;
+}
+.object-viewer-reset-btn {
+  border-color: var(--palette-text-dim);
+  color: var(--palette-text-secondary);
+}
+.object-viewer-reset-btn:active {
+  transform: scale(0.95);
 }
 .object-viewer-scan-btn--active {
   background: color-mix(in srgb, var(--palette-cyan-label) 20%, transparent);

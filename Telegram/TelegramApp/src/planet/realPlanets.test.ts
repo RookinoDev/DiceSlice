@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { BOSS_PLANETS, REGULAR_PLANETS, realPlanetForStage } from './realPlanets'
+import { BOSS_PLANETS, REGULAR_PLANETS, realPlanetByName, realPlanetForStage } from './realPlanets'
+import { GENERATED_REGULAR, GENERATED_BOSSES } from './rosterGen'
 
 const BOSS_INTERVAL = 10
+
+describe('realPlanetByName', () => {
+  // Regression: byName used to only index the 66 hand-tuned objects, so ~99% of the card
+  // catalog (every generated object) resolved to undefined - CardArt rendered blank and
+  // ObjectViewer's whole body silently didn't mount (its guard is `card && target`).
+  it('resolves generated objects, not just the hand-tuned 66', () => {
+    expect(realPlanetByName(GENERATED_REGULAR[0].name)).toBe(GENERATED_REGULAR[0])
+    expect(realPlanetByName(GENERATED_BOSSES[0].name)).toBe(GENERATED_BOSSES[0])
+  })
+
+  it('still resolves hand-tuned objects', () => {
+    expect(realPlanetByName('EARTH')?.name).toBe('EARTH')
+  })
+
+  it('returns undefined for an unknown name', () => {
+    expect(realPlanetByName('NOT A REAL PLANET')).toBeUndefined()
+  })
+})
 
 describe('realPlanetForStage', () => {
   it('is deterministic: the same sector always shows the same body', () => {

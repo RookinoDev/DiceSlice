@@ -191,9 +191,10 @@ export function realPlanetForStage(stage: number, bossInterval: number): RealPla
   return ALL_REGULAR[(s - 1 - bossesBefore) % ALL_REGULAR.length]
 }
 
-// Name -> profile, over the 66 hand-tuned objects only (the generated extension isn't part of
-// Set 1's card catalog - see game/cards/catalog.ts, whose `name` field must match one of these).
-const byName = new Map<string, RealPlanet>([...REGULAR_PLANETS, ...BOSS_PLANETS].map((p) => [p.name, p]))
+// Name -> profile, over EVERY object (hand-tuned + generated) - the card catalog now covers
+// the full ~5,890-object roster (see game/cards/generatedCards.ts), so this must too or
+// ~99% of cards render with no planet art at all.
+const byName = new Map<string, RealPlanet>([...ALL_REGULAR, ...ALL_BOSSES].map((p) => [p.name, p]))
 
 /** The live shader profile for a card's artwork, looked up by its exact catalog name. */
 export function realPlanetByName(name: string): RealPlanet | undefined {

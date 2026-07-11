@@ -360,6 +360,8 @@ export interface PlanetImpulseApi {
   setZoom(zoom: number): void
   /** Current spin angle (radians) - lets a caller (the object viewer's fact-chip pins) project a feature's stored surface position to its current screen position every frame without this component re-rendering. */
   getRotation(): number
+  /** Smoothly eases rotation/tilt/zoom back to the default framing (object viewer's RESET button). */
+  resetView(): void
 }
 
 // Underdamped spring constants for the displacement/rotation kick - SPRING_K pulls the
@@ -446,6 +448,9 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
     // orthographic camera's pinch-to-dolly. Both no-ops unless the viewer's controller calls them.
     let userTilt = 0
     let zoom = 1
+    // Non-null while easing back to the default view (object viewer's RESET) - the animate
+    // loop below lerps rotation/tilt/zoom toward these each frame, then clears itself.
+    let resetTarget: { rotation: number; tilt: number; zoom: number } | null = null
 
     onReady?.({
       impulse(px, py, strength) {
@@ -476,21 +481,30 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
         }
       },
       addRotation(deltaRad) {
+        resetTarget = null // the player grabbed it - cancel any in-flight reset ease
         rotation += deltaRad
       },
       flingRotation(angularVelocity) {
         rotationKickVel += angularVelocity
       },
       addTilt(deltaRad) {
+        resetTarget = null
         userTilt = Math.max(-1, Math.min(1, userTilt + deltaRad))
       },
       setZoom(z) {
+        resetTarget = null
         zoom = z
         camera.zoom = zoom
         camera.updateProjectionMatrix()
       },
       getRotation() {
         return rotation
+      },
+      resetView() {
+        // Nearest multiple of a full turn to the CURRENT rotation, so easing back to "0"
+        // always takes the short way round instead of spinning back through every lap.
+        const target = Math.round(rotation / (Math.PI * 2)) * (Math.PI * 2)
+        resetTarget = { rotation: target, tilt: 0, zoom: 1 }
       },
     })
 
@@ -512,6 +526,23 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
       rotationKickVel *= Math.exp(-ROTATION_KICK_DECAY * dt)
 
       rotation += dt * profile.rotationRate + rotationKickVel * dt
+
+      // Ease back toward the default view after resetView() - exponential approach, so it
+      // starts fast and settles gently rather than a linear snap. Clears itself once close.
+      if (resetTarget) {
+        const ease = 1 - Math.exp(-6 * dt)
+        rotation += (resetTarget.rotation - rotation) * ease
+        userTilt += (resetTarget.tilt - userTilt) * ease
+        zoom += (resetTarget.zoom - zoom) * ease
+        camera.zoom = zoom
+        camera.updateProjectionMatrix()
+        if (Math.abs(resetTarget.rotation - rotation) < 0.002 && Math.abs(resetTarget.tilt - userTilt) < 0.002 && Math.abs(resetTarget.zoom - zoom) < 0.002) {
+          rotation = resetTarget.rotation
+          userTilt = resetTarget.tilt
+          zoom = resetTarget.zoom
+          resetTarget = null
+        }
+      }
 
       const hpNow = hpFractionRef.current
       meshes.forEach((mesh, i) => {

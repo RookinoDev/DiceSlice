@@ -194,9 +194,20 @@ export function ObjectViewer({ card, open, onClose }: ObjectViewerProps) {
             </div>
           )}
           <div className="object-viewer-hint">DRAG TO ORBIT · PINCH TO ZOOM{features.length > 0 ? ' · TAP A MARKER' : ''}</div>
-          <button className={`object-viewer-scan-btn ${scanActive ? 'object-viewer-scan-btn--active' : ''}`} onClick={() => setScanActive((v) => !v)}>
-            {scanActive ? 'SCANNING...' : 'SCAN'}
-          </button>
+          <div className="object-viewer-actions">
+            <button
+              className="object-viewer-reset-btn"
+              onClick={() => {
+                zoomRef.current = 1
+                apiRef.current?.resetView()
+              }}
+            >
+              RESET VIEW
+            </button>
+            <button className={`object-viewer-scan-btn ${scanActive ? 'object-viewer-scan-btn--active' : ''}`} onClick={() => setScanActive((v) => !v)}>
+              {scanActive ? 'SCANNING...' : 'SCAN'}
+            </button>
+          </div>
           {scanActive && (
             <div className="object-viewer-scan-table">
               {Object.entries(card.physical).map(([label, value]) => (
