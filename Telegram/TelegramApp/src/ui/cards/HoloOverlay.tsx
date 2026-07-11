@@ -5,7 +5,7 @@
 // of these is alive at a time (the one focused card), matching the "hard cap two WebGL
 // contexts" budget in §8 alongside the object's own PlanetCanvas render.
 import { useEffect, useRef, type RefObject } from 'react'
-import { WebGLRenderer, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, DoubleSide, AdditiveBlending } from 'three'
+import { WebGLRenderer, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, DoubleSide, NormalBlending } from 'three'
 import type { CardRarity } from '../../game/cards/catalog'
 
 export interface HoloLightVector {
@@ -34,6 +34,11 @@ void main() {
 }
 `
 
+// Real foil under light is a diffraction grating (fine parallel color bands that shift hue
+// as the angle changes) plus a glassy specular sweep plus rare bright glints - three distinct
+// visible layers, alpha-blended (NOT additive - additive is why the old version vanished on
+// bright art: adding a rainbow to near-white pixels just makes more white) so the color reads
+// as a real translucent tint over ANY artwork, dark or light.
 const fragmentShader = /* glsl */ `
 varying vec2 vUv;
 uniform vec2 uLight;
@@ -52,27 +57,32 @@ vec3 hsv2rgb(vec3 c) {
 void main() {
   vec2 uv = vUv;
   vec2 c = uv - 0.5;
+  vec2 lightDir = length(uLight) > 0.001 ? normalize(uLight) : vec2(0.0, 1.0);
+  float pos = dot(c, lightDir);
 
-  // Rainbow foil band, angled by the light/tilt vector plus a slow idle drift.
-  float band = dot(c, uLight) * 3.2 + uTime * 0.06;
-  vec3 rainbow = hsv2rgb(vec3(fract(band), 0.85, 1.0));
+  // Diffraction grating: fine + coarse bands at different speeds/angles so the hue cycles
+  // richly across the surface instead of one smooth gradient - reads as an actual foil texture.
+  float bandsFine = pos * 13.0 + uTime * 0.18;
+  float bandsCoarse = pos * 3.5 - uTime * 0.06 + c.x * 2.0;
+  float hue = fract(bandsFine * 0.12 + bandsCoarse * 0.4);
+  vec3 rainbow = hsv2rgb(vec3(hue, 0.7, 1.0));
 
-  // Two broad specular sweeps at different rates - a fake dual-layer lamination.
-  float sweep1 = smoothstep(0.42, 0.0, abs(fract(uv.x + uv.y * 0.3 - dot(uLight, vec2(0.6, 0.4)) * 0.6) - 0.5));
-  float sweep2 = smoothstep(0.32, 0.0, abs(fract(uv.x * 0.7 - uv.y - dot(uLight, vec2(-0.4, 0.7)) * 0.6) - 0.5));
+  // A bright specular band glides across the card as the light angle changes - the "glassy
+  // lamination catching the light" read.
+  float sweepPos = fract(pos * 1.2 + dot(uLight, vec2(0.8, 0.5)) * 0.6 + uTime * 0.05);
+  float sweep = pow(smoothstep(0.5, 0.0, abs(sweepPos - 0.5)), 2.0);
 
-  // Discrete sparkle glints - a hashed grid popping in and out, not uniform glitter.
-  vec2 cell = floor(uv * (16.0 + uSparkleDensity * 26.0));
+  // Rare, small, bright glints - not a wash across the whole card.
+  vec2 cell = floor(uv * (20.0 + uSparkleDensity * 34.0));
   float h = hash(cell);
-  float twinkle = step(0.965, h) * max(0.0, 0.5 + 0.5 * sin(uTime * 3.0 + h * 40.0 + dot(uLight, vec2(3.0, 1.7))));
+  float twinklePhase = sin(uTime * 2.2 + h * 60.0 + dot(uLight, vec2(4.0, 2.3)));
+  float twinkle = step(0.975, h) * smoothstep(0.55, 1.0, twinklePhase);
 
-  // Edge highlight that chases the light around the card border.
-  float edgeDist = min(min(uv.x, 1.0 - uv.x), min(uv.y, 1.0 - uv.y));
-  float rim = smoothstep(0.055, 0.0, edgeDist) * (0.5 + 0.5 * dot(normalize(c), normalize(uLight + vec2(0.0001))));
-
-  float alpha = (0.16 * sweep1 + 0.16 * sweep2 + 0.4 * twinkle + 0.35 * rim) * uIntensity;
-  vec3 col = mix(rainbow, vec3(1.0), twinkle * 0.6 + rim * 0.3);
-  gl_FragColor = vec4(col, clamp(alpha, 0.0, 0.9));
+  // A base tint is always present (so the foil reads even before the player ever touches the
+  // card), the sweep and glints layer brighter moments on top.
+  float alpha = clamp((0.24 + 0.22 * sweep + twinkle * 0.9) * uIntensity, 0.0, 0.95);
+  vec3 col = mix(rainbow, vec3(1.0), sweep * 0.35 + twinkle * 0.85);
+  gl_FragColor = vec4(col, alpha);
 }
 `
 
@@ -103,7 +113,7 @@ export function HoloOverlay({ rarity, lightRef, className }: HoloOverlayProps) {
       transparent: true,
       depthWrite: false,
       side: DoubleSide,
-      blending: AdditiveBlending,
+      blending: NormalBlending,
     })
     const mesh = new Mesh(geometry, material)
     scene.add(mesh)
