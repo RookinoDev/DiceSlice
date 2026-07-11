@@ -16,7 +16,7 @@ import { hapticAction, hapticSuccess, hapticTap } from '../../telegram'
 import { RARITY_LABEL, type CardRarity } from '../../game/cards/catalog'
 import { cardById } from '../../game/cards/generatedCards'
 import { VARIANT_LABEL } from '../../game/cards/variants'
-import { openPackRequest, PACK_LABEL, type MintedCard, type OpenPackResult, type PendingPack } from '../../game/cards/cardsApi'
+import { openPackRequest, PACK_LABEL, type PackType, type MintedCard, type OpenPackResult, type PendingPack } from '../../game/cards/cardsApi'
 
 interface PackOpeningOverlayProps {
   apiBaseUrl: string | undefined
@@ -29,6 +29,11 @@ interface PackOpeningOverlayProps {
 const RARITY_RANK: Record<CardRarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, ultra: 5 }
 const TEAR_HOLD_MS = 900
 const DEAL_STAGGER_MS = 110
+
+// A pack's premium color/weight, keyed to its guaranteed floor rarity - reused for the
+// wrapper glow, the tear-open burst, and (via --burst-scale) how big that burst reads.
+const PACK_TIER_RARITY: Record<PackType, CardRarity> = { meteor: 'uncommon', stellar: 'rare', deepsky: 'epic', singularity: 'legendary' }
+const PACK_TIER_BURST_SCALE: Record<PackType, number> = { meteor: 1, stellar: 1.15, deepsky: 1.35, singularity: 1.6 }
 
 type Phase =
   | { kind: 'pack' }
@@ -46,6 +51,11 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
   const tearStart = useRef(0)
   const busy = useRef(false)
   const reducedMotion = useRef(false)
+  // Snapshot of the pack type actually being torn - pendingPacks[0] can shift out from
+  // under the burst phase the instant onOpened() fires (parent removes the pack from the
+  // queue while the burst is still animating), which would otherwise flicker the burst's
+  // tier color/scale to whatever pack is now first in line.
+  const tornPackType = useRef<PackType | null>(null)
 
   const currentPack = pendingPacks[0] ?? null
 
@@ -109,6 +119,7 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
   const completeTear = async (packId: number) => {
     cancelAnimationFrame(tearRaf.current)
     busy.current = true
+    tornPackType.current = currentPack?.type ?? null
     setPhase({ kind: 'burst' })
     audio.packTear()
     setTimeout(() => audio.packBurst(), 90)
@@ -192,7 +203,7 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
           <div className="pack-overlay-stage">
             <button
               className={`pack-wrapper ${tearing ? 'pack-wrapper--tearing' : ''}`}
-              style={{ '--tear': tearProgress, '--pack-glow': RARITY_COLOR[currentPack.type === 'singularity' ? 'legendary' : currentPack.type === 'deepsky' ? 'epic' : currentPack.type === 'stellar' ? 'rare' : 'uncommon'] } as CSSProperties}
+              style={{ '--tear': tearProgress, '--pack-glow': RARITY_COLOR[PACK_TIER_RARITY[currentPack.type]] } as CSSProperties}
               onPointerDown={beginTear}
               onPointerUp={cancelTear}
               onPointerLeave={cancelTear}
@@ -213,7 +224,15 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
         ))}
 
       {phase.kind === 'burst' && (
-        <div className="pack-overlay-stage">
+        <div
+          className="pack-overlay-stage"
+          style={
+            {
+              '--pack-glow': RARITY_COLOR[PACK_TIER_RARITY[tornPackType.current ?? 'meteor']],
+              '--burst-scale': PACK_TIER_BURST_SCALE[tornPackType.current ?? 'meteor'],
+            } as CSSProperties
+          }
+        >
           <div className="pack-burst-flash" />
           <div className="pack-burst-ring" />
         </div>

@@ -10,7 +10,7 @@ import { RARITY_LABEL, type CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import { VARIANT_LABEL, variantRank } from '../../game/cards/variants'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
-import { recordCardView } from '../../game/cards/cardPrefs'
+import { loadFavorites, recordCardView, toggleFavorite } from '../../game/cards/cardPrefs'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticTap } from '../../telegram'
 import { useParticles } from '../combatFx/useParticles'
@@ -47,6 +47,7 @@ const REST: SpringState = { rx: 0, ry: 0, rz: 0, scale: 1 }
 export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardDetailSheetProps) {
   const [flipped, setFlipped] = useState(false)
   const [squash, setSquash] = useState(0)
+  const [isFavorite, setIsFavorite] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const drag = useRef({ active: false, startX: 0, startY: 0, moved: 0, lastX: 0, lastDx: 0 })
   const pointers = useRef(new Map<number, { x: number; y: number }>())
@@ -98,6 +99,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
   useEffect(() => {
     if (!open || !card) return
     setFlipped(false)
+    setIsFavorite(loadFavorites().has(card.id))
     recordCardView(card.id)
     cur.current = { rx: 0, ry: 0, rz: 0, scale: 0.6 }
     vel.current = { rx: 0, ry: 0, rz: 0, scale: reducedMotion.current ? 0 : 3.5 }
@@ -250,6 +252,21 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                 </div>
               )}
               <div className="card-detail-rarity-tag">{RARITY_LABEL[card.rarity]}</div>
+              {!locked && (
+                <button
+                  className={`card-detail-fav-btn ${isFavorite ? 'card-detail-fav-btn--active' : ''}`}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsFavorite(toggleFavorite(card.id))
+                    audio.click()
+                    hapticTap()
+                  }}
+                  aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                >
+                  {isFavorite ? '♥' : '♡'}
+                </button>
+              )}
               <div className="card-detail-name">{locked ? '???' : card.name}</div>
               <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
               {owned && (

@@ -18,9 +18,12 @@ interface CardGridItemProps {
 export function CardGridItem({ card, owned, setTotal, favorite, onSelect }: CardGridItemProps) {
   const color = RARITY_COLOR[card.rarity]
   const variantClass = owned.bestVariant !== 'standard' ? `card-grid-item--${owned.bestVariant}` : ''
+  // Legendary/ultra get a stronger, slowly pulsing glow so top-tier pulls stand out in the
+  // grid at a glance, not just by border hue (see .card-grid-item--rarity-* in ui.css).
+  const rarityClass = card.rarity === 'legendary' || card.rarity === 'ultra' ? `card-grid-item--rarity-${card.rarity}` : ''
 
   return (
-    <button className={`card-grid-item ${variantClass}`} style={{ '--rarity-color': color } as CSSProperties} onClick={onSelect}>
+    <button className={`card-grid-item ${variantClass} ${rarityClass}`} style={{ '--rarity-color': color } as CSSProperties} onClick={onSelect}>
       <CardArt cardName={card.name} mode="grid" />
       {owned.bestVariant !== 'standard' && <div className="card-grid-variant">{VARIANT_LABEL[owned.bestVariant]}</div>}
       {owned.count > 1 && <div className="card-grid-count">×{owned.count}</div>}

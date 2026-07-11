@@ -2640,6 +2640,26 @@
 .card-grid-item {
   height: 138px;
   overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+/* Desktop/preview nicety - gated on real hover support so touch taps never get stuck "hovered". */
+@media (hover: hover) and (pointer: fine) {
+  .card-grid-item:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--rarity-color, transparent) 45%, transparent);
+  }
+}
+
+/* Legendary/ultra pulls get a stronger, slow pulse in the grid - same rhythm as the focused
+   card and pack-ceremony treatments (card-edge-pulse), so a top-tier card reads as special
+   at a glance instead of only differing by border hue. */
+.card-grid-item--rarity-legendary {
+  box-shadow: 0 0 16px color-mix(in srgb, var(--rarity-color) 55%, transparent);
+  animation: card-edge-pulse 2.2s ease-in-out infinite;
+}
+.card-grid-item--rarity-ultra {
+  box-shadow: 0 0 22px color-mix(in srgb, var(--rarity-color) 70%, transparent);
+  animation: card-edge-pulse 1.6s ease-in-out infinite;
 }
 
 /* Per-variant grid treatments: cheap CSS-only tiers (the focused card gets the WebGL holo). */
@@ -2830,7 +2850,9 @@
   .card-detail-flip--polychrome .card-detail-art-wrap::after,
   .card-detail-flip--legendary,
   .card-detail-flip--ultra,
-  .card-detail-flip--ultra .card-detail-face--front::before {
+  .card-detail-flip--ultra .card-detail-face--front::before,
+  .card-grid-item--rarity-legendary,
+  .card-grid-item--rarity-ultra {
     animation: none;
   }
 }
@@ -2883,6 +2905,46 @@
   pointer-events: none;
   border-radius: 10px;
 }
+.card-detail-fav-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--palette-text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.2, 1.4, 0.4, 1), color 0.15s ease;
+}
+.card-detail-fav-btn:active {
+  transform: scale(0.85);
+}
+.card-detail-fav-btn--active {
+  color: var(--palette-magenta);
+  text-shadow: 0 0 8px rgba(226, 79, 255, 0.8);
+  animation: fav-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes fav-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-detail-fav-btn--active {
+    animation: none;
+  }
+}
+
 .card-detail-rarity-tag {
   align-self: flex-start;
   padding: 3px 9px;
@@ -3403,7 +3465,7 @@
 .pack-burst-flash {
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 50% 45%, rgba(255, 240, 200, 0.9), transparent 55%);
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--pack-glow, #ffe0a0) 55%, white 45%), transparent 55%);
   animation: pack-burst-flash 0.45s ease-out forwards;
 }
 @keyframes pack-burst-flash {
@@ -3417,11 +3479,15 @@
     opacity: 0;
   }
 }
+/* Higher pack tiers get a visibly bigger, brighter shockwave (--burst-scale, set from the
+   pack's guaranteed rarity floor in PackOpeningOverlay.tsx) - premium packs should look
+   premium the instant they burst, before the player even sees a card. */
 .pack-burst-ring {
-  width: 60px;
-  height: 60px;
+  width: calc(60px * var(--burst-scale, 1));
+  height: calc(60px * var(--burst-scale, 1));
   border-radius: 50%;
-  border: 3px solid rgba(255, 220, 140, 0.9);
+  border: 3px solid var(--pack-glow, rgba(255, 220, 140, 0.9));
+  box-shadow: 0 0 30px var(--pack-glow, transparent);
   animation: pack-burst-ring 0.55s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
 }
 @keyframes pack-burst-ring {
@@ -3430,7 +3496,7 @@
     opacity: 1;
   }
   100% {
-    transform: scale(7);
+    transform: scale(calc(7 * var(--burst-scale, 1)));
     opacity: 0;
   }
 }

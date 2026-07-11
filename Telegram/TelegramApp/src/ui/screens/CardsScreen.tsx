@@ -6,7 +6,7 @@ import type { CardDefinition, CardRarity } from '../../game/cards/catalog'
 import { cardById, FULL_CATALOG } from '../../game/cards/generatedCards'
 import type { OwnedCard } from '../../game/cards/cardsApi'
 import { summarizeCollection, type OwnedSummary } from '../../game/cards/collectionSummary'
-import { loadFavorites } from '../../game/cards/cardPrefs'
+import { loadFavorites, loadRecentViews } from '../../game/cards/cardPrefs'
 import { VARIANT_LABEL, VARIANT_ORDER, type CardVariant } from '../../game/cards/variants'
 import { CardGridItem } from '../cards/CardGridItem'
 
@@ -28,8 +28,8 @@ const TYPE_FILTERS: Array<{ id: string; label: string; match: (classification: s
   { id: 'deepsky', label: 'DEEP SKY', match: (c) => /nebula|galaxy|black hole/i.test(c) },
 ]
 
-type SortMode = 'number' | 'rarity' | 'newest' | 'name' | 'count'
-const SORT_LABEL: Record<SortMode, string> = { number: 'Nº', rarity: 'RARITY', newest: 'NEWEST', name: 'A-Z', count: 'DUPES' }
+type SortMode = 'number' | 'rarity' | 'newest' | 'name' | 'count' | 'recent'
+const SORT_LABEL: Record<SortMode, string> = { number: 'Nº', rarity: 'RARITY', newest: 'NEWEST', name: 'A-Z', count: 'DUPES', recent: 'RECENT' }
 const RARITY_RANK: Record<CardRarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, ultra: 5 }
 
 interface CardsScreenProps {
@@ -54,11 +54,15 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
   const [dupesOnly, setDupesOnly] = useState(false)
   const [sort, setSort] = useState<SortMode>('number')
 
-  // Favorites re-read when the collection or the toggle changes (cheap; localStorage-backed).
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const favorites = useMemo(() => loadFavorites(), [ownedCards, favoritesOnly])
+  // Read fresh every render (not memoized): favoriting happens in a sibling sheet
+  // (CardDetailSheet), and this is a small localStorage array - parsing it is cheap
+  // enough that a stale cache would cost more than just re-reading it.
+  const favorites = loadFavorites()
 
   const summary = useMemo(() => summarizeCollection(ownedCards), [ownedCards])
+  // Recency rank for the RECENT sort: lower index = viewed more recently. Cards never opened
+  // sink to the bottom (Infinity), same recompute-per-render reasoning as favorites above.
+  const recentRank = sort === 'recent' ? new Map(loadRecentViews().map((id, i) => [id, i])) : null
 
   const entries = useMemo<Entry[]>(() => {
     const q = query.trim().toLowerCase()
@@ -91,9 +95,12 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
       case 'count':
         out.sort((a, b) => b.owned.count - a.owned.count || a.card.no - b.card.no)
         break
+      case 'recent':
+        out.sort((a, b) => (recentRank?.get(a.card.id) ?? Infinity) - (recentRank?.get(b.card.id) ?? Infinity) || a.card.no - b.card.no)
+        break
     }
     return out
-  }, [summary, query, rarity, typeId, variant, favoritesOnly, dupesOnly, sort, favorites])
+  }, [summary, query, rarity, typeId, variant, favoritesOnly, dupesOnly, sort, favorites, recentRank])
 
   // --- Virtualization: fixed-height rows of COLUMNS cells inside an internal scroller.
   // Only visible rows (+overscan) mount; React key = rowIndex reuses the same row elements
@@ -171,7 +178,7 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
         <button className={chip(dupesOnly)} onClick={() => setDupesOnly((d) => !d)}>
           DUPES
         </button>
-        {(['number', 'rarity', 'newest', 'name', 'count'] as SortMode[]).map((s) => (
+        {(['number', 'rarity', 'newest', 'recent', 'name', 'count'] as SortMode[]).map((s) => (
           <button key={s} className={chip(sort === s)} onClick={() => setSort(s)}>
             {SORT_LABEL[s]}
           </button>
