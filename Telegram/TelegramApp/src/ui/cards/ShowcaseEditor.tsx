@@ -94,7 +94,7 @@ export function ShowcaseEditor({ apiBaseUrl, ownedCards, showcase, onChange, onI
           return (
             <button
               key={i}
-              className={`showcase-slot ${activeSlot === i ? 'showcase-slot--active' : ''}`}
+              className={`showcase-slot ${card ? `cf-${card.rarity}` : ''} ${activeSlot === i ? 'showcase-slot--active' : ''}`}
               style={card ? ({ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties) : undefined}
               onClick={() => {
                 hapticTap()
@@ -175,7 +175,7 @@ export function ShowcaseView({ showcase, onInspect }: { showcase: ShowcaseEntry[
           const card = cardById(entry.cardId)
           if (!card) return null
           return (
-            <button key={i} className="showcase-slot" style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties} onClick={() => onInspect(card)}>
+            <button key={i} className={`showcase-slot cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties} onClick={() => onInspect(card)}>
               <CardArt cardName={card.name} mode="grid" className="showcase-slot-art" />
               {entry.variant !== 'standard' && <div className="showcase-slot-variant">{VARIANT_LABEL[entry.variant]}</div>}
             </button>

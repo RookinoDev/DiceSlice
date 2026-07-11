@@ -292,8 +292,11 @@ function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: 
     <div
       className={[
         'pack-card',
+        `cf-${card.rarity}`,
         dealing ? 'pack-card--dealing' : '',
         revealed ? 'pack-card--revealed' : '',
+        // Epic+ pulls get spinning rarity-colored god-rays behind them once face-up.
+        revealed && RARITY_RANK[card.rarity] >= 3 ? 'pack-card--rays' : '',
         isTop && !revealed ? 'pack-card--top' : '',
         lifting ? 'pack-card--lifting' : '',
       ].join(' ')}
@@ -328,7 +331,7 @@ function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: 
 function RecapBest({ card }: { card: MintedCard }) {
   const def = cardById(card.cardId)
   return (
-    <div className="pack-recap-best" style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties}>
+    <div className={`pack-recap-best cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties}>
       <div className="pack-recap-best-crown">BEST PULL</div>
       <CardArt cardName={def?.name ?? card.cardId} mode="grid" className="pack-reveal-art" />
       <div className="pack-reveal-name">{def?.name ?? card.cardId}</div>
@@ -344,7 +347,7 @@ function RecapBest({ card }: { card: MintedCard }) {
 function RecapMini({ card, index }: { card: MintedCard; index: number }) {
   const def = cardById(card.cardId)
   return (
-    <div className="pack-recap-mini" style={{ '--rarity-color': RARITY_COLOR[card.rarity], '--pop-delay': `${index * 90}ms` } as CSSProperties}>
+    <div className={`pack-recap-mini cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity], '--pop-delay': `${index * 90}ms` } as CSSProperties}>
       <CardArt cardName={def?.name ?? card.cardId} mode="grid" className="pack-reveal-art" />
       <div className="pack-recap-mini-name">{def?.name ?? card.cardId}</div>
       {card.isNew && <div className="pack-reveal-new">NEW</div>}

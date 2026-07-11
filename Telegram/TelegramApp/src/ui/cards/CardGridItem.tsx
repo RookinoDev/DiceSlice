@@ -23,7 +23,7 @@ export function CardGridItem({ card, owned, setTotal, favorite, onSelect }: Card
   const rarityClass = card.rarity === 'legendary' || card.rarity === 'ultra' ? `card-grid-item--rarity-${card.rarity}` : ''
 
   return (
-    <button className={`card-grid-item ${variantClass} ${rarityClass}`} style={{ '--rarity-color': color } as CSSProperties} onClick={onSelect}>
+    <button className={`card-grid-item cf-${card.rarity} ${variantClass} ${rarityClass}`} style={{ '--rarity-color': color } as CSSProperties} onClick={onSelect}>
       <CardArt cardName={card.name} mode="grid" />
       {owned.bestVariant !== 'standard' && <div className="card-grid-variant">{VARIANT_LABEL[owned.bestVariant]}</div>}
       {owned.count > 1 && <div className="card-grid-count">×{owned.count}</div>}

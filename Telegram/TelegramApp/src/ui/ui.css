@@ -4113,3 +4113,252 @@
     animation: none;
   }
 }
+
+/* ===== Card Anatomy pass: frame materials, starfield art windows, pouch, reveal rays =====
+   Appended AFTER all earlier card rules on purpose: equal-specificity selectors here win by
+   cascade order, so the old flat borders/backgrounds are overridden without editing them. */
+
+/* Every card face carries a cf-<rarity> class. --frame-grad is the frame MATERIAL - a real
+   TCG differentiates tiers by metal (gunmetal/steel/glass/gold/iridescent), not border hue. */
+:root {
+  --frame-grad: linear-gradient(165deg, #4a5268, #262b3d 55%, #343b52);
+  /* Shared pinprick starfield for art windows (planet floats in space, not on a panel). */
+  --starfield:
+    radial-gradient(1px 1px at 18% 22%, rgba(255, 255, 255, 0.8), transparent 60%),
+    radial-gradient(1px 1px at 72% 14%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1.5px 1.5px at 84% 66%, rgba(255, 255, 255, 0.6), transparent 60%),
+    radial-gradient(1px 1px at 34% 82%, rgba(255, 255, 255, 0.45), transparent 60%),
+    radial-gradient(1px 1px at 56% 38%, rgba(255, 255, 255, 0.35), transparent 60%),
+    radial-gradient(1.4px 1.4px at 8% 58%, rgba(255, 255, 255, 0.5), transparent 60%),
+    radial-gradient(1px 1px at 92% 42%, rgba(255, 255, 255, 0.4), transparent 60%),
+    radial-gradient(1px 1px at 44% 8%, rgba(255, 255, 255, 0.55), transparent 60%);
+}
+.cf-common {
+  --frame-grad: linear-gradient(165deg, #4a5268, #262b3d 55%, #343b52);
+}
+.cf-uncommon {
+  --frame-grad: linear-gradient(165deg, #5a7d69, #23372c 55%, #3adc84 130%);
+}
+.cf-rare {
+  --frame-grad: linear-gradient(165deg, #7fd8e8, #1f4652 45%, #43ddee 105%);
+}
+.cf-epic {
+  --frame-grad:
+    radial-gradient(circle 3px at 7px 7px, rgba(255, 255, 255, 0.9), transparent 4px),
+    radial-gradient(circle 3px at calc(100% - 7px) 7px, rgba(255, 255, 255, 0.9), transparent 4px),
+    radial-gradient(circle 3px at 7px calc(100% - 7px), rgba(255, 255, 255, 0.9), transparent 4px),
+    radial-gradient(circle 3px at calc(100% - 7px) calc(100% - 7px), rgba(255, 255, 255, 0.9), transparent 4px),
+    linear-gradient(165deg, #e07bff, #55246e 45%, #a13cc9 105%);
+}
+.cf-legendary {
+  --frame-grad:
+    radial-gradient(circle 3px at 7px 7px, #fff6d8, transparent 4px),
+    radial-gradient(circle 3px at calc(100% - 7px) 7px, #fff6d8, transparent 4px),
+    radial-gradient(circle 3px at 7px calc(100% - 7px), #fff6d8, transparent 4px),
+    radial-gradient(circle 3px at calc(100% - 7px) calc(100% - 7px), #fff6d8, transparent 4px),
+    linear-gradient(160deg, #f7dd8a, #b8860b 35%, #7a5306 55%, #ffcf5e 80%, #f7dd8a);
+}
+.cf-ultra {
+  --frame-grad: linear-gradient(115deg, #ff6e6e, #ffd25a 20%, #82ff96 40%, #64d2ff 60%, #c882ff 80%, #ff6e6e);
+}
+
+/* The double-background border trick: solid card body in the padding box, frame material in
+   the border box - a gradient "metal" frame with zero extra elements. */
+.card-grid-item {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--palette-sheet-row), var(--palette-sheet-row)) padding-box,
+    var(--frame-grad) border-box;
+}
+.card-detail-face {
+  border: 2.5px solid transparent;
+  background:
+    linear-gradient(var(--palette-sheet), var(--palette-sheet)) padding-box,
+    var(--frame-grad) border-box;
+}
+.pack-card-front {
+  border: 2.5px solid transparent;
+  background:
+    linear-gradient(var(--palette-sheet), var(--palette-sheet)) padding-box,
+    var(--frame-grad) border-box;
+}
+.pack-recap-best,
+.pack-recap-mini,
+.showcase-slot {
+  border: 1.5px solid transparent;
+  background:
+    linear-gradient(var(--palette-sheet-row), var(--palette-sheet-row)) padding-box,
+    var(--frame-grad) border-box;
+}
+/* Ultra frames slowly cycle their iridescence (background-position only - cheap). */
+.cf-ultra.card-grid-item,
+.cf-ultra .card-detail-face,
+.cf-ultra.pack-card-front,
+.cf-ultra.pack-recap-best {
+  background-size: auto, 320% 320%;
+  animation: cf-ultra-cycle 5s linear infinite;
+}
+@keyframes cf-ultra-cycle {
+  0% {
+    background-position: 0 0, 0% 0%;
+  }
+  100% {
+    background-position: 0 0, 320% 320%;
+  }
+}
+
+/* Art windows: the object floats in a star-dusted space slot with an inset bezel. */
+.card-art-swatch {
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.65) 0%, transparent 26%),
+    radial-gradient(
+      circle at 50% 50%,
+      var(--art-color) 0%,
+      color-mix(in srgb, var(--art-color) 55%, black 45%) 48%,
+      color-mix(in srgb, var(--art-color) 25%, black 75%) 62%,
+      transparent 68%
+    ),
+    var(--starfield),
+    radial-gradient(ellipse 120% 90% at 50% 110%, color-mix(in srgb, var(--rarity-color, #43ddee) 14%, transparent), transparent 70%);
+  background-color: #070a14;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07), inset 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+.card-detail-art-wrap {
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    var(--starfield),
+    radial-gradient(ellipse 130% 80% at 50% 115%, color-mix(in srgb, var(--rarity-color, #43ddee) 16%, transparent), transparent 70%),
+    #070a14;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+.object-viewer-canvas-box {
+  background-color: #070a14;
+  background-image: var(--starfield);
+  border-radius: 12px;
+}
+
+/* Detail-card typography: a collectible title, not a UI caption. */
+.card-detail-eyebrow {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--palette-text-dim);
+}
+.card-detail-name {
+  font-size: 21px;
+  letter-spacing: 0.04em;
+}
+.card-detail-mint {
+  padding: 3px 10px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+  font-family: Consolas, Menlo, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+/* The pack is a sealed foil pouch: crimped zigzag seal strip + an orb-and-rays emblem. */
+.pack-wrapper-body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 16px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.05));
+  clip-path: polygon(
+    0% 0%, 100% 0%, 100% 55%,
+    96% 100%, 92% 55%, 88% 100%, 84% 55%, 80% 100%, 76% 55%, 72% 100%, 68% 55%, 64% 100%,
+    60% 55%, 56% 100%, 52% 55%, 48% 100%, 44% 55%, 40% 100%, 36% 55%, 32% 100%, 28% 55%,
+    24% 100%, 20% 55%, 16% 100%, 12% 55%, 8% 100%, 4% 55%, 0% 100%
+  );
+  z-index: 1;
+}
+.pack-wrapper-emblem {
+  position: relative;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.92);
+  text-shadow: none;
+  background:
+    radial-gradient(circle at 32% 28%, rgba(255, 255, 255, 0.55), transparent 42%),
+    radial-gradient(circle, var(--pack-glow), color-mix(in srgb, var(--pack-glow) 30%, black 70%) 72%);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--pack-glow) 70%, transparent);
+}
+.pack-wrapper-emblem::before {
+  content: '';
+  position: absolute;
+  inset: -26px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--pack-glow) 30%, transparent) 0deg 6deg, transparent 6deg 24deg);
+  animation: cf-rays-spin 14s linear infinite;
+  z-index: -1;
+}
+/* Slow-drifting dust in the ceremony room so the stage itself is alive. */
+.pack-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--starfield);
+  opacity: 0.5;
+  animation: pack-dust-drift 24s linear infinite alternate;
+}
+@keyframes pack-dust-drift {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-26px);
+  }
+}
+
+/* Epic+ reveals: rarity-colored god-rays fan out behind the card as it flips over. */
+.pack-card--rays::before {
+  content: '';
+  position: absolute;
+  inset: -42%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 8deg, color-mix(in srgb, var(--rarity-color) 26%, transparent) 0deg 7deg, transparent 7deg 26deg);
+  animation: cf-rays-in 0.6s ease-out forwards, cf-rays-spin 11s linear infinite;
+  z-index: -1;
+}
+@keyframes cf-rays-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes cf-rays-spin {
+  from {
+    rotate: 0deg;
+  }
+  to {
+    rotate: 360deg;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cf-ultra.card-grid-item,
+  .cf-ultra .card-detail-face,
+  .cf-ultra.pack-card-front,
+  .cf-ultra.pack-recap-best,
+  .pack-wrapper-emblem::before,
+  .pack-overlay::before,
+  .pack-card--rays::before {
+    animation: none;
+  }
+}

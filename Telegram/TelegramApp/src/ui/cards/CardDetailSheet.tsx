@@ -244,7 +244,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
         >
           <div
             key={squash}
-            className={`card-detail-flip ${flipped ? 'card-detail-flip--back' : ''} ${variantClass} ${rarityClass}`}
+            className={`card-detail-flip cf-${card.rarity} ${flipped ? 'card-detail-flip--back' : ''} ${variantClass} ${rarityClass}`}
             style={{ '--rarity-color': color } as CSSProperties}
           >
             <div className="card-detail-face card-detail-face--front">
@@ -278,6 +278,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                   {isFavorite ? '♥' : '♡'}
                 </button>
               )}
+              <div className="card-detail-eyebrow">{locked ? 'UNDISCOVERED' : card.classification.toUpperCase()}</div>
               <div className="card-detail-name">{locked ? '???' : card.name}</div>
               <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
               {owned && (
