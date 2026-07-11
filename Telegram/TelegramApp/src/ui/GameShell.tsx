@@ -320,7 +320,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
 
   // Progressive disclosure, matching Fleet/Artifacts/Prestige: hidden until there's something
   // to look at (an owned card or a pack waiting), not from the very first launch.
-  const showCards = ownedCards.length > 0 || pendingPacks.length > 0
+  // Always visible: hiding a whole feature behind a network fetch meant one slow/failed
+  // /api/collection call made the tab vanish. CardsScreen's empty state covers new players.
+  const showCards = true
   const cardOwnedSummary = useMemo(() => summarizeCollection(ownedCards), [ownedCards])
 
   return (
