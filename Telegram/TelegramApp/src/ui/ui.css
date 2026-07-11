@@ -2905,20 +2905,25 @@
   flex: 1;
   min-height: 0;
   margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+/* The sphere reads as an object FLOATING in the frame, not wallpaper filling it - shrunk off
+   full-bleed so the starfield backdrop (see .card-detail-art-wrap's background, Card Anatomy
+   pass) shows as a visible margin all round, same as the grid orb already does. */
 .card-detail-art {
-  width: 100%;
-  height: 100%;
+  width: 80%;
+  height: 80%;
   display: block;
 }
 .card-detail-holo-overlay {
   position: absolute;
-  inset: 0;
-  /* Canvas is a replaced element - inset:0 alone does NOT stretch it, it falls back to the
-     browser's intrinsic 300x150 default. Without this the whole holo effect renders into a
-     tiny corner blob instead of covering the card - explicit sizing is required. */
-  width: 100%;
-  height: 100%;
+  /* Matches .card-detail-art's 80% centered box exactly ((100%-80%)/2 = 10%) - canvas is a
+     replaced element, inset alone won't stretch it, explicit width/height are required. */
+  inset: 10%;
+  width: 80%;
+  height: 80%;
   pointer-events: none;
   border-radius: 10px;
 }
@@ -2962,8 +2967,15 @@
   }
 }
 
+.card-detail-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 6px;
+}
 .card-detail-rarity-tag {
-  align-self: flex-start;
   padding: 3px 9px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--rarity-color, transparent) 22%, transparent);
@@ -2972,7 +2984,6 @@
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  margin-bottom: 6px;
 }
 .card-detail-name {
   font-family: var(--font-display);
@@ -3002,9 +3013,7 @@
   color: var(--palette-text-dimmer);
 }
 .card-detail-explore-btn {
-  position: absolute;
-  right: 14px;
-  bottom: 54px;
+  flex-shrink: 0;
   padding: 5px 12px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--rarity-color, var(--palette-cyan-label)) 60%, transparent);
@@ -3014,6 +3023,9 @@
   font-size: 10px;
   letter-spacing: 0.1em;
   backdrop-filter: blur(4px);
+}
+.card-detail-explore-btn:active {
+  transform: scale(0.94);
 }
 .card-detail-locked-body {
   margin: auto;

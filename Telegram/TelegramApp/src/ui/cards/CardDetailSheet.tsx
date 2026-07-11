@@ -46,7 +46,6 @@ const REST: SpringState = { rx: 0, ry: 0, rz: 0, scale: 1 }
 
 export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardDetailSheetProps) {
   const [flipped, setFlipped] = useState(false)
-  const [squash, setSquash] = useState(0)
   const [isFavorite, setIsFavorite] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const drag = useRef({ active: false, startX: 0, startY: 0, moved: 0, lastX: 0, lastDx: 0 })
@@ -153,11 +152,11 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
 
   const doFlip = () => {
     setFlipped((f) => !f)
-    setSquash((n) => n + 1)
     audio.click()
     hapticTap()
     // A flip lands with a little vertical squash: kick the scale spring instead of a keyframe
-    // so it composes with whatever tilt/zoom is in flight.
+    // so it composes with whatever tilt/zoom is in flight. The spring writes transform via ref
+    // every frame regardless of React state, so this needs no remount to show up.
     vel.current.scale -= 2.2
   }
 
@@ -243,7 +242,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
           onWheel={onWheel}
         >
           <div
-            key={squash}
             className={`card-detail-flip cf-${card.rarity} ${flipped ? 'card-detail-flip--back' : ''} ${variantClass} ${rarityClass}`}
             style={{ '--rarity-color': color } as CSSProperties}
           >
@@ -262,7 +260,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                   )}
                 </div>
               )}
-              <div className="card-detail-rarity-tag">{RARITY_LABEL[card.rarity]}</div>
               {!locked && (
                 <button
                   className={`card-detail-fav-btn ${isFavorite ? 'card-detail-fav-btn--active' : ''}`}
@@ -278,6 +275,24 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                   {isFavorite ? '♥' : '♡'}
                 </button>
               )}
+              {/* Rarity tag + EXPLORE share one row - EXPLORE sits at the right, level with the
+                  rarity it's themed to match, instead of floating off on its own near the bottom. */}
+              <div className="card-detail-meta-row">
+                <div className="card-detail-rarity-tag">{RARITY_LABEL[card.rarity]}</div>
+                {!locked && (
+                  <button
+                    className="card-detail-explore-btn"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      hapticAction()
+                      onExplore()
+                    }}
+                  >
+                    EXPLORE
+                  </button>
+                )}
+              </div>
               <div className="card-detail-eyebrow">{locked ? 'UNDISCOVERED' : card.classification.toUpperCase()}</div>
               <div className="card-detail-name">{locked ? '???' : card.name}</div>
               <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
@@ -289,19 +304,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                 </div>
               )}
               {!locked && <div className="card-detail-flip-hint">TAP TO FLIP · DRAG TO TILT · PINCH TO ZOOM</div>}
-              {!locked && (
-                <button
-                  className="card-detail-explore-btn"
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    hapticAction()
-                    onExplore()
-                  }}
-                >
-                  EXPLORE
-                </button>
-              )}
             </div>
             <div className="card-detail-face card-detail-face--back">
               {locked ? (
