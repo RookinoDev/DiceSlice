@@ -2712,8 +2712,20 @@
   border-radius: 10px;
   overflow: hidden;
 }
+/* Grid placeholder (no live WebGL per cell - see CardArt.tsx): a genuine circular orb
+   silhouette (highlight layer + a sphere gradient that goes fully transparent past its
+   radius, not a formless blur filling the whole tile) floating in the card's dark slot. */
 .card-art-swatch {
-  background: var(--palette-panel);
+  background:
+    radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.65) 0%, transparent 26%),
+    radial-gradient(
+      circle at 50% 50%,
+      var(--art-color) 0%,
+      color-mix(in srgb, var(--art-color) 55%, black 45%) 48%,
+      color-mix(in srgb, var(--art-color) 25%, black 75%) 62%,
+      transparent 68%
+    );
+  background-color: var(--palette-panel);
 }
 .card-art-loading,
 .card-art-missing {

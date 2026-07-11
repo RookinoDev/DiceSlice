@@ -68,6 +68,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
     reducedMotion.current = window.matchMedia('(prefers-reduced-motion: reduce)').matches
     let raf = 0
     let last = performance.now()
+    let idleAngle = 0
     const tick = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000)
       last = now
@@ -87,8 +88,18 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
       if (wrapRef.current) {
         wrapRef.current.style.transform = `perspective(900px) rotateX(${c.rx}deg) rotateY(${c.ry}deg) rotateZ(${c.rz}deg) scale(${c.scale})`
       }
-      holoLightRef.current.x = c.ry / DRAG_TILT_MAX_DEG
-      holoLightRef.current.y = -c.rx / DRAG_TILT_MAX_DEG
+      // Foil should never sit dead - while the card is untouched and settled flat, the light
+      // vector slowly orbits on its own so holo+ cards keep shimmering at rest instead of only
+      // reacting to a drag the player may never think to try. A live drag/tilt always wins.
+      const settled = !drag.current.active && pointers.current.size === 0 && Math.abs(c.rx) < 0.4 && Math.abs(c.ry) < 0.4
+      if (settled && !reducedMotion.current) {
+        idleAngle += dt * 0.5
+        holoLightRef.current.x = Math.sin(idleAngle) * 0.55
+        holoLightRef.current.y = Math.cos(idleAngle * 0.7) * 0.55
+      } else {
+        holoLightRef.current.x = c.ry / DRAG_TILT_MAX_DEG
+        holoLightRef.current.y = -c.rx / DRAG_TILT_MAX_DEG
+      }
       raf = requestAnimationFrame(tick)
     }
     raf = requestAnimationFrame(tick)
