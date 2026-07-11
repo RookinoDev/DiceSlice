@@ -2902,6 +2902,11 @@
 .card-detail-holo-overlay {
   position: absolute;
   inset: 0;
+  /* Canvas is a replaced element - inset:0 alone does NOT stretch it, it falls back to the
+     browser's intrinsic 300x150 default. Without this the whole holo effect renders into a
+     tiny corner blob instead of covering the card - explicit sizing is required. */
+  width: 100%;
+  height: 100%;
   pointer-events: none;
   border-radius: 10px;
 }
