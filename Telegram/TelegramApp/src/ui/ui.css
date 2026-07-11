@@ -4193,7 +4193,7 @@
 /* Ultra frames slowly cycle their iridescence (background-position only - cheap). */
 .cf-ultra.card-grid-item,
 .cf-ultra .card-detail-face,
-.cf-ultra.pack-card-front,
+.cf-ultra .pack-card-front,
 .cf-ultra.pack-recap-best {
   background-size: auto, 320% 320%;
   animation: cf-ultra-cycle 5s linear infinite;
@@ -4354,7 +4354,7 @@
 @media (prefers-reduced-motion: reduce) {
   .cf-ultra.card-grid-item,
   .cf-ultra .card-detail-face,
-  .cf-ultra.pack-card-front,
+  .cf-ultra .pack-card-front,
   .cf-ultra.pack-recap-best,
   .pack-wrapper-emblem::before,
   .pack-overlay::before,
