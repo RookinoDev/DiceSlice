@@ -1,6 +1,7 @@
 // Ported from GamePhone.dc.html's bottom navigation bar.
 import type { ReactElement } from 'react'
 import { audio } from '../game/audio/AudioManager'
+import { registerLandmark } from './combatFx/landmarks'
 import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavPrestigeIcon, NavCardsIcon } from './icons'
 
 export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'prestige' | 'cards'
@@ -60,6 +61,8 @@ export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPre
             <button
               key={t.tab}
               className="bottomnav-tab"
+              // Landmark so the boss-kill "+pack" fly-to animation knows where the CARDS tab is.
+              ref={t.tab === 'cards' ? (el) => registerLandmark('nav-cards', el) : undefined}
               onClick={() => {
                 audio.click()
                 onSelect(t.tab)

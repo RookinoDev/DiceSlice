@@ -119,6 +119,33 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     }
   }
 
+  // Boss kill = a card pack earned: a pack chip bursts off the planet, hangs for a beat, then
+  // flies to the CARDS tab and punches it. Same landmark/particle pattern as the gold vacuum.
+  const spawnPackDrop = () => {
+    const origin = getLandmarkRect('planet')
+    const dest = getLandmarkRect('nav-cards')
+    const shellRect = shellRef.current?.getBoundingClientRect()
+    if (!origin || !dest || !shellRect) return
+    const x = origin.left + origin.width / 2 - shellRect.left
+    const y = origin.top + origin.height / 2 - shellRect.top
+    const destX = dest.left + dest.width / 2 - shellRect.left
+    const destY = dest.top + dest.height / 2 - shellRect.top
+    spawnRewardParticle({
+      className: 'fx-pack-drop',
+      x,
+      y,
+      durationMs: 1250,
+      style: { '--tx': `${destX - x}px`, '--ty': `${destY - y}px` } as CSSProperties,
+    })
+    setTimeout(() => {
+      const el = getLandmarkElement('nav-cards')
+      if (!el) return
+      el.classList.remove('fx-gold-punch')
+      void el.offsetWidth
+      el.classList.add('fx-gold-punch')
+    }, 1250)
+  }
+
   const showToast = (text: string) => {
     setToastText(text)
     clearTimeout(toastTimeout.current)
@@ -182,6 +209,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           audio.bossDown()
           hapticSuccess()
           triggerShake('big')
+          spawnPackDrop()
         } else {
           showToast(`PLANET DESTROYED · +${gold.toShortString()} Stardust`)
           // Calm Before Destruction (#64): a shorter hush than the boss's, same reasoning.
@@ -291,6 +319,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Packs granted by a mid-session save sync were invisible until the app was reopened -
+  // opening the Cards tab is the moment the player looks for them, so refetch right there.
+  useEffect(() => {
+    if (tab === 'cards') refreshCards()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   const handlePackOpened = (packId: number, result: OpenPackResult) => {
     setPendingPacks((prev) => prev.filter((p) => p.id !== packId))
