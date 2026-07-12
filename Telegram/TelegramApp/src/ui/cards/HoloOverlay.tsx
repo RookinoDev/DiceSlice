@@ -1,12 +1,25 @@
 // Phase 2 WebGL holo tier (docs/CARD_SYSTEM_PLAN.md §3): a small full-card-quad shader laid
-// over a holo card's artwork in the focused detail view. Everything is procedural noise/hash
-// math, not a packed pattern-mask texture - "no asset without a generator" (§2), and it means
-// this is the first purely-code holo pattern, tunable per rarity without new art. Only ever one
-// of these is alive at a time (the one focused card), matching the "hard cap two WebGL
+// over a holo card's artwork in the focused detail view. The rainbow band pattern is driven by
+// a real authored texture (holofoil-mask-tile.png, a tileable 512x512 grayscale swirl - see
+// §2's asset manifest) rather than pure sine math, matching the plan's own formula:
+// "hue = dot(lightVec, uv-warp) * frequency + patternMask.r". Sparkle/sweep/edge layers stay
+// procedural (hash-based) since those are discrete events, not a pattern to author. Only ever
+// one of these is alive at a time (the one focused card), matching the "hard cap two WebGL
 // contexts" budget in §8 alongside the object's own PlanetCanvas render.
 import { useEffect, useRef, type RefObject } from 'react'
-import { WebGLRenderer, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, DoubleSide, NormalBlending } from 'three'
+import { WebGLRenderer, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, DoubleSide, NormalBlending, TextureLoader, RepeatWrapping, LinearFilter } from 'three'
 import type { CardRarity } from '../../game/cards/catalog'
+import holofoilMaskUrl from '../../assets/cards/holofoil-mask-tile.png'
+
+// Loaded once and shared across every HoloOverlay instance ever mounted (a card is opened and
+// closed repeatedly over a session) - Three.js Textures are renderer-agnostic, so one decoded
+// image can back many independent WebGLRenderers without re-fetching. Never disposed: it's a
+// tiny (512x512) texture meant to live for the app's lifetime, same discipline as a sprite atlas.
+const holofoilMask = new TextureLoader().load(holofoilMaskUrl)
+holofoilMask.wrapS = RepeatWrapping
+holofoilMask.wrapT = RepeatWrapping
+holofoilMask.minFilter = LinearFilter
+holofoilMask.magFilter = LinearFilter
 
 export interface HoloLightVector {
   x: number
@@ -45,6 +58,7 @@ uniform vec2 uLight;
 uniform float uTime;
 uniform float uIntensity;
 uniform float uSparkleDensity;
+uniform sampler2D uMaskTex;
 
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 
@@ -60,11 +74,18 @@ void main() {
   vec2 lightDir = length(uLight) > 0.001 ? normalize(uLight) : vec2(0.0, 1.0);
   float pos = dot(c, lightDir);
 
-  // Diffraction grating: fine + coarse bands at different speeds/angles so the hue cycles
-  // richly across the surface instead of one smooth gradient - reads as an actual foil texture.
+  // The authored swirl mask, warped by the light/tilt vector so the pattern itself seems to
+  // shift under the card the way a real diffraction surface does, plus a slow independent
+  // drift so it's never fully static at rest. Tiled 2.4x across the card (RepeatWrapping).
+  vec2 maskUv = uv * 2.4 + lightDir * 0.35 + vec2(uTime * 0.015, -uTime * 0.011);
+  float mask = texture2D(uMaskTex, maskUv).r;
+
+  // Diffraction grating: fine + coarse bands, perturbed by the mask so the hue organizes into
+  // the swirl's actual shape instead of pure straight bands - the plan's own formula
+  // ("hue = dot(lightVec, uv-warp) * frequency + patternMask.r"), just with real art for warp.
   float bandsFine = pos * 13.0 + uTime * 0.18;
   float bandsCoarse = pos * 3.5 - uTime * 0.06 + c.x * 2.0;
-  float hue = fract(bandsFine * 0.12 + bandsCoarse * 0.4);
+  float hue = fract(bandsFine * 0.12 + bandsCoarse * 0.4 + mask * 0.6);
   vec3 rainbow = hsv2rgb(vec3(hue, 0.7, 1.0));
 
   // A bright specular band glides across the card as the light angle changes - the "glassy
@@ -72,11 +93,14 @@ void main() {
   float sweepPos = fract(pos * 1.2 + dot(uLight, vec2(0.8, 0.5)) * 0.6 + uTime * 0.05);
   float sweep = pow(smoothstep(0.5, 0.0, abs(sweepPos - 0.5)), 2.0);
 
-  // Rare, small, bright glints - not a wash across the whole card.
+  // Rare, small, bright glints from a hash grid, PLUS glints riding the mask's own bright
+  // streaks (its highlight ridges read as foil catching the light along the real swirl art).
   vec2 cell = floor(uv * (20.0 + uSparkleDensity * 34.0));
   float h = hash(cell);
   float twinklePhase = sin(uTime * 2.2 + h * 60.0 + dot(uLight, vec2(4.0, 2.3)));
   float twinkle = step(0.975, h) * smoothstep(0.55, 1.0, twinklePhase);
+  float maskGlint = smoothstep(0.7, 0.94, mask) * (0.5 + 0.5 * sin(uTime * 2.6 + mask * 30.0));
+  twinkle = max(twinkle, maskGlint * uSparkleDensity);
 
   // A base tint is always present (so the foil reads even before the player ever touches the
   // card), the sweep and glints layer brighter moments on top.
@@ -109,6 +133,7 @@ export function HoloOverlay({ rarity, lightRef, className }: HoloOverlayProps) {
         uTime: { value: 0 },
         uIntensity: { value: INTENSITY[rarity] },
         uSparkleDensity: { value: SPARKLE_DENSITY[rarity] },
+        uMaskTex: { value: holofoilMask },
       },
       transparent: true,
       depthWrite: false,
