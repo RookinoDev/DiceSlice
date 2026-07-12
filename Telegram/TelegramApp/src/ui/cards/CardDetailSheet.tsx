@@ -5,7 +5,8 @@
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
 import { Sheet } from '../Sheet'
 import { CardArt } from './CardArt'
-import { RARITY_COLOR, collectionNo } from './cardTheme'
+import { RARITY_COLOR, RARITY_GEM, collectionNo } from './cardTheme'
+import cornerOrnament from '../../assets/cards/frame-corner-ornament.png'
 import { RARITY_LABEL, type CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import { VARIANT_LABEL, variantRank } from '../../game/cards/variants'
@@ -295,7 +296,10 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
               </div>
               <div className="card-detail-eyebrow">{locked ? 'UNDISCOVERED' : card.classification.toUpperCase()}</div>
               <div className="card-detail-name">{locked ? '???' : card.name}</div>
-              <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
+              <div className="card-detail-no">
+                {!locked && <img src={RARITY_GEM[card.rarity]} className="card-detail-gem" alt="" />}
+                {collectionNo(card.no, FULL_CATALOG.length)}
+              </div>
               {owned && (
                 <div className="card-detail-mint">
                   Mint #{String(owned.bestSerial).padStart(4, '0')}
@@ -304,6 +308,14 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                 </div>
               )}
               {!locked && <div className="card-detail-flip-hint">TAP TO FLIP · DRAG TO TILT · PINCH TO ZOOM</div>}
+              {!locked && (card.rarity === 'legendary' || card.rarity === 'ultra') && (
+                <>
+                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tl" alt="" />
+                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tr" alt="" />
+                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--bl" alt="" />
+                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--br" alt="" />
+                </>
+              )}
             </div>
             <div className="card-detail-face card-detail-face--back">
               {locked ? (

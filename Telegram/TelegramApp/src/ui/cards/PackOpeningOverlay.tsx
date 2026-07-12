@@ -312,9 +312,7 @@ function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: 
       }
     >
       <div className="pack-card-inner">
-        <div className="pack-card-back">
-          <div className="pack-card-back-emblem">✦</div>
-        </div>
+        <div className="pack-card-back" />
         <div className="pack-card-front">
           <CardArt cardName={def?.name ?? card.cardId} mode="grid" className="pack-reveal-art" />
           <div className="pack-reveal-rarity">{RARITY_LABEL[card.rarity]}</div>

@@ -5,7 +5,7 @@ import type { CardDefinition } from '../../game/cards/catalog'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
 import { VARIANT_LABEL } from '../../game/cards/variants'
 import { CardArt } from './CardArt'
-import { RARITY_COLOR, collectionNo } from './cardTheme'
+import { RARITY_COLOR, RARITY_GEM, collectionNo } from './cardTheme'
 
 interface CardGridItemProps {
   card: CardDefinition
@@ -28,7 +28,10 @@ export function CardGridItem({ card, owned, setTotal, favorite, onSelect }: Card
       {owned.bestVariant !== 'standard' && <div className="card-grid-variant">{VARIANT_LABEL[owned.bestVariant]}</div>}
       {owned.count > 1 && <div className="card-grid-count">×{owned.count}</div>}
       {favorite && <div className="card-grid-fav">♥</div>}
-      <div className="card-grid-no">{collectionNo(card.no, setTotal)}</div>
+      <div className="card-grid-no">
+        <img src={RARITY_GEM[card.rarity]} className="card-grid-gem" alt="" />
+        {collectionNo(card.no, setTotal)}
+      </div>
       <div className="card-grid-name">{card.name}</div>
     </button>
   )
