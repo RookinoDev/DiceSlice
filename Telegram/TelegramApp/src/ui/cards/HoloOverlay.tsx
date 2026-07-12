@@ -47,11 +47,11 @@ void main() {
 }
 `
 
-// Real foil under light is a diffraction grating (fine parallel color bands that shift hue
-// as the angle changes) plus a glassy specular sweep plus rare bright glints - three distinct
-// visible layers, alpha-blended (NOT additive - additive is why the old version vanished on
-// bright art: adding a rainbow to near-white pixels just makes more white) so the color reads
-// as a real translucent tint over ANY artwork, dark or light.
+// Real foil is subtle: a slow, broad pastel gradient (not a busy rainbow), one soft glassy
+// sweep as the actual "catching the light" moment, and rare, gentle glints - alpha-blended
+// (NOT additive - additive is why an earlier version vanished on bright art: adding a rainbow
+// to near-white pixels just makes more white) and capped well under full opacity so the card's
+// own art always reads through clearly underneath the foil, not washed out by it.
 const fragmentShader = /* glsl */ `
 varying vec2 vUv;
 uniform vec2 uLight;
@@ -80,32 +80,32 @@ void main() {
   vec2 maskUv = uv * 2.4 + lightDir * 0.35 + vec2(uTime * 0.015, -uTime * 0.011);
   float mask = texture2D(uMaskTex, maskUv).r;
 
-  // Diffraction grating: fine + coarse bands, perturbed by the mask so the hue organizes into
-  // the swirl's actual shape instead of pure straight bands - the plan's own formula
-  // ("hue = dot(lightVec, uv-warp) * frequency + patternMask.r"), just with real art for warp.
-  float bandsFine = pos * 13.0 + uTime * 0.18;
-  float bandsCoarse = pos * 3.5 - uTime * 0.06 + c.x * 2.0;
-  float hue = fract(bandsFine * 0.12 + bandsCoarse * 0.4 + mask * 0.6);
-  vec3 rainbow = hsv2rgb(vec3(hue, 0.7, 1.0));
+  // Broad, slow color drift (low frequency = smooth wide bands, not busy stripes) - the mask
+  // only nudges the phase gently so the swirl organizes it without dominating the gradient.
+  float bandsFine = pos * 4.0 + uTime * 0.1;
+  float bandsCoarse = pos * 1.6 - uTime * 0.035 + c.x * 1.1;
+  float hue = fract(bandsFine * 0.32 + bandsCoarse * 0.24 + mask * 0.16);
+  // Pastel, not neon: modest saturation, and always blended a little toward white for a
+  // pearlescent rather than a saturated-rainbow read.
+  vec3 rainbow = mix(hsv2rgb(vec3(hue, 0.4, 1.0)), vec3(1.0), 0.22);
 
-  // A bright specular band glides across the card as the light angle changes - the "glassy
-  // lamination catching the light" read.
-  float sweepPos = fract(pos * 1.2 + dot(uLight, vec2(0.8, 0.5)) * 0.6 + uTime * 0.05);
-  float sweep = pow(smoothstep(0.5, 0.0, abs(sweepPos - 0.5)), 2.0);
+  // One soft specular band glides across the card as the light angle changes - the single
+  // "glassy lamination catching the light" moment, wide and gentle rather than a hard stripe.
+  float sweepPos = fract(pos * 1.1 + dot(uLight, vec2(0.8, 0.5)) * 0.6 + uTime * 0.05);
+  float sweep = pow(smoothstep(0.62, 0.0, abs(sweepPos - 0.5)), 1.6);
 
-  // Rare, small, bright glints from a hash grid, PLUS glints riding the mask's own bright
-  // streaks (its highlight ridges read as foil catching the light along the real swirl art).
-  vec2 cell = floor(uv * (20.0 + uSparkleDensity * 34.0));
+  // Sparse, soft glints - a rare catch-light, not a field of static.
+  vec2 cell = floor(uv * (14.0 + uSparkleDensity * 20.0));
   float h = hash(cell);
-  float twinklePhase = sin(uTime * 2.2 + h * 60.0 + dot(uLight, vec2(4.0, 2.3)));
-  float twinkle = step(0.975, h) * smoothstep(0.55, 1.0, twinklePhase);
-  float maskGlint = smoothstep(0.7, 0.94, mask) * (0.5 + 0.5 * sin(uTime * 2.6 + mask * 30.0));
-  twinkle = max(twinkle, maskGlint * uSparkleDensity);
+  float twinklePhase = sin(uTime * 1.8 + h * 60.0 + dot(uLight, vec2(4.0, 2.3)));
+  float twinkle = step(0.988, h) * smoothstep(0.7, 1.0, twinklePhase);
+  float maskGlint = smoothstep(0.82, 0.97, mask) * (0.5 + 0.5 * sin(uTime * 2.0 + mask * 30.0));
+  twinkle = max(twinkle * 0.7, maskGlint * uSparkleDensity * 0.4);
 
-  // A base tint is always present (so the foil reads even before the player ever touches the
-  // card), the sweep and glints layer brighter moments on top.
-  float alpha = clamp((0.24 + 0.22 * sweep + twinkle * 0.9) * uIntensity, 0.0, 0.95);
-  vec3 col = mix(rainbow, vec3(1.0), sweep * 0.35 + twinkle * 0.85);
+  // A faint base tint is always present (so the foil reads at rest, not only mid-drag), the
+  // sweep and glints layer brighter moments on top - overall capped so art underneath survives.
+  float alpha = clamp((0.13 + 0.18 * sweep + twinkle * 0.5) * uIntensity, 0.0, 0.62);
+  vec3 col = mix(rainbow, vec3(1.0), sweep * 0.3 + twinkle * 0.6);
   gl_FragColor = vec4(col, alpha);
 }
 `

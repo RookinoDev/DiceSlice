@@ -7,7 +7,7 @@ import { Sheet } from '../Sheet'
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, RARITY_GEM, collectionNo } from './cardTheme'
 import cornerOrnament from '../../assets/cards/frame-corner-ornament.png'
-import { RARITY_LABEL, type CardDefinition } from '../../game/cards/catalog'
+import type { CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import { VARIANT_LABEL, variantRank } from '../../game/cards/variants'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
@@ -247,12 +247,21 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
             style={{ '--rarity-color': color } as CSSProperties}
           >
             <div className="card-detail-face card-detail-face--front">
+              <div className="card-detail-top-row">
+                <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
+                {!locked && owned && <div className="card-detail-rarity-tag">{VARIANT_LABEL[owned.bestVariant].toUpperCase()}</div>}
+              </div>
               {locked ? (
                 <div className="card-detail-art-wrap">
                   <div className="card-art card-art-ghost card-detail-art" />
                 </div>
               ) : (
                 <div className="card-detail-art-wrap">
+                  <div className="card-detail-art-rings">
+                    <div className="card-detail-art-ring card-detail-art-ring--1" />
+                    <div className="card-detail-art-ring card-detail-art-ring--2" />
+                    <div className="card-detail-art-ring card-detail-art-ring--3" />
+                  </div>
                   <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
                   {owned && variantRank(owned.bestVariant) >= variantRank('holo') && (
                     <Suspense fallback={null}>
@@ -276,10 +285,34 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                   {isFavorite ? '♥' : '♡'}
                 </button>
               )}
-              {/* Rarity tag + EXPLORE share one row - EXPLORE sits at the right, level with the
-                  rarity it's themed to match, instead of floating off on its own near the bottom. */}
-              <div className="card-detail-meta-row">
-                <div className="card-detail-rarity-tag">{RARITY_LABEL[card.rarity]}</div>
+              <div className="card-detail-name-row">
+                <div className="card-detail-name">{locked ? '???' : card.name}</div>
+                <div className="card-detail-type-tag">{locked ? 'UNDISCOVERED' : card.classification}</div>
+              </div>
+              {!locked && (
+                <div className="card-detail-physical">
+                  {Object.entries(card.physical).map(([label, value]) => (
+                    <div key={label} className="card-detail-physical-row">
+                      <span>{label}</span>
+                      <span>{value}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {owned && (
+                <div className="card-detail-edition-row">
+                  <div>
+                    <div className="card-detail-edition-label">MINT Nº</div>
+                    <div className="card-detail-edition-value">
+                      #{String(owned.bestSerial).padStart(4, '0')}
+                      {owned.count > 1 ? ` · ×${owned.count} owned` : ''}
+                    </div>
+                  </div>
+                  <img src={RARITY_GEM[card.rarity]} className="card-detail-edition-gem" alt="" />
+                </div>
+              )}
+              {!locked && <div className="card-detail-flavor-box">&ldquo;{card.flavor}&rdquo;</div>}
+              <div className="card-detail-bottom-row">
                 {!locked && (
                   <button
                     className="card-detail-explore-btn"
@@ -293,21 +326,8 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                     EXPLORE
                   </button>
                 )}
+                {!locked && <div className="card-detail-flip-hint">TAP TO FLIP · DRAG TO TILT · PINCH TO ZOOM</div>}
               </div>
-              <div className="card-detail-eyebrow">{locked ? 'UNDISCOVERED' : card.classification.toUpperCase()}</div>
-              <div className="card-detail-name">{locked ? '???' : card.name}</div>
-              <div className="card-detail-no">
-                {!locked && <img src={RARITY_GEM[card.rarity]} className="card-detail-gem" alt="" />}
-                {collectionNo(card.no, FULL_CATALOG.length)}
-              </div>
-              {owned && (
-                <div className="card-detail-mint">
-                  Mint #{String(owned.bestSerial).padStart(4, '0')}
-                  {owned.bestVariant !== 'standard' ? ` · ${VARIANT_LABEL[owned.bestVariant].toUpperCase()}` : ''}
-                  {owned.count > 1 ? ` · ×${owned.count} owned` : ''}
-                </div>
-              )}
-              {!locked && <div className="card-detail-flip-hint">TAP TO FLIP · DRAG TO TILT · PINCH TO ZOOM</div>}
               {!locked && (card.rarity === 'legendary' || card.rarity === 'ultra') && (
                 <>
                   <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tl" alt="" />
@@ -322,17 +342,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
                 <div className="card-detail-locked-body">Defeat the right boss to discover this card.</div>
               ) : (
                 <>
-                  <div className="card-detail-classification">{card.classification}</div>
-                  <div className="card-detail-flavor">"{card.flavor}"</div>
-                  <div className="card-detail-section-label">PHYSICAL CHARACTERISTICS</div>
-                  <div className="card-detail-physical">
-                    {Object.entries(card.physical).map(([label, value]) => (
-                      <div key={label} className="card-detail-physical-row">
-                        <span>{label}</span>
-                        <span>{value}</span>
-                      </div>
-                    ))}
-                  </div>
                   <div className="card-detail-section-label">FACTS</div>
                   <ul className="card-detail-facts">
                     {card.facts.map((f) => (
