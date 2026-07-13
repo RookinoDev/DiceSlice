@@ -25,6 +25,14 @@ function spriteSizePx(index: number): number {
   return 15 + Math.min(13, index * 0.65)
 }
 
+// Real ship art, keyed by ship index - only ships with an entry here render their actual
+// sprite; everything else still falls back to the tier clip-path silhouette. Source art must
+// face "up" (nose at the top of the image) - that's the 0deg convention useFleetSiegeOrbit's
+// facingDeg math already assumes (matches the placeholder triangles' point-up shape).
+const SHIP_ART: Partial<Record<number, string>> = {
+  0: '/ships/interceptor-01.png',
+}
+
 function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, bossActive, bossSecondsLeft, bossTimerSeconds }: FleetSiegeOrbitProps) {
   const { visibleIndices, registerSprite, registerRoot, registerTrail, trailPoolSize, particlesRef } = useFleetSiegeOrbit({
     session,
@@ -49,6 +57,20 @@ function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, 
       {visibleIndices.map((i) => {
         const tier = shipTierVisualForIndex(i)
         const size = spriteSizePx(i)
+        const art = SHIP_ART[i]
+        if (art) {
+          return (
+            <img
+              key={i}
+              ref={registerSprite(i)}
+              className="siege-ship siege-ship--art"
+              src={art}
+              alt=""
+              draggable={false}
+              style={{ width: size * 1.6, height: size * 1.6, filter: `drop-shadow(0 0 ${Math.round(size * 0.4)}px ${tier.color})` }}
+            />
+          )
+        }
         return (
           <div
             key={i}

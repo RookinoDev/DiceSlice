@@ -2354,6 +2354,12 @@
   pointer-events: none;
   will-change: transform, opacity;
 }
+/* Real ship art (see FleetSiegeOrbit.tsx's SHIP_ART map) instead of the tier clip-path
+   silhouette - object-fit keeps the source image's real proportions instead of squashing it
+   into the square sprite box every other ship uses. */
+.siege-ship--art {
+  object-fit: contain;
+}
 
 /* Engine trail pool (see updateTrailPool/emitTrail in useFleetSiegeOrbit.ts) - a fixed set of
    these render once and are only ever repositioned/recolored/faded via direct style writes,

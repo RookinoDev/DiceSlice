@@ -158,7 +158,7 @@ function makeTrailPool(): TrailParticle[] {
 
 export interface FleetSiegeHandle {
   visibleIndices: number[]
-  registerSprite: (index: number) => (el: HTMLDivElement | null) => void
+  registerSprite: (index: number) => (el: HTMLElement | null) => void
   registerRoot: (el: HTMLDivElement | null) => void
   registerTrail: (index: number) => (el: HTMLDivElement | null) => void
   trailPoolSize: number
@@ -202,7 +202,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   // callback would silently miss on every ship's first mount. Keeping element refs in their own
   // map that's never wholesale-replaced means it doesn't matter which one - the ref callback or
   // the sync effect - runs first.
-  const elByIndexRef = useRef(new Map<number, HTMLDivElement | null>())
+  const elByIndexRef = useRef(new Map<number, HTMLElement | null>())
   const trailPoolRef = useRef(makeTrailPool())
   const trailCursorRef = useRef(0)
   const formationRef = useRef<FormationTarget>({ radius: 1, speed: 1, squash: 1 })
@@ -463,11 +463,11 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   // Memoized per-index so the ref callback identity is stable across renders - CombatScreen
   // (and therefore this component) re-renders every game tick, and an unstable ref identity
   // would make React detach+reattach every sprite's ref on every frame for nothing.
-  const spriteRefCallbacks = useRef(new Map<number, (el: HTMLDivElement | null) => void>())
+  const spriteRefCallbacks = useRef(new Map<number, (el: HTMLElement | null) => void>())
   const registerSprite = (index: number) => {
     let cb = spriteRefCallbacks.current.get(index)
     if (!cb) {
-      cb = (el: HTMLDivElement | null) => elByIndexRef.current.set(index, el)
+      cb = (el: HTMLElement | null) => elByIndexRef.current.set(index, el)
       spriteRefCallbacks.current.set(index, cb)
     }
     return cb
