@@ -67,7 +67,7 @@ function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, 
               src={art}
               alt=""
               draggable={false}
-              style={{ width: size * 1.6, height: size * 1.6, filter: `drop-shadow(0 0 ${Math.round(size * 0.4)}px ${tier.color})` }}
+              style={{ width: size * 3.2, height: size * 3.2, filter: `drop-shadow(0 0 ${Math.round(size * 0.4)}px ${tier.color})` }}
             />
           )
         }
