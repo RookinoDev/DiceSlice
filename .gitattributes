@@ -169,3 +169,8 @@ Unity/Packages/packages-lock.json linguist-generated
 
 # Exceptions for .asset files such as lightning pre-baking
 LightingData.asset     binary
+
+# Telegram web app: plain git blobs, not LFS. The LFS rules above target the Unity
+# project's large binary assets; small web-app images should just be normal blobs so
+# CI checkouts (which don't fetch LFS content) get the real bytes instead of pointers.
+Telegram/** filter=
