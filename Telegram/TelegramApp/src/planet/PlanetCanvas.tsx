@@ -1,8 +1,9 @@
 // Three.js replacement for PixelPlanetGenerator's quad-stack + orthographic camera approach
 // (Assets/PixelPlanets/Scripts/PixelPlanetGenerator.cs MakeLayer/MakeMat/Update).
 import { useEffect, useRef } from 'react'
-import { WebGLRenderer, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, Vector4, DoubleSide, type Material, type IUniform } from 'three'
+import { WebGLRenderer, WebGLRenderTarget, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, Vector4, DoubleSide, NoBlending, type Material, type IUniform } from 'three'
 import { planetVertexShader } from './glsl/common'
+import { outlinePostFragmentShader, outlinePostVertexShader } from './shaders/outlinePost'
 import { noAtmosphereFragmentShader } from './shaders/noAtmosphere'
 import { planetCratersFragmentShader } from './shaders/planetCraters'
 import { planetUnderFragmentShader } from './shaders/planetUnder'
@@ -430,9 +431,37 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
     })
     const timeAccum = layers.map(() => Math.random() * 1000)
 
+    // Toon outline post-pass (ported from Unity's CameraOutline - see shaders/outlinePost.ts):
+    // the planet renders into an offscreen target, then a fullscreen quad runs edge detection
+    // over it and composites the ink line. No depth buffer needed - everything here is
+    // alpha-blended quads, and the edge detection is luminance/alpha based.
+    const renderTarget = new WebGLRenderTarget(1, 1, { depthBuffer: false, stencilBuffer: false })
+    const postScene = new Scene()
+    const postCamera = new OrthographicCamera(-1, 1, 1, -1, 0.1, 10)
+    postCamera.position.z = 5
+    const postMaterial = new ShaderMaterial({
+      vertexShader: outlinePostVertexShader,
+      fragmentShader: outlinePostFragmentShader,
+      uniforms: {
+        uScene: { value: renderTarget.texture },
+        uTexel: { value: new Vector2(1, 1) },
+      },
+      // NoBlending: this pass owns every canvas pixel (including alpha) each frame; the scene's
+      // own transparency already happened in the render-target pass.
+      blending: NoBlending,
+      depthTest: false,
+      depthWrite: false,
+      transparent: true,
+    })
+    postScene.add(new Mesh(geometry, postMaterial))
+
     const resize = () => {
       const { clientWidth, clientHeight } = canvas
-      if (clientWidth > 0 && clientHeight > 0) renderer.setSize(clientWidth, clientHeight, false)
+      if (clientWidth > 0 && clientHeight > 0) {
+        renderer.setSize(clientWidth, clientHeight, false)
+        renderTarget.setSize(clientWidth, clientHeight)
+        ;(postMaterial.uniforms.uTexel.value as Vector2).set(1 / clientWidth, 1 / clientHeight)
+      }
     }
     resize()
     const resizeObserver = new ResizeObserver(resize)
@@ -557,7 +586,10 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
         if (uniforms.uTilt) uniforms.uTilt.value = userTilt
       })
 
+      renderer.setRenderTarget(renderTarget)
       renderer.render(scene, camera)
+      renderer.setRenderTarget(null)
+      renderer.render(postScene, postCamera)
       raf = requestAnimationFrame(animate)
     }
     raf = requestAnimationFrame(animate)
@@ -566,6 +598,8 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
       cancelAnimationFrame(raf)
       resizeObserver.disconnect()
       meshes.forEach((mesh) => (mesh.material as Material).dispose())
+      postMaterial.dispose()
+      renderTarget.dispose()
       geometry.dispose()
       renderer.dispose()
     }
