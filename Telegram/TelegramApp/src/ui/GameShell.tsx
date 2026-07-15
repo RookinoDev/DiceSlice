@@ -96,7 +96,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     const destX = dest.left + dest.width / 2 - shellRect.left
     const destY = dest.top + dest.height / 2 - shellRect.top
     const travelMs = 480
-    const waveCount = big ? 5 : 1
+    // #8 fix: every destruction now sends a proper 8-12 coin flourish (was 1 coin for a normal
+    // kill, only boss kills got a multi-wave burst), and the gold pill ticks on EACH arrival
+    // instead of only the last one.
+    const waveCount = big ? 12 : 8 + Math.floor(Math.random() * 3)
 
     for (let i = 0; i < waveCount; i++) {
       setTimeout(() => {
@@ -109,15 +112,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           durationMs: travelMs,
           style: { '--tx': `${destX - originX - jitterX}px`, '--ty': `${destY - originY - jitterY}px` } as CSSProperties,
         })
-        if (i === waveCount - 1) {
-          setTimeout(() => {
-            const el = getLandmarkElement('gold-pill')
-            if (!el) return
-            el.classList.remove('fx-gold-punch')
-            void el.offsetWidth
-            el.classList.add('fx-gold-punch')
-          }, travelMs)
-        }
+        setTimeout(() => {
+          const el = getLandmarkElement('gold-pill')
+          if (!el) return
+          el.classList.remove('fx-gold-punch')
+          void el.offsetWidth
+          el.classList.add('fx-gold-punch')
+        }, travelMs)
       }, i * 70)
     }
   }

@@ -5,7 +5,7 @@ import { Sheet } from '../Sheet'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import { buildMainViewModel } from '../../game/ui/MainPresenter'
 import { planetMaxScale } from '../../planet/planetProfiles'
-import { realPlanetForStage } from '../../planet/realPlanets'
+import { realPlanetForStage, type RealPlanet } from '../../planet/realPlanets'
 import type { PlanetImpulseApi } from '../../planet/PlanetCanvas'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticSuccess, hapticTap } from '../../telegram'
@@ -43,6 +43,11 @@ const HP_BAR_SHAKE_DROP = 0.04
 const HP_FILL_CATCH_UP_RATE = 10
 /** Rare-roll odds for the Secret Rare Destruction variant - cosmetic lottery, not gameplay. */
 const SECRET_DESTRUCTION_CHANCE = 1 / 300
+/** #6 fix: how long the destroyed planet's visual holds before the next one enters - display
+ * only, EnemyController has already spawned the next planet synchronously with zero delay. */
+const DESTRUCTION_PAUSE_MS = 1500
+/** #7 fix: the next planet's scale/fade/flash entrance duration. */
+const PLANET_ENTRANCE_MS = 460
 
 // Milestone Visual Evolution (#37) - the tap-damage icon's color tiers up with real tap level.
 function tapIconTierColor(level: number): string {
@@ -139,15 +144,12 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   // instance changes (new spawn), not every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const target = useMemo(() => realPlanetForStage(s.enemy.current?.stage ?? s.stage.currentStage, s.bossStageInterval), [s.enemy.current])
-  const profile = target.profile
-  const planetScale = planetMaxScale(profile)
   const { ref: planetRef, pulse: pulsePlanet } = usePlanetHitFlash(s)
   const { ref: screenRef, triggerShake } = useScreenShake<HTMLDivElement>()
   const { count: tapStreak, fading: comboFading, inRhythm, registerTap } = useTapStreak()
   const { phase: overdrivePhase, countdownText: overdriveCountdown } = useOverdriveJuice(s)
   const { containerRef: particlesRef, spawn: spawnParticle } = useParticles()
   const impulseApiRef = useRef<PlanetImpulseApi | null>(null)
-  const material = useMemo(() => impactMaterialFor(profile), [profile])
   const overdriveActive = s.skills.isActive(SkillType.Overdrive)
   const overdriveSecondsLeft = overdriveActive ? Math.ceil(s.skills.activeTimeLeft(SkillType.Overdrive)) : 0
   const overdrivePanic = overdriveActive && overdriveSecondsLeft <= 2
@@ -160,6 +162,24 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   const lastUpgradeAt = useRef(0)
   const upgradeStreak = useRef(0)
   const lastImpactRef = useRef({ x: 0, y: 0 })
+  // #6/#7 fix: the destroyed planet's visual (mesh + name) holds for a beat instead of
+  // snapping straight to the next target the instant EnemyController spawns it - purely a
+  // display decoupling, targetRef always tracks the real live target so the pause can read
+  // "whatever's current" once it's over, without re-subscribing to anything.
+  const targetRef = useRef(target)
+  targetRef.current = target
+  const [displayTarget, setDisplayTarget] = useState<RealPlanet>(target)
+  const [destructionPhase, setDestructionPhase] = useState<'idle' | 'destroying' | 'entering'>('idle')
+  const destructionTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+  useEffect(() => {
+    if (destructionPhase === 'idle') setDisplayTarget(target)
+  }, [target, destructionPhase])
+  useEffect(() => () => destructionTimers.current.forEach(clearTimeout), [])
+  // The rendered mesh/scale/material track displayTarget (frozen during the destruction pause),
+  // not the live target - see the effect above.
+  const profile = displayTarget.profile
+  const planetScale = planetMaxScale(profile)
+  const material = useMemo(() => impactMaterialFor(profile), [profile])
   const materialRef = useRef(material)
   materialRef.current = material
   const [hpBarShake, setHpBarShake] = useState(0)
@@ -226,6 +246,9 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       const secret = Math.random() < SECRET_DESTRUCTION_CHANCE
       const preset = destructionPreset(ratio, secret)
       const { x, y } = lastImpactRef.current
+      // #6 fix: flash + shockwave ring ahead of the existing colored debris burst.
+      spawnParticle({ className: 'fx-destruct-flash', x, y, durationMs: 260 })
+      spawnParticle({ className: 'fx-destruct-shock', x, y, durationMs: 520 })
       spawnDestructionBurst(spawnParticle, x, y, materialRef.current.debrisColor, preset)
       if (secret) {
         clearTimeout(recordTimeout.current)
@@ -234,6 +257,19 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         hapticSuccess()
         recordTimeout.current = setTimeout(() => setRecordText(null), 1600)
       }
+
+      // #6/#7 fix: hold on the destroyed planet's (fading) visual for a beat, then swap the
+      // display to whatever's live now and play its entrance. EnemyController already spawned
+      // the next planet synchronously above, with zero delay - reward/stage/economy don't wait
+      // on any of this, only the mesh/name shown here does.
+      setDestructionPhase('destroying')
+      const holdTimer = setTimeout(() => {
+        setDisplayTarget(targetRef.current)
+        setDestructionPhase('entering')
+        const enterTimer = setTimeout(() => setDestructionPhase('idle'), PLANET_ENTRANCE_MS)
+        destructionTimers.current.push(enterTimer)
+      }, DESTRUCTION_PAUSE_MS)
+      destructionTimers.current.push(holdTimer)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s])
@@ -337,7 +373,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         )}
       </div>
 
-      <div className="combat-target-name">{target.name}</div>
+      <div className="combat-target-name">{displayTarget.name}</div>
 
       {/* #1 fix: HP bar now sits right under the planet's name, not below the planet art. */}
       <div key={hpBarShake} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
@@ -377,7 +413,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         />
         <button
           ref={planetRef}
-          className="combat-planet"
+          className={`combat-planet ${destructionPhase !== 'idle' ? `combat-planet--${destructionPhase}` : ''}`}
           style={{ '--planet-scale': planetScale } as CSSProperties}
           onClick={(e) => {
             s.tap()
@@ -400,6 +436,8 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
           }}
           aria-label="Tap to attack"
         >
+          {/* #7 fix: a soft flash behind the planet as the next one enters. */}
+          {destructionPhase === 'entering' && <div className="combat-planet-entry-flash" />}
           <Suspense fallback={<div className="combat-planet-visual combat-planet-loading" />}>
             <PlanetCanvas profile={profile} className="combat-planet-visual" onReady={(api) => (impulseApiRef.current = api)} hpFraction={vm.hpFraction} />
           </Suspense>
