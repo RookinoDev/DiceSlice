@@ -79,6 +79,17 @@ db.exec(`
   )
 `)
 
+// Sprint 5 (fix-plan-2026-07-14.docx, item #11): daily-login pack days (10/20/30 of the 30-day
+// cycle - see TelegramApp's DailyRewardTable.ts/BalanceConfig.dailyPackDays). last_streak_granted
+// is the highest save.dailyStreak value already scanned for pack days, so a re-sync at the same
+// streak grants nothing - same idempotency shape as pack_progress.bosses_granted above.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS daily_pack_progress (
+    telegram_user_id INTEGER PRIMARY KEY,
+    last_streak_granted INTEGER NOT NULL DEFAULT 0
+  )
+`)
+
 // --- Cards v2 migration: 6-variant model, boss-quality packs, dust, showcase ---
 // (holo INTEGER stays as a legacy column, kept in sync for any stale clients; the
 // variant TEXT column is the source of truth from here on.)
@@ -202,6 +213,58 @@ export function grantPacksFromSave(telegramUserId, save) {
     db.prepare('UPDATE pack_progress SET bosses_granted = bosses_granted + ? WHERE telegram_user_id = ?').run(delta, telegramUserId)
     db.exec('COMMIT')
     return delta
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+// Mirrors TelegramApp's defaultBalanceConfig.dailyPackDays (src/game/config/BalanceConfig.ts) -
+// small, rarely-changing table, kept in sync by hand same as this file already does for
+// cardPool.json (see its own header comment): client and server must agree on tiers.
+const DAILY_PACK_DAYS = { 10: 'meteor', 20: 'stellar', 30: 'deepsky' }
+const DAILY_CYCLE_LENGTH = 30
+/** How many streak values a single sync will scan looking for pack days - bounds the loop
+ * below against a malformed/huge reported streak; 300 covers 30 real pack-day crossings, far
+ * more than any realistically-syncing client would ever need in one call. */
+const MAX_DAILY_STREAK_SCAN = 300
+
+function dayInDailyCycle(streak) {
+  return ((Math.max(1, streak) - 1) % DAILY_CYCLE_LENGTH) + 1
+}
+
+/**
+ * Grants card packs for daily-login streak milestones (days 10/20/30, see DAILY_PACK_DAYS)
+ * revealed by a cloud-save sync. Tracks the highest streak value already scanned; a reported
+ * streak LOWER than that means the run reset (DailyRewardService resets streak to 1 on a missed
+ * day) and started fresh, so the floor resets too - each fresh run through day 10/20/30 earns
+ * its own pack, same as the daily reward itself is claimable again every cycle. Same
+ * client-authoritative-progress/server-authoritative-grant trust model as boss packs.
+ */
+export function grantDailyPackFromSave(telegramUserId, save) {
+  const streak = Math.floor(Number(save?.dailyStreak))
+  if (!Number.isFinite(streak) || streak <= 0) return 0
+
+  const now = Date.now()
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.prepare('INSERT OR IGNORE INTO daily_pack_progress (telegram_user_id) VALUES (?)').run(telegramUserId)
+    const row = db.prepare('SELECT last_streak_granted FROM daily_pack_progress WHERE telegram_user_id = ?').get(telegramUserId)
+    const floor = streak < row.last_streak_granted ? 0 : row.last_streak_granted
+    const scanTo = Math.min(streak, floor + MAX_DAILY_STREAK_SCAN)
+
+    const insert = db.prepare('INSERT INTO packs (telegram_user_id, type, created_at, quality) VALUES (?, ?, ?, ?)')
+    let granted = 0
+    for (let s = floor + 1; s <= scanTo; s++) {
+      const type = DAILY_PACK_DAYS[dayInDailyCycle(s)]
+      if (type) {
+        insert.run(telegramUserId, type, now, 0)
+        granted++
+      }
+    }
+    db.prepare('UPDATE daily_pack_progress SET last_streak_granted = ? WHERE telegram_user_id = ?').run(scanTo, telegramUserId)
+    db.exec('COMMIT')
+    return granted
   } catch (e) {
     db.exec('ROLLBACK')
     throw e

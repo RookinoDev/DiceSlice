@@ -1916,6 +1916,20 @@
 .daily-cell.today .daily-cell-reward {
   color: var(--palette-gold-label);
 }
+/* #11 fix: relic/pack bonus days (30-day cycle) get a small badge under the gold amount. */
+.daily-cell-bonus {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.03em;
+  color: var(--palette-cyan-label);
+}
+.daily-cell.past .daily-cell-bonus {
+  color: var(--palette-success);
+}
+.daily-cell.today .daily-cell-bonus {
+  color: var(--palette-gold-label);
+}
 .daily-claim-button {
   width: 100%;
   padding: 15px;

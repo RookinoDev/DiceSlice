@@ -1,4 +1,5 @@
 // Tunable balance data, ported 1:1 from Assets/PixelPlanets/StellarBreaker/Scripts/Config/BalanceConfig.cs
+import type { PackType } from '../cards/cardsApi'
 
 export interface BalanceConfig {
   // Enemy HP: HP(stage) = base * growth^(stage-1)
@@ -74,9 +75,11 @@ export interface BalanceConfig {
   // Monetization
   dailyResetHourUtc: number
 
-  // Daily reward: day 1..7 cycle, loops after day 7
+  // Daily reward: day 1..30 cycle, loops after day 30
   dailyGoldKillMultiples: number[]
-  dailyRelicDay: number
+  dailyRelicDays: number[]
+  /** Day-in-cycle -> pack tier granted that day (sparse; most days grant no pack). */
+  dailyPackDays: Partial<Record<number, PackType>>
 
   // Skills - unlock levels & timing
   skillUnlockLevels: number[]
@@ -153,8 +156,17 @@ export const defaultBalanceConfig: BalanceConfig = {
 
   dailyResetHourUtc: 0,
 
-  dailyGoldKillMultiples: [3, 4, 5, 6, 8, 10, 15],
-  dailyRelicDay: 7,
+  dailyGoldKillMultiples: [
+    3, 4, 5, 6, 8, 10, 15, // days 1-7 (unchanged from the original 7-day cycle)
+    6, 7, 9, // days 8-10 (day 10 also grants a pack)
+    7, 8, 10, 20, // days 11-14 (day 14 also grants a Relic)
+    8, 9, 10, 12, 14, 16, // days 15-20 (day 20 also grants a pack)
+    26, // day 21 also grants a Relic
+    9, 10, 12, 14, 16, 18, 20, 24, // days 22-29
+    40, // day 30: cycle finale, also grants a pack
+  ],
+  dailyRelicDays: [7, 14, 21],
+  dailyPackDays: { 10: 'meteor', 20: 'stellar', 30: 'deepsky' },
 
   skillUnlockLevels: [50, 100, 200, 300, 400, 500],
   skillDurationSeconds: 30,

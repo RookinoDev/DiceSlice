@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
-import { claimPurchases, craftCard, getCollection, getDust, getProfile, getSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, refineInstances, setShowcase, upsertProfile } from './db.mjs'
+import { claimPurchases, craftCard, getCollection, getDust, getProfile, getSave, grantDailyPackFromSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, refineInstances, setShowcase, upsertProfile } from './db.mjs'
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/stellar-breaker\.pages\.dev$/,
@@ -121,6 +121,8 @@ export function startServer(botToken, port) {
         upsertProfile(userId, { firstName: user.first_name, username: user.username, photoUrl: user.photo_url })
         // ...and the pack-earning heartbeat: new boss kills in the save grant card packs.
         grantPacksFromSave(userId, body.save)
+        // ...and daily-login pack days (10/20/30 of the cycle) grant a pack too.
+        grantDailyPackFromSave(userId, body.save)
         sendJson(res, 200, { ok: true, pendingPacks: listUnopenedPacks(userId).length })
       } catch (e) {
         console.error('[server] save error:', e)

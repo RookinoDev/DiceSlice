@@ -18,15 +18,20 @@ interface MissionsSheetProps {
 
 export function MissionsSheet({ session: s, open, onClose, onClaimed }: MissionsSheetProps) {
   const m = s.missions
+  // Sprint 5 (#10): 180 generated missions (6 templates x 30 levels) share one running counter
+  // per template - only the lowest-level unclaimed mission of each template is the "active" one
+  // to work toward, the rest of that chain is implicit until claimed in order.
+  const active = m.activeIndices()
 
   return (
     <Sheet open={open} onClose={onClose} title="MISSIONS">
       <div className="missions-list">
-        {Array.from({ length: m.count }, (_, i) => {
+        {active.map((i) => {
           const def = m.def(i)
           const complete = m.isComplete(i)
           const claimed = m.isClaimed(i)
           const pct = m.progress01(i) * 100
+          const reward = m.rewardFor(i, s.oneKillGold)
           return (
             <div key={i} className="mission-row">
               <div className="mission-name">{def.displayName}</div>
@@ -38,13 +43,13 @@ export function MissionsSheet({ session: s, open, onClose, onClaimed }: Missions
               </div>
               <div className="mission-footer-row">
                 <div className="mission-progress-label">
-                  {formatProgress(m.progressOf(i).toNumber(), def.target)} · {def.goldReward.toLocaleString()} Stardust
+                  {formatProgress(m.progressOf(i).toNumber(), def.target)} · {reward.toShortString()} Stardust
                 </div>
                 <button
                   className={`mission-claim ${complete && !claimed ? 'claimable' : ''}`}
                   disabled={!complete || claimed}
                   onClick={() => {
-                    if (m.claim(i)) {
+                    if (s.claimMission(i)) {
                       audio.prestige()
                       hapticAction()
                       onClaimed()

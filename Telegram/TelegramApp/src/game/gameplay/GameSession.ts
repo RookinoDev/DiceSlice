@@ -8,7 +8,8 @@ import { buildDefaultMissions } from '../config/MissionDefinition'
 import { buildPrototypeSkills, SkillType } from '../config/SkillDefinition'
 import { CurrencyService } from '../economy/CurrencyService'
 import { DailyRewardService } from '../monetization/DailyRewardService'
-import { dailyGrantsRelic, dailyGoldFor, dayInCycle } from '../economy/DailyRewardTable'
+import { dailyGrantsPack, dailyGrantsRelic, dailyGoldFor, dayInCycle } from '../economy/DailyRewardTable'
+import type { PackType } from '../cards/cardsApi'
 import { ArtifactService } from './ArtifactService'
 import { EnemyController } from './EnemyController'
 import { MissionService } from './MissionService'
@@ -22,10 +23,12 @@ import { TapDamageUpgrade } from './TapDamageUpgrade'
 import { newLifetimeStats, type LifetimeStats } from './LifetimeStats'
 
 export interface DailyPreview {
-  /** 1..7 in the cycle */
+  /** 1..30 in the cycle */
   day: number
   gold: BigNumber
   relic: boolean
+  /** Pack tier granted this day, if any - client preview only, see claimDaily's own comment. */
+  pack: PackType | null
   /** true = claimable now / claim just succeeded */
   canClaim: boolean
 }
@@ -83,8 +86,11 @@ export class GameSession {
 
     this.enemy.onPlanetKilled.on((e) => this.handleKill(e.planet, e.overkill))
     this.enemy.onPlanetKilled.on(() => this.missions.notifyPlanetDestroyed())
+    this.stage.onBossCleared.on(() => this.missions.notifyBossDefeated())
     this.taps.onDamageDealt.on((e) => this.missions.notifyTapDamage(e.amount))
+    this.taps.onDamageDealt.on(() => this.missions.notifyTapCount())
     this.ships.onShipChanged.on(() => this.missions.notifyShipUpgraded())
+    this.prestige.onPrestiged.on(() => this.missions.notifyPrestiged())
     this.stage.onBossFailed.on((stage) => this.handleBossFailed(stage))
 
     // Lifetime profile counters - observe-only, never feed back into gameplay.
@@ -134,9 +140,15 @@ export class GameSession {
     return this.artifacts.buyOrUpgrade(i)
   }
 
+  /** Gold value of a single kill at the player's current stage - the shared unit missions and
+   * the daily reward both scale their payouts against, so neither goes stale as stages climb. */
+  get oneKillGold(): BigNumber {
+    return this.stage.goldFor(this.stage.currentStage)
+  }
+
   /** Claim a completed mission's Gold reward. False if not complete or already claimed. */
   claimMission(i: number): boolean {
-    return this.missions.claim(i)
+    return this.missions.claim(i, this.oneKillGold)
   }
 
   // -- Buy Max (spend everything affordable; never overspends) --
@@ -195,27 +207,36 @@ export class GameSession {
     const can = this.daily.canClaim(nowUnixSeconds)
     const streak = this.daily.previewStreak(nowUnixSeconds)
     const day = dayInCycle(streak)
-    const oneKillGold = this.stage.goldFor(this.stage.currentStage)
-    const gold = dailyGoldFor(streak, oneKillGold, this.cfg)
+    const gold = dailyGoldFor(streak, this.oneKillGold, this.cfg)
     const relic = dailyGrantsRelic(streak, this.cfg) && this.stage.highestStage >= this.cfg.prestigeUnlockStage
-    return { day, gold, relic, canClaim: can }
+    const pack = dailyGrantsPack(streak, this.cfg)
+    return { day, gold, relic, pack, canClaim: can }
   }
 
   /**
-   * Gold preview for a specific day-in-cycle (1..7), independent of the current
-   * streak - used to render the full 7-day reward grid at once.
+   * Gold preview for a specific day-in-cycle (1..30), independent of the current
+   * streak - used to render the full 30-day reward grid at once.
    */
   dailyGoldForDay(dayInCycleNum: number): BigNumber {
-    const oneKillGold = this.stage.goldFor(this.stage.currentStage)
-    return dailyGoldFor(dayInCycleNum, oneKillGold, this.cfg)
+    return dailyGoldFor(dayInCycleNum, this.oneKillGold, this.cfg)
   }
 
-  /** True if the given day-in-cycle (1..7) additionally grants a Relic. */
+  /** True if the given day-in-cycle (1..30) additionally grants a Relic. */
   dailyGrantsRelicOnDay(dayInCycleNum: number): boolean {
     return dailyGrantsRelic(dayInCycleNum, this.cfg)
   }
 
-  /** Claim today's daily reward. Returns what was granted (canClaim=false if already claimed today). */
+  /** Pack tier the given day-in-cycle (1..30) additionally grants, if any. Preview only - see
+   * claimDaily's comment on why the actual grant is server-side. */
+  dailyGrantsPackOnDay(dayInCycleNum: number): PackType | null {
+    return dailyGrantsPack(dayInCycleNum, this.cfg)
+  }
+
+  /** Claim today's daily reward. Returns what was granted (canClaim=false if already claimed
+   * today). Gold/Relics are granted locally like the rest of this client-authoritative economy;
+   * a pack day's actual pack is NOT fabricated here - it's a scarcer, more gate-kept resource
+   * than gold, so it's granted the same way boss-kill packs already are: server-side, off the
+   * synced dailyStreak, so it can't be replayed by rewinding a local save (see TelegramBot). */
   claimDaily(nowUnixSeconds: number): DailyPreview {
     const preview = this.previewDaily(nowUnixSeconds)
     if (!preview.canClaim) return preview

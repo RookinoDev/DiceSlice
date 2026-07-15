@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 // Point db.mjs at a throwaway file before it opens its connection (module-load time).
 process.env.SQLITE_PATH = join(mkdtempSync(join(tmpdir(), 'sb-db-test-')), 'test.db')
-const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, grantPacksFromSave, listUnopenedPacks, openPack, getCollection, getDust, refineInstances, craftCard, setShowcase } = await import('./db.mjs')
+const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, grantPacksFromSave, grantDailyPackFromSave, listUnopenedPacks, openPack, getCollection, getDust, refineInstances, craftCard, setShowcase } = await import('./db.mjs')
 
 test('getSave returns null for a user who never synced', () => {
   assert.equal(getSave(111), null)
@@ -59,6 +59,33 @@ test('pack grants track boss-kill deltas from save syncs, idempotently', () => {
   assert.equal(packs.length, 5)
   assert.equal(packs[0].type, 'meteor') // deepest 20 -> giants band
   assert.equal(packs[4].type, 'stellar') // deepest 60 -> star band
+})
+
+test('daily pack days (10/20/30) grant idempotently and re-grant after a streak reset', () => {
+  const save = (streak) => ({ version: 1, dailyStreak: streak })
+  assert.equal(grantDailyPackFromSave(1500, save(5)), 0) // no pack day crossed yet
+  assert.equal(grantDailyPackFromSave(1500, save(10)), 1) // crossed day 10
+  assert.equal(grantDailyPackFromSave(1500, save(10)), 0) // same sync value re-synced: nothing new
+  assert.equal(grantDailyPackFromSave(1500, save(25)), 1) // crossed day 20 (days 21-25 have none)
+  assert.equal(grantDailyPackFromSave(1500, save(35)), 1) // crossed day 30 (days 31-35 have none)
+  const packs = listUnopenedPacks(1500)
+  assert.equal(packs.length, 3)
+  assert.deepEqual(
+    packs.map((p) => p.type),
+    ['meteor', 'stellar', 'deepsky'],
+  )
+  // A missed day resets DailyRewardService's streak to 1 - a lower reported streak than we've
+  // already scanned must be treated as a fresh run, not "nothing new".
+  assert.equal(grantDailyPackFromSave(1500, save(10)), 1) // fresh run, crossed day 10 again
+  assert.equal(listUnopenedPacks(1500).length, 4)
+})
+
+test('daily pack days: a single sync spanning multiple pack days grants all of them, including into a second 30-day loop', () => {
+  assert.equal(grantDailyPackFromSave(1600, { version: 1, dailyStreak: 45 }), 4) // days 10, 20, 30, then 10-of-loop-2 (=streak 40)
+  assert.deepEqual(
+    listUnopenedPacks(1600).map((p) => p.type),
+    ['meteor', 'stellar', 'deepsky', 'meteor'],
+  )
 })
 
 test('openPack mints serialed cards once and refuses re-opens and foreign packs', () => {
