@@ -10,7 +10,7 @@ import { CurrencyService } from '../economy/CurrencyService'
 import { DailyRewardService } from '../monetization/DailyRewardService'
 import { dailyGrantsPack, dailyGrantsRelic, dailyGoldFor, dayInCycle } from '../economy/DailyRewardTable'
 import type { PackType } from '../cards/cardsApi'
-import { ArtifactService } from './ArtifactService'
+import { ArtifactService, type ArtifactUnlockContext } from './ArtifactService'
 import { EnemyController } from './EnemyController'
 import { MissionService } from './MissionService'
 import type { Planet } from './Planet'
@@ -81,8 +81,14 @@ export class GameSession {
     this.artifacts = new ArtifactService(buildDefaultArtifacts(cfg), this.prestige.relics)
     this.missions = new MissionService(buildDefaultMissions(), this.wallet)
 
-    // Taps are multiplied by the active tap-damage skill buff x permanent tap artifact.
-    this.taps = new TapController(this.enemy, this.tapUpgrade, () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()))
+    // Taps are multiplied by the active tap-damage skill buff x permanent tap artifact,
+    // with a chance to crit (Voidglass Lens - 0 until unlocked and owned).
+    this.taps = new TapController(
+      this.enemy,
+      this.tapUpgrade,
+      () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()),
+      () => this.artifacts.tapCritChance(),
+    )
 
     this.enemy.onPlanetKilled.on((e) => this.handleKill(e.planet, e.overkill))
     this.enemy.onPlanetKilled.on(() => this.missions.notifyPlanetDestroyed())
@@ -125,7 +131,7 @@ export class GameSession {
       this.onSkillDamage.emit(droneDmg)
     }
 
-    return this.ships.tick(deltaSeconds, this.enemy, this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()))
+    return this.ships.tick(deltaSeconds, this.enemy, this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()), this.artifacts.shipCritChance())
   }
 
   upgradeTapDamage(): boolean {
@@ -135,9 +141,18 @@ export class GameSession {
     return this.ships.buyOrUpgrade(i, this.wallet)
   }
 
-  /** Buy/upgrade a permanent artifact with Relics. False if unaffordable. */
+  /** Context the 3 locked artifacts' unlock conditions read (see ArtifactDefinition.ts). */
+  private get artifactUnlockContext(): ArtifactUnlockContext {
+    return { highestStage: this.stage.highestStage, prestigeCount: this.stats.prestigeCount }
+  }
+  /** Whether artifact i is unlocked yet - UI reads this to show the real row vs. a locked one. */
+  isArtifactUnlocked(i: number): boolean {
+    return this.artifacts.isUnlocked(i, this.artifactUnlockContext)
+  }
+
+  /** Buy/upgrade a permanent artifact with Relics. False if unaffordable or still locked. */
   buyArtifact(i: number): boolean {
-    return this.artifacts.buyOrUpgrade(i)
+    return this.artifacts.buyOrUpgrade(i, this.artifactUnlockContext)
   }
 
   /** Gold value of a single kill at the player's current stage - the shared unit missions and
@@ -159,7 +174,7 @@ export class GameSession {
     return this.ships.buyOrUpgradeMax(i, this.wallet)
   }
   buyArtifactMax(i: number): number {
-    return this.artifacts.buyOrUpgradeMax(i)
+    return this.artifacts.buyOrUpgradeMax(i, this.artifactUnlockContext)
   }
 
   /** Activate a skill: timed buffs start, Meteor deals instant damage. */

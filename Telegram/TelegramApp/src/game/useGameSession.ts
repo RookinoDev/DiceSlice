@@ -40,7 +40,8 @@ function loadAndBegin(cfg: BalanceConfig): Boot {
     if (last > 0 && last <= now) {
       const stage = session.stage.currentStage
       const income = offlineIncomePerSecond(session.ships.fleetDps(), session.stage.hpFor(stage), session.stage.goldFor(stage))
-      const gold = offlineEarningsFromConfig(last, now, income, cfg)
+      // Phoenix Cinders (see #13) - artifact levels are already restored by applySave above.
+      const gold = offlineEarningsFromConfig(last, now, income, cfg).mul(session.artifacts.offlineRewardMultiplier())
       if (gold.gt(BigNumber.Zero)) {
         session.wallet.add(gold)
         offline = { seconds: Math.min(now - last, cfg.offlineCapHours * 3600), gold }

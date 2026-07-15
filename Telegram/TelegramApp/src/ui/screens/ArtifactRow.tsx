@@ -5,38 +5,24 @@ import type { GameSession } from '../../game/gameplay/GameSession'
 import { ArtifactEffect, artifactBonusAt } from '../../game/config/ArtifactDefinition'
 import { hapticAction } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
-import { ArtifactGravityIcon, ArtifactStarChartIcon, ArtifactHeliosIcon } from '../icons'
-
-function effectLabel(effect: ArtifactEffect): string {
-  switch (effect) {
-    case ArtifactEffect.Dps:
-      return 'Fleet DPS'
-    case ArtifactEffect.Gold:
-      return 'Gold Gain'
-    case ArtifactEffect.TapDamage:
-      return 'Tap Damage'
-    default:
-      return ''
-  }
-}
-
-function effectIconBg(effect: ArtifactEffect): string {
-  switch (effect) {
-    case ArtifactEffect.Dps:
-      return 'rgba(67,221,238,0.12)'
-    case ArtifactEffect.Gold:
-      return 'rgba(255,216,115,0.12)'
-    case ArtifactEffect.TapDamage:
-      return 'rgba(255,178,56,0.12)'
-    default:
-      return 'rgba(255,255,255,0.06)'
-  }
-}
+import { ArtifactGravityIcon, ArtifactStarChartIcon, ArtifactHeliosIcon, ArtifactPhoenixIcon, ArtifactVoidglassIcon, ArtifactBeaconIcon } from '../icons'
+import { effectLabel, effectIconBg } from './artifactEffectMeta'
 
 function EffectIcon({ effect }: { effect: ArtifactEffect }) {
-  if (effect === ArtifactEffect.Dps) return <ArtifactGravityIcon />
-  if (effect === ArtifactEffect.Gold) return <ArtifactStarChartIcon />
-  return <ArtifactHeliosIcon />
+  switch (effect) {
+    case ArtifactEffect.Dps:
+      return <ArtifactGravityIcon />
+    case ArtifactEffect.Gold:
+      return <ArtifactStarChartIcon />
+    case ArtifactEffect.OfflineReward:
+      return <ArtifactPhoenixIcon />
+    case ArtifactEffect.TapCritChance:
+      return <ArtifactVoidglassIcon />
+    case ArtifactEffect.ShipCritChance:
+      return <ArtifactBeaconIcon />
+    default:
+      return <ArtifactHeliosIcon />
+  }
 }
 
 interface ArtifactRowProps {

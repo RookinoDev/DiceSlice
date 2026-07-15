@@ -15,6 +15,9 @@ const TAP_COLOR = '#fff299'
 const FLEET_COLOR = '#8cd9ff'
 const SKILL_COLOR = '#ff8c33'
 const REWARD_COLOR = 'var(--palette-success)'
+/** Crit hits (Voidglass Lens / Ancestral Beacon, see #13) get their own color + a longer life
+ * so the flourish actually reads before it fades, distinct from a normal hit number. */
+const CRIT_COLOR = '#c98cff'
 
 export function useFloatingNumbers(session: GameSession) {
   const [entries, setEntries] = useState<FloatingEntry[]>([])
@@ -29,8 +32,12 @@ export function useFloatingNumbers(session: GameSession) {
 
   useEffect(() => {
     const offs = [
-      session.taps.onDamageDealt.on((e) => spawn(e.amount.toShortString(), TAP_COLOR)),
-      session.ships.onShipHit.on((e) => spawn(e.damage.toShortString(), FLEET_COLOR, 0.5)),
+      session.taps.onDamageDealt.on((e) =>
+        e.isCrit ? spawn(`CRIT! ${e.amount.toShortString()}`, CRIT_COLOR, 1.1) : spawn(e.amount.toShortString(), TAP_COLOR),
+      ),
+      session.ships.onShipHit.on((e) =>
+        e.isCrit ? spawn(`CRIT! ${e.damage.toShortString()}`, CRIT_COLOR, 0.8) : spawn(e.damage.toShortString(), FLEET_COLOR, 0.5),
+      ),
       session.onSkillDamage.on((dmg) => spawn(`⚡${dmg.toShortString()}`, SKILL_COLOR, 0.9)),
       session.onReward.on(({ planet, gold }) => {
         const bossSuffix = planet.isBoss ? `  (×${session.stage.bossRewardMultiplier(planet.stage).toFixed(1)} BOSS BONUS)` : ''

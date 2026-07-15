@@ -1,6 +1,6 @@
-// Static "coming soon" placeholder for the 3 designed artifacts (Offline Rewards, Crit Chance,
-// Relics-on-Prestige bonus) that have no backing system in the real game yet - not wired to any
-// purchase logic, per the explicit scope decision to show-but-lock rather than hide or fake them.
+// Placeholder for one of the 3 real-but-locked artifacts (see #13, ArtifactDefinition.ts's
+// unlock conditions) until its unlock condition is met - shows what actually unlocks it instead
+// of a generic "coming soon", since these are now backed by a real system, not a design promise.
 import type { ReactNode } from 'react'
 import { LockIcon } from '../icons'
 
@@ -8,9 +8,10 @@ interface LockedArtifactRowProps {
   icon: ReactNode
   name: string
   effectLabel: string
+  unlockLabel: string
 }
 
-export function LockedArtifactRow({ icon, name, effectLabel }: LockedArtifactRowProps) {
+export function LockedArtifactRow({ icon, name, effectLabel, unlockLabel }: LockedArtifactRowProps) {
   return (
     <div className="artifact-row is-locked">
       <div className="row-icon-wrap" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -22,7 +23,7 @@ export function LockedArtifactRow({ icon, name, effectLabel }: LockedArtifactRow
       </div>
       <div className="row-unlock-req">
         <LockIcon />
-        <div>Coming soon</div>
+        <div>{unlockLabel}</div>
       </div>
     </div>
   )

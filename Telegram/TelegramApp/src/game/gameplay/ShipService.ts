@@ -9,6 +9,8 @@ import { upgradeCostExponential } from '../economy/UpgradeCost'
 import type { EnemyController } from './EnemyController'
 
 const MAX_HITS_PER_SHIP_PER_TICK = 1000 // safety clamp
+/** Flat bonus applied to a critical ship hit's damage (Ancestral Beacon artifact, see #13). */
+export const SHIP_CRIT_DAMAGE_MULTIPLIER = 2
 
 /**
  * Owns the fleet: per-ship levels, buy/upgrade (infinite), cooldown-based hits,
@@ -23,7 +25,7 @@ export class ShipService {
   /** (shipIndex, newLevel) */
   readonly onShipChanged = new Emitter<{ index: number; level: number }>()
   /** (shipIndex, hitDamage) - for floating numbers. */
-  readonly onShipHit = new Emitter<{ index: number; damage: BigNumber }>()
+  readonly onShipHit = new Emitter<{ index: number; damage: BigNumber; isCrit: boolean }>()
 
   constructor(ships: ShipDefinition[], cfg: BalanceConfig) {
     this.ships = ships
@@ -112,8 +114,10 @@ export class ShipService {
     }
   }
 
-  /** Advance all ship cooldowns by deltaSeconds; idle damage with an optional DPS multiplier. */
-  tick(deltaSeconds: number, enemy: EnemyController, dpsMultiplier: BigNumber = BigNumber.One): BigNumber {
+  /** Advance all ship cooldowns by deltaSeconds; idle damage with an optional DPS multiplier
+   * and an optional per-hit crit chance (Ancestral Beacon - 0 until unlocked and owned). Each
+   * hit rolls independently, same real-randomness reasoning as TapController's crit. */
+  tick(deltaSeconds: number, enemy: EnemyController, dpsMultiplier: BigNumber = BigNumber.One, critChance = 0): BigNumber {
     if (!enemy || deltaSeconds <= 0) return BigNumber.Zero
 
     let total = BigNumber.Zero
@@ -126,9 +130,12 @@ export class ShipService {
       let hits = 0
       while (this.timers[i] >= cd && hits < MAX_HITS_PER_SHIP_PER_TICK) {
         this.timers[i] -= cd
-        const hit = this.hitDamage(i).mul(dpsMultiplier)
+        const isCrit = Math.random() < critChance
+        const hit = this.hitDamage(i)
+          .mul(dpsMultiplier)
+          .mul(new BigNumber(isCrit ? SHIP_CRIT_DAMAGE_MULTIPLIER : 1))
         if (enemy.current) enemy.applyDamage(hit)
-        this.onShipHit.emit({ index: i, damage: hit })
+        this.onShipHit.emit({ index: i, damage: hit, isCrit })
         total = total.add(hit)
         hits++
       }
