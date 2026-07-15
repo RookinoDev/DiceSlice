@@ -483,29 +483,43 @@
   font-size: 19px;
   color: var(--palette-text-primary);
 }
-.combat-boss-timer-row {
+.combat-boss-name-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 10px;
 }
-.combat-boss-timer-track {
-  width: 150px;
-  height: 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  overflow: hidden;
-}
-.combat-boss-timer-fill {
-  height: 100%;
-  border-radius: 4px;
-  transition: width 0.2s linear;
-}
-.combat-boss-timer-label {
+/* #2 fix: glass pill, ring border = time remaining (conic-gradient, no separate bar element),
+   translucent + blurred fill instead of the old opaque bar+bold-number row. */
+.combat-boss-timer-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 2px solid transparent;
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 16px;
-  min-width: 34px;
+  font-size: 13px;
+  color: var(--palette-text-primary);
+  /* background-color can't be layered in a multi-background shorthand - a same-color
+     linear-gradient() simulates the solid glass fill while staying a valid background-image,
+     so it can sit alongside the conic-gradient ring (see the identical trick on
+     .card-grid-item's --frame-grad border). */
+  background: linear-gradient(rgba(10, 14, 28, 0.55), rgba(10, 14, 28, 0.55)) padding-box, conic-gradient(var(--palette-gold) var(--boss-pct), rgba(255, 255, 255, 0.14) var(--boss-pct)) border-box;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background-image 0.2s linear;
+}
+.combat-boss-timer-pill--urgent {
+  color: var(--palette-danger);
+  background: linear-gradient(rgba(40, 10, 14, 0.6), rgba(40, 10, 14, 0.6)) padding-box, conic-gradient(var(--palette-danger) var(--boss-pct), rgba(255, 255, 255, 0.14) var(--boss-pct)) border-box;
+  animation: boss-timer-urgent-pulse 0.6s ease-in-out infinite;
+}
+@keyframes boss-timer-urgent-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 
 .combat-sector-caption {
@@ -569,6 +583,9 @@
   .combat-planet-wrap--unstable::before {
     animation: none;
     opacity: 0.6;
+  }
+  .combat-boss-timer-pill--urgent {
+    animation: none;
   }
 }
 
@@ -871,7 +888,11 @@
   position: relative;
   z-index: 1;
   width: 224px;
-  margin-top: 18px;
+  /* #1 fix: now sits directly under the planet's name (was under the planet art) - tighter gap
+     so the two read as one "target status" group instead of the old spacing tuned to separate
+     the bar from the art below it. */
+  margin-top: 4px;
+  margin-bottom: 12px;
   flex-shrink: 0;
 }
 .combat-hp-track {
@@ -941,10 +962,75 @@
   position: relative;
   z-index: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   gap: 11px;
   padding: 14px 0 12px;
+}
+/* #3 fix: name under each icon + a "?" info button, since a hover `title` never shows on touch. */
+.skill-slot-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.skill-slot-name {
+  font-family: var(--font-display);
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  color: var(--palette-text-dim);
+  text-align: center;
+  max-width: 64px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.combat-skills-info-btn {
+  align-self: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--palette-text-dim);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 16px;
+}
+.skill-info-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.skill-info-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.skill-info-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--palette-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.skill-info-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--palette-text-primary);
+}
+.skill-info-desc {
+  font-size: 12px;
+  color: var(--palette-text-secondary);
+  margin-top: 2px;
 }
 
 .skill-slot {
@@ -1938,7 +2024,12 @@
   position: absolute;
   inset: 0;
   z-index: 80;
-  background: radial-gradient(circle at 50% 38%, rgba(67, 221, 238, 0.16), rgba(6, 8, 16, 0.94) 65%);
+  /* #12 fix: the old gradient put its LEAST opaque point (16%) exactly where the centered text
+     sits, and its most opaque point (94%) at the empty edges - backwards, so the readable
+     content was the hardest part to read against whatever's behind it. A solid opaque base
+     layer + the cyan glow as a translucent accent ON TOP of it (fading to transparent, not to
+     another semi-transparent color) keeps the accent while guaranteeing full opacity everywhere. */
+  background: radial-gradient(circle at 50% 38%, rgba(67, 221, 238, 0.2), transparent 55%), #06080f;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2154,8 +2245,9 @@
   }
 }
 
-/* Affordable Upgrade Attention (#54) - a slow, gentle glow breath (deliberately NOT a flash)
-   on the tap-upgrade card while it's actually affordable. */
+/* Affordable Upgrade Attention (#54, extended by #9) - a slow, gentle glow breath (deliberately
+   NOT a flash) plus a small scale change on the tap-upgrade card while it's actually affordable -
+   #9 specifically asked for the button to visibly change size, not just glow. */
 .combat-tap-upgrade.affordable {
   animation: affordable-breathe 2.4s ease-in-out infinite;
 }
@@ -2163,9 +2255,11 @@
   0%,
   100% {
     box-shadow: 0 0 0 rgba(255, 178, 56, 0);
+    transform: scale(1);
   }
   50% {
     box-shadow: 0 0 16px rgba(255, 178, 56, 0.28);
+    transform: scale(1.025);
   }
 }
 

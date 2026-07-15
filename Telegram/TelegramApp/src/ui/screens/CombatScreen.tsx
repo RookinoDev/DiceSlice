@@ -1,6 +1,7 @@
 // Ported from GamePhone.dc.html's Main/Combat screen. Legendary variant intentionally
 // omitted - our real StageManager only has Normal/Boss stages.
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { Sheet } from '../Sheet'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import { buildMainViewModel } from '../../game/ui/MainPresenter'
 import { planetMaxScale } from '../../planet/planetProfiles'
@@ -162,6 +163,10 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   const materialRef = useRef(material)
   materialRef.current = material
   const [hpBarShake, setHpBarShake] = useState(0)
+  // #3 fix: skill icons had no visible name and no touch-friendly way to read their
+  // description (only a `title` tooltip, which mobile/touch never shows) - a small "?" opens
+  // a sheet listing every skill's name+description instead.
+  const [skillInfoOpen, setSkillInfoOpen] = useState(false)
   const prevHpFractionRef = useRef(vm.hpFraction)
   // #5 fix: Drone Swarm applies damage every single tick (GameSession.tick() -> applyDamage()
   // runs every rAF frame while active), so vm.hpFraction changes ~60x/sec during its uptime.
@@ -296,7 +301,9 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vm.bossActive, vm.bossSecondsLeft])
 
-  const bossUrgent = vm.bossSecondsLeft <= 15
+  // #2 fix: tightened from <=15 to <=5 - the pill redesign's ring is legible enough at a
+  // glance that flagging urgency 15s out (a third of most boss timers) read as alarmist.
+  const bossUrgent = vm.bossSecondsLeft <= 5
   const bossTimePct = Math.max(0, Math.min(100, (vm.bossSecondsLeft / s.bossTimerSeconds) * 100))
   const hpColor = vm.isBoss ? 'var(--palette-danger)' : 'var(--palette-cyan)'
 
@@ -315,15 +322,12 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         {vm.bossActive ? (
           <div className="combat-boss-badge">
             <div className="combat-boss-label">BOSS ENCOUNTER</div>
-            <div className="combat-boss-name">{vm.zoneLabel || vm.stageLabel}</div>
-            <div className="combat-boss-timer-row">
-              <div className="combat-boss-timer-track">
-                <div
-                  className="combat-boss-timer-fill"
-                  style={{ width: `${bossTimePct}%`, background: bossUrgent ? 'var(--palette-danger)' : 'var(--palette-gold)' }}
-                />
-              </div>
-              <div className="combat-boss-timer-label" style={{ color: bossUrgent ? 'var(--palette-danger)' : 'var(--palette-gold)' }}>
+            <div className="combat-boss-name-row">
+              <div className="combat-boss-name">{vm.zoneLabel || vm.stageLabel}</div>
+              {/* #2 fix: a glass pill with a conic-gradient ring for "time left at a glance"
+                  replaces the old bar+bold-number row, and sits beside the name instead of
+                  stacked under it. */}
+              <div className={`combat-boss-timer-pill ${bossUrgent ? 'combat-boss-timer-pill--urgent' : ''}`} style={{ '--boss-pct': `${bossTimePct}%` } as CSSProperties}>
                 0:{String(vm.bossSecondsLeft).padStart(2, '0')}
               </div>
             </div>
@@ -334,6 +338,27 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       </div>
 
       <div className="combat-target-name">{target.name}</div>
+
+      {/* #1 fix: HP bar now sits right under the planet's name, not below the planet art. */}
+      <div key={hpBarShake} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
+        <div className="combat-hp-track">
+          <div
+            ref={(el) => {
+              hpFillRef.current = el
+              // Correct width on first paint - the rAF loop only starts writing from its
+              // next frame, and by then hpDisplayedRef already matches (both init to
+              // vm.hpFraction at mount), so this is just avoiding a one-frame flash to 0%.
+              if (el) el.style.width = `${hpDisplayedRef.current * 100}%`
+            }}
+            className="combat-hp-fill"
+            style={{ background: hpColor }}
+          />
+        </div>
+        <div className="combat-hp-caption-row">
+          <span className="combat-hp-caption">HULL INTEGRITY</span>
+          <span className="combat-hp-label">{vm.hpText}</span>
+        </div>
+      </div>
 
       <div className={`combat-planet-wrap ${unstable ? 'combat-planet-wrap--unstable' : ''}`}>
         {tapStreak >= 5 && (
@@ -382,26 +407,6 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         </button>
       </div>
 
-      <div key={hpBarShake} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
-        <div className="combat-hp-track">
-          <div
-            ref={(el) => {
-              hpFillRef.current = el
-              // Correct width on first paint - the rAF loop only starts writing from its
-              // next frame, and by then hpDisplayedRef already matches (both init to
-              // vm.hpFraction at mount), so this is just avoiding a one-frame flash to 0%.
-              if (el) el.style.width = `${hpDisplayedRef.current * 100}%`
-            }}
-            className="combat-hp-fill"
-            style={{ background: hpColor }}
-          />
-        </div>
-        <div className="combat-hp-caption-row">
-          <span className="combat-hp-caption">HULL INTEGRITY</span>
-          <span className="combat-hp-label">{vm.hpText}</span>
-        </div>
-      </div>
-
       <div className="combat-skills">
         {vm.skills.map((sk) => {
           const Icon = SKILL_ICONS[sk.type] ?? SkillOverdriveIcon
@@ -414,26 +419,52 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
           // cooldown-style wipe/number during actual cooldown; active gets its own bright glow.
           const glyphColor = sk.ready || sk.active ? '#F4F6FB' : '#4A5170'
           return (
-            <button
-              key={sk.type}
-              className={`skill-slot ${sk.ready ? 'ready' : ''} ${sk.active ? 'skill-slot--active' : ''}`}
-              disabled={!sk.ready}
-              onClick={() => {
-                if (s.activateSkill(sk.type)) {
-                  audio.skill()
-                  hapticAction()
-                  onSkillActivated(sk.label)
-                }
-              }}
-              title={sk.description}
-            >
-              <Icon color={glyphColor} />
-              {!sk.active && <div className="skill-cooldown-overlay" style={cooldownWipeStyle(sk.secondsLeft, sk.totalSeconds)} />}
-              {!sk.active && sk.secondsLeft > 0 && !sk.ready && <div className="skill-cooldown-label">{sk.secondsLeft}</div>}
-            </button>
+            <div key={sk.type} className="skill-slot-wrap">
+              <button
+                className={`skill-slot ${sk.ready ? 'ready' : ''} ${sk.active ? 'skill-slot--active' : ''}`}
+                disabled={!sk.ready}
+                onClick={() => {
+                  if (s.activateSkill(sk.type)) {
+                    audio.skill()
+                    hapticAction()
+                    onSkillActivated(sk.label)
+                  }
+                }}
+                title={sk.description}
+              >
+                <Icon color={glyphColor} />
+                {!sk.active && <div className="skill-cooldown-overlay" style={cooldownWipeStyle(sk.secondsLeft, sk.totalSeconds)} />}
+                {!sk.active && sk.secondsLeft > 0 && !sk.ready && <div className="skill-cooldown-label">{sk.secondsLeft}</div>}
+              </button>
+              {/* #3 fix: a short name under each icon - previously only readable via a
+                  hover `title`, which never shows on touch. */}
+              <div className="skill-slot-name">{sk.label}</div>
+            </div>
           )
         })}
+        <button className="combat-skills-info-btn" onClick={() => setSkillInfoOpen(true)} aria-label="Powerup descriptions">
+          ?
+        </button>
       </div>
+
+      <Sheet open={skillInfoOpen} onClose={() => setSkillInfoOpen(false)} title="POWERUPS">
+        <div className="skill-info-list">
+          {vm.skills.map((sk) => {
+            const InfoIcon = SKILL_ICONS[sk.type] ?? SkillOverdriveIcon
+            return (
+              <div key={sk.type} className="skill-info-row">
+                <div className="skill-info-icon">
+                  <InfoIcon color="#F4F6FB" />
+                </div>
+                <div>
+                  <div className="skill-info-name">{sk.label}</div>
+                  <div className="skill-info-desc">{sk.description}</div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </Sheet>
 
       {recordText && (
         <div key={recordText} className="record-hit-banner">
