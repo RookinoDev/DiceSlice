@@ -883,7 +883,11 @@
 .combat-hp-fill {
   height: 100%;
   border-radius: 5px;
-  transition: width 0.15s linear;
+  /* #5 fix: width is now smoothed by a persistent rAF exponential chase in CombatScreen.tsx
+     (see HP_FILL_CATCH_UP_RATE), not a CSS transition - a 0.15s transition retargeted every
+     frame during continuous drone-swarm damage never caught up to the real value, so the bar
+     visibly lagged/stalled behind the (correctly updating) HP number. A CSS transition here
+     would now just compound against the JS-side smoothing, so it's gone rather than tuned. */
 }
 .combat-hp-caption-row {
   display: flex;
@@ -959,6 +963,22 @@
 }
 .skill-slot.ready {
   border-color: rgba(255, 178, 56, 0.5);
+}
+/* #4 fix: a currently-active buff (Overdrive etc.) reads as "on and boosting you" - a bright
+   pulsing ring - instead of the dark cooldown-wipe treatment meant for "recharging". */
+.skill-slot--active {
+  border-color: rgba(67, 221, 238, 0.75);
+  box-shadow: 0 0 12px rgba(67, 221, 238, 0.55);
+  animation: skill-active-pulse 1.1s ease-in-out infinite;
+}
+@keyframes skill-active-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(67, 221, 238, 0.45);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(67, 221, 238, 0.85);
+  }
 }
 .skill-slot:active {
   transform: scale(0.92);
@@ -2207,7 +2227,8 @@
 @media (prefers-reduced-motion: reduce) {
   .dot-notification,
   .dot-daily,
-  .combat-tap-upgrade.affordable {
+  .combat-tap-upgrade.affordable,
+  .skill-slot--active {
     animation: none;
   }
   .topbar-icon-btn,
@@ -2832,13 +2853,37 @@
 }
 
 /* Rare-card-specific extras: legendary edge-chase, ultra idle sparkles. */
+/* #19 fix: this element has transform-style: preserve-3d (it's the flip target), so it must
+   NEVER get an animated `filter` - filter on a preserve-3d element (or any of its ancestors)
+   forces the browser to flatten that subtree into a 2D bitmap to composite it, which is exactly
+   why legendary/ultra cards used to show a mirrored front instead of flipping to the back:
+   card-edge-pulse animated filter:brightness() right here. Box-shadow doesn't force that
+   flattening, so the pulse is reproduced by animating the glow's spread/opacity instead. */
 .card-detail-flip--legendary {
   box-shadow: 0 0 26px color-mix(in srgb, var(--rarity-color) 55%, transparent);
-  animation: card-edge-pulse 2.2s ease-in-out infinite;
+  animation: card-glow-pulse-legendary 2.2s ease-in-out infinite;
 }
 .card-detail-flip--ultra {
   box-shadow: 0 0 32px color-mix(in srgb, var(--rarity-color) 70%, transparent);
-  animation: card-edge-pulse 1.6s ease-in-out infinite;
+  animation: card-glow-pulse-ultra 1.6s ease-in-out infinite;
+}
+@keyframes card-glow-pulse-legendary {
+  0%,
+  100% {
+    box-shadow: 0 0 22px color-mix(in srgb, var(--rarity-color) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 32px color-mix(in srgb, var(--rarity-color) 68%, transparent);
+  }
+}
+@keyframes card-glow-pulse-ultra {
+  0%,
+  100% {
+    box-shadow: 0 0 26px color-mix(in srgb, var(--rarity-color) 55%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 40px color-mix(in srgb, var(--rarity-color) 85%, transparent);
+  }
 }
 .card-detail-flip--ultra .card-detail-face--front::before {
   content: '✦ ✧ ✦';
@@ -2885,12 +2930,17 @@
 }
 .card-detail-flip {
   position: relative;
-  width: 100%;
   /* Taller than a standard 0.7 TCG ratio - the front face now carries art + stat table +
      mint row + flavor quote in one view (Card Anatomy v2), so it needs the extra height to
-     give the art window real presence instead of being squeezed to a sliver. */
+     give the art window real presence instead of being squeezed to a sliver.
+     #16 fix: with only width capped (100%/340px) and height purely aspect-ratio-derived, a
+     0.58 ratio at 340px wide is 586px tall - taller than .sheet-panel's own 80vh cap minus its
+     header/padding on anything but a tall phone, forcing a scroll to see the rest of the card.
+     Capping width by 36vh too (36vh * (1/0.58) ~= 62vh tall at most) means the card shrinks to
+     fit short viewports instead of overflowing, while still hitting the full 340px/586px size
+     on any screen tall enough to afford it. */
+  width: min(100%, 340px, 36vh);
   aspect-ratio: 0.58;
-  max-width: 340px;
   margin: 0 auto;
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -2946,8 +2996,12 @@
   border-radius: 10px;
 }
 .card-detail-fav-btn {
+  /* #22 fix: top-right used to collide with the variant/rarity tag that now lives in
+     .card-detail-top-row (added by the Card Anatomy v2 redesign) - both absolutely positioned
+     at the same corner. Bottom-right is clear: .card-detail-bottom-row's content is centered,
+     never reaching the corners. */
   position: absolute;
-  top: 14px;
+  bottom: 14px;
   right: 14px;
   width: 30px;
   height: 30px;

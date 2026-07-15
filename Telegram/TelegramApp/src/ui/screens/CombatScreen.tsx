@@ -38,6 +38,8 @@ const UPGRADE_ESCALATION_GAP_MS = 500
 const INSTABILITY_THRESHOLD = 0.25
 /** A single hit removing more than this fraction of max HP shakes the living boss health bar. */
 const HP_BAR_SHAKE_DROP = 0.04
+/** Per-second exponential catch-up rate for the HP fill bar (see #5 fix, same idea as useCountUp's CATCH_UP_RATE). */
+const HP_FILL_CATCH_UP_RATE = 10
 /** Rare-roll odds for the Secret Rare Destruction variant - cosmetic lottery, not gameplay. */
 const SECRET_DESTRUCTION_CHANCE = 1 / 300
 
@@ -161,6 +163,18 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   materialRef.current = material
   const [hpBarShake, setHpBarShake] = useState(0)
   const prevHpFractionRef = useRef(vm.hpFraction)
+  // #5 fix: Drone Swarm applies damage every single tick (GameSession.tick() -> applyDamage()
+  // runs every rAF frame while active), so vm.hpFraction changes ~60x/sec during its uptime.
+  // The bar's width used to be React-driven straight from vm.hpFraction with a CSS
+  // `transition: width 0.15s linear` for the nice slide-on-hit feel - fine for a single discrete
+  // tap hit, but a 150ms transition retargeted every ~16ms never gets anywhere near where it's
+  // chasing, so the fill visibly lagged/stalled behind the real (correctly-updating) HP number.
+  // Same fix as useCountUp.ts: own the smoothing with a persistent rAF exponential chase and
+  // write width directly to the DOM, instead of fighting a CSS transition with a moving target.
+  const hpFillRef = useRef<HTMLDivElement>(null)
+  const hpTargetRef = useRef(vm.hpFraction)
+  const hpDisplayedRef = useRef(vm.hpFraction)
+  hpTargetRef.current = vm.hpFraction
   // Planetary Instability (#16, #45, #70): a boss below the hull threshold gets small
   // periodic jitter + a core-pulse glow, driven off the real hpFraction01() - no fake danger.
   const unstable = vm.isBoss && vm.hpFraction > 0 && vm.hpFraction < INSTABILITY_THRESHOLD
@@ -226,6 +240,28 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
     if (vm.isBoss && drop > HP_BAR_SHAKE_DROP) setHpBarShake((n) => n + 1)
     prevHpFractionRef.current = vm.hpFraction
   }, [vm.hpFraction, vm.isBoss])
+
+  // HP bar fill: persistent rAF chase (see #5 fix comment above) instead of a CSS transition -
+  // one loop for the life of the screen, not restarted per render/target change.
+  useEffect(() => {
+    let raf = 0
+    let last = 0
+    const step = (now: number) => {
+      const dt = last ? Math.min(0.1, (now - last) / 1000) : 0
+      last = now
+      const from = hpDisplayedRef.current
+      const to = hpTargetRef.current
+      const diff = to - from
+      if (dt > 0 && diff !== 0) {
+        const closeEnough = Math.abs(diff) < 0.001
+        hpDisplayedRef.current = closeEnough ? to : from + diff * (1 - Math.exp(-HP_FILL_CATCH_UP_RATE * dt))
+      }
+      if (hpFillRef.current) hpFillRef.current.style.width = `${hpDisplayedRef.current * 100}%`
+      raf = requestAnimationFrame(step)
+    }
+    raf = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(raf)
+  }, [])
 
   useEffect(() => {
     if (!unstable) return
@@ -348,7 +384,17 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
 
       <div key={hpBarShake} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
         <div className="combat-hp-track">
-          <div className="combat-hp-fill" style={{ width: `${vm.hpFraction * 100}%`, background: hpColor }} />
+          <div
+            ref={(el) => {
+              hpFillRef.current = el
+              // Correct width on first paint - the rAF loop only starts writing from its
+              // next frame, and by then hpDisplayedRef already matches (both init to
+              // vm.hpFraction at mount), so this is just avoiding a one-frame flash to 0%.
+              if (el) el.style.width = `${hpDisplayedRef.current * 100}%`
+            }}
+            className="combat-hp-fill"
+            style={{ background: hpColor }}
+          />
         </div>
         <div className="combat-hp-caption-row">
           <span className="combat-hp-caption">HULL INTEGRITY</span>
@@ -359,11 +405,18 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       <div className="combat-skills">
         {vm.skills.map((sk) => {
           const Icon = SKILL_ICONS[sk.type] ?? SkillOverdriveIcon
-          const glyphColor = sk.ready ? '#F4F6FB' : '#4A5170'
+          // #4 fix: secondsLeft/totalSeconds double as BOTH "buff time remaining" (while active)
+          // and "time until usable again" (while on cooldown) - see MainPresenter.ts's ternary.
+          // The dark cooldown-wipe + countdown number were rendering unconditionally whenever
+          // !ready, which is true through the ENTIRE active+cooldown span, so an active buff
+          // showed the same "mostly-dark circle with a number floating in the middle" chrome as
+          // a recharging, unusable skill - reading as a stuck/frozen icon. Only show the
+          // cooldown-style wipe/number during actual cooldown; active gets its own bright glow.
+          const glyphColor = sk.ready || sk.active ? '#F4F6FB' : '#4A5170'
           return (
             <button
               key={sk.type}
-              className={`skill-slot ${sk.ready ? 'ready' : ''}`}
+              className={`skill-slot ${sk.ready ? 'ready' : ''} ${sk.active ? 'skill-slot--active' : ''}`}
               disabled={!sk.ready}
               onClick={() => {
                 if (s.activateSkill(sk.type)) {
@@ -375,8 +428,8 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
               title={sk.description}
             >
               <Icon color={glyphColor} />
-              <div className="skill-cooldown-overlay" style={cooldownWipeStyle(sk.secondsLeft, sk.totalSeconds)} />
-              {sk.secondsLeft > 0 && !sk.ready && <div className="skill-cooldown-label">{sk.secondsLeft}</div>}
+              {!sk.active && <div className="skill-cooldown-overlay" style={cooldownWipeStyle(sk.secondsLeft, sk.totalSeconds)} />}
+              {!sk.active && sk.secondsLeft > 0 && !sk.ready && <div className="skill-cooldown-label">{sk.secondsLeft}</div>}
             </button>
           )
         })}
