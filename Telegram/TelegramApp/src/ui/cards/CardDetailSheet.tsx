@@ -26,6 +26,9 @@ interface CardDetailSheetProps {
   open: boolean
   onClose: () => void
   onExplore: () => void
+  /** When there's more than one card to browse, NEXT advances within this list (wraps around). */
+  onNext?: () => void
+  hasNext?: boolean
 }
 
 const DRAG_TILT_MAX_DEG = 18
@@ -45,7 +48,7 @@ interface SpringState {
 
 const REST: SpringState = { rx: 0, ry: 0, rz: 0, scale: 1 }
 
-export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardDetailSheetProps) {
+export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext, hasNext }: CardDetailSheetProps) {
   const [flipped, setFlipped] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -61,6 +64,34 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
   // in CSS - one physical model, two readers.
   const holoLightRef = useRef<HoloLightVector>({ x: 0, y: 0 })
   const { containerRef: particlesRef, spawn: spawnParticle } = useParticles()
+  // #23 fix: the holo shader covers the whole card frame, not the planet render - these track
+  // the art window's live rect (relative to the front face) so a CSS mask can punch a hole over
+  // it. Re-measured on any resize of either box, not just on card change.
+  const frontFaceRef = useRef<HTMLDivElement>(null)
+  const artWrapRef = useRef<HTMLDivElement>(null)
+  const [holoHole, setHoloHole] = useState<{ left: string; top: string; width: string; height: string } | null>(null)
+
+  useEffect(() => {
+    const face = frontFaceRef.current
+    const wrap = artWrapRef.current
+    if (!face || !wrap) return
+    const measure = () => {
+      const fr = face.getBoundingClientRect()
+      const wr = wrap.getBoundingClientRect()
+      if (fr.width === 0 || fr.height === 0) return
+      setHoloHole({
+        left: `${((wr.left - fr.left) / fr.width) * 100}%`,
+        top: `${((wr.top - fr.top) / fr.height) * 100}%`,
+        width: `${(wr.width / fr.width) * 100}%`,
+        height: `${(wr.height / fr.height) * 100}%`,
+      })
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(face)
+    ro.observe(wrap)
+    return () => ro.disconnect()
+  }, [card?.id])
 
   // The spring loop: runs only while the sheet is open.
   useEffect(() => {
@@ -246,28 +277,35 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
             className={`card-detail-flip cf-${card.rarity} ${flipped ? 'card-detail-flip--back' : ''} ${variantClass} ${rarityClass}`}
             style={{ '--rarity-color': color } as CSSProperties}
           >
-            <div className="card-detail-face card-detail-face--front">
+            <div className="card-detail-face card-detail-face--front" ref={frontFaceRef}>
               <div className="card-detail-top-row">
                 <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
                 {!locked && owned && <div className="card-detail-rarity-tag">{VARIANT_LABEL[owned.bestVariant].toUpperCase()}</div>}
               </div>
               {locked ? (
-                <div className="card-detail-art-wrap">
+                <div className="card-detail-art-wrap" ref={artWrapRef}>
                   <div className="card-art card-art-ghost card-detail-art" />
                 </div>
               ) : (
-                <div className="card-detail-art-wrap">
-                  <div className="card-detail-art-rings">
-                    <div className="card-detail-art-ring card-detail-art-ring--1" />
-                    <div className="card-detail-art-ring card-detail-art-ring--2" />
-                    <div className="card-detail-art-ring card-detail-art-ring--3" />
-                  </div>
+                <div className="card-detail-art-wrap" ref={artWrapRef}>
                   <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
-                  {owned && variantRank(owned.bestVariant) >= variantRank('holo') && (
-                    <Suspense fallback={null}>
-                      <HoloOverlay rarity={card.rarity} lightRef={holoLightRef} className="card-detail-holo-overlay" />
-                    </Suspense>
-                  )}
+                </div>
+              )}
+              {!locked && owned && variantRank(owned.bestVariant) >= variantRank('holo') && holoHole && (
+                <div
+                  className="card-detail-holo-mask"
+                  style={
+                    {
+                      '--holo-hole-left': holoHole.left,
+                      '--holo-hole-top': holoHole.top,
+                      '--holo-hole-width': holoHole.width,
+                      '--holo-hole-height': holoHole.height,
+                    } as CSSProperties
+                  }
+                >
+                  <Suspense fallback={null}>
+                    <HoloOverlay rarity={card.rarity} lightRef={holoLightRef} className="card-detail-holo-overlay" />
+                  </Suspense>
                 </div>
               )}
               {!locked && (
@@ -355,6 +393,31 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore }: CardD
           </div>
         </div>
         <ParticleLayer containerRef={particlesRef} />
+      </div>
+      <div className="card-detail-nav-row">
+        <button
+          className="card-detail-nav-btn card-detail-nav-btn--close"
+          onClick={() => {
+            audio.click()
+            hapticTap()
+            setFlipped(false)
+            onClose()
+          }}
+        >
+          CLOSE
+        </button>
+        {hasNext && onNext && (
+          <button
+            className="card-detail-nav-btn card-detail-nav-btn--next"
+            onClick={() => {
+              audio.click()
+              hapticTap()
+              onNext()
+            }}
+          >
+            NEXT
+          </button>
+        )}
       </div>
     </Sheet>
   )

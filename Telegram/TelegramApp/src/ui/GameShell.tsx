@@ -71,6 +71,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [myShowcase, setMyShowcase] = useState<ShowcaseEntry[]>([])
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
   const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null)
+  // The filtered/sorted list CardsScreen was showing when the card was opened - lets the
+  // detail sheet's NEXT button browse without needing to re-derive filters up here.
+  const [selectedCardList, setSelectedCardList] = useState<CardDefinition[]>([])
   const [objectViewerOpen, setObjectViewerOpen] = useState(false)
   const [packSheetOpen, setPackSheetOpen] = useState(false)
   const [toastText, setToastText] = useState<string | null>(null)
@@ -382,7 +385,16 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         {tab === 'artifacts' && vm.showArtifacts && <ArtifactsScreen session={session} onToast={showToast} />}
         {tab === 'prestige' && vm.showPrestige && <PrestigeScreen session={session} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} />}
         {tab === 'cards' && showCards && (
-          <CardsScreen ownedCards={ownedCards} dust={dust} pendingPackCount={pendingPacks.length} onSelectCard={setSelectedCard} onOpenPacks={() => setPackSheetOpen(true)} />
+          <CardsScreen
+            ownedCards={ownedCards}
+            dust={dust}
+            pendingPackCount={pendingPacks.length}
+            onSelectCard={(card, list) => {
+              setSelectedCard(card)
+              setSelectedCardList(list)
+            }}
+            onOpenPacks={() => setPackSheetOpen(true)}
+          />
         )}
       </div>
 
@@ -410,7 +422,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         ownedCards={ownedCards}
         showcase={myShowcase}
         onShowcaseChange={setMyShowcase}
-        onInspectCard={setSelectedCard}
+        onInspectCard={(card) => {
+          setSelectedCard(card)
+          setSelectedCardList([])
+        }}
         onClose={() => {
           setProfileOpen(false)
           setVisitorProfile(null)
@@ -424,6 +439,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         open={selectedCard !== null}
         onClose={() => setSelectedCard(null)}
         onExplore={() => setObjectViewerOpen(true)}
+        hasNext={selectedCardList.length > 1}
+        onNext={() => {
+          if (!selectedCard) return
+          const idx = selectedCardList.findIndex((c) => c.id === selectedCard.id)
+          if (idx === -1) return
+          setSelectedCard(selectedCardList[(idx + 1) % selectedCardList.length])
+        }}
       />
       <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
       <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={() => setPackSheetOpen(false)} />

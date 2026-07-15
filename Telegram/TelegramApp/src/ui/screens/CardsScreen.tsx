@@ -7,7 +7,6 @@ import { cardById, FULL_CATALOG } from '../../game/cards/generatedCards'
 import type { OwnedCard } from '../../game/cards/cardsApi'
 import { summarizeCollection, type OwnedSummary } from '../../game/cards/collectionSummary'
 import { loadFavorites, loadRecentViews } from '../../game/cards/cardPrefs'
-import { VARIANT_LABEL, VARIANT_ORDER, type CardVariant } from '../../game/cards/variants'
 import { CardGridItem } from '../cards/CardGridItem'
 
 const COLUMNS = 3
@@ -17,17 +16,6 @@ const OVERSCAN_ROWS = 3
 
 const RARITY_FILTERS: Array<CardRarity | 'all'> = ['all', 'common', 'uncommon', 'rare', 'epic', 'legendary', 'ultra']
 
-/** Coarse object-type groups derived from the classification string (data-driven, no per-card table). */
-const TYPE_FILTERS: Array<{ id: string; label: string; match: (classification: string) => boolean }> = [
-  { id: 'all', label: 'ALL', match: () => true },
-  { id: 'planet', label: 'PLANETS', match: (c) => /planet$/i.test(c) && !/exoplanet/i.test(c) },
-  { id: 'moon', label: 'MOONS', match: (c) => /satellite/i.test(c) },
-  { id: 'exoplanet', label: 'EXOPLANETS', match: (c) => /exoplanet/i.test(c) },
-  { id: 'smallbody', label: 'SMALL BODIES', match: (c) => /asteroid|comet|dwarf planet/i.test(c) },
-  { id: 'star', label: 'STARS', match: (c) => /star/i.test(c) },
-  { id: 'deepsky', label: 'DEEP SKY', match: (c) => /nebula|galaxy|black hole/i.test(c) },
-]
-
 type SortMode = 'number' | 'rarity' | 'newest' | 'name' | 'count' | 'recent'
 const SORT_LABEL: Record<SortMode, string> = { number: 'Nº', rarity: 'RARITY', newest: 'NEWEST', name: 'A-Z', count: 'DUPES', recent: 'RECENT' }
 const RARITY_RANK: Record<CardRarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, ultra: 5 }
@@ -36,7 +24,7 @@ interface CardsScreenProps {
   ownedCards: OwnedCard[]
   dust: number
   pendingPackCount: number
-  onSelectCard: (card: CardDefinition) => void
+  onSelectCard: (card: CardDefinition, list: CardDefinition[]) => void
   onOpenPacks: () => void
 }
 
@@ -48,10 +36,6 @@ interface Entry {
 export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, onOpenPacks }: CardsScreenProps) {
   const [query, setQuery] = useState('')
   const [rarity, setRarity] = useState<CardRarity | 'all'>('all')
-  const [typeId, setTypeId] = useState('all')
-  const [variant, setVariant] = useState<CardVariant | 'all'>('all')
-  const [favoritesOnly, setFavoritesOnly] = useState(false)
-  const [dupesOnly, setDupesOnly] = useState(false)
   const [sort, setSort] = useState<SortMode>('number')
 
   // Read fresh every render (not memoized): favoriting happens in a sibling sheet
@@ -66,17 +50,12 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
 
   const entries = useMemo<Entry[]>(() => {
     const q = query.trim().toLowerCase()
-    const typeMatch = TYPE_FILTERS.find((t) => t.id === typeId)?.match ?? (() => true)
     const out: Entry[] = []
     for (const [cardId, owned] of summary) {
       const card = cardById(cardId)
       if (!card) continue // unknown id from a newer catalog version - hide rather than crash
       if (q && !card.name.toLowerCase().includes(q)) continue
       if (rarity !== 'all' && card.rarity !== rarity) continue
-      if (!typeMatch(card.classification)) continue
-      if (variant !== 'all' && !owned.variants[variant]) continue
-      if (favoritesOnly && !favorites.has(cardId)) continue
-      if (dupesOnly && owned.count < 2) continue
       out.push({ card, owned })
     }
     switch (sort) {
@@ -100,7 +79,7 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
         break
     }
     return out
-  }, [summary, query, rarity, typeId, variant, favoritesOnly, dupesOnly, sort, favorites, recentRank])
+  }, [summary, query, rarity, sort, recentRank])
 
   // --- Virtualization: fixed-height rows of COLUMNS cells inside an internal scroller.
   // Only visible rows (+overscan) mount; React key = rowIndex reuses the same row elements
@@ -140,11 +119,13 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
             {summary.size} / {FULL_CATALOG.length} · {ownedCards.length} cards · ✦ {dust.toLocaleString()} dust
           </div>
         </div>
-        {pendingPackCount > 0 && (
-          <button className="cards-open-packs-btn" onClick={onOpenPacks}>
-            OPEN PACKS <span className="cards-open-packs-count">{pendingPackCount}</span>
-          </button>
-        )}
+        <button
+          className={`cards-open-packs-btn ${pendingPackCount === 0 ? 'cards-open-packs-btn--disabled' : ''}`}
+          disabled={pendingPackCount === 0}
+          onClick={onOpenPacks}
+        >
+          OPEN PACKS <span className="cards-open-packs-count">{pendingPackCount}</span>
+        </button>
       </div>
 
       <input className="cards-search" type="search" placeholder="Search your cards..." value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -157,27 +138,6 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
         ))}
       </div>
       <div className="cards-filter-row">
-        {TYPE_FILTERS.map((t) => (
-          <button key={t.id} className={chip(typeId === t.id)} onClick={() => setTypeId(t.id)}>
-            {t.label}
-          </button>
-        ))}
-      </div>
-      <div className="cards-filter-row">
-        <button className={chip(variant === 'all')} onClick={() => setVariant('all')}>
-          ANY VARIANT
-        </button>
-        {VARIANT_ORDER.filter((v) => v !== 'standard').map((v) => (
-          <button key={v} className={chip(variant === v)} onClick={() => setVariant(v)}>
-            {VARIANT_LABEL[v].toUpperCase()}
-          </button>
-        ))}
-        <button className={chip(favoritesOnly)} onClick={() => setFavoritesOnly((f) => !f)}>
-          ♥ FAVS
-        </button>
-        <button className={chip(dupesOnly)} onClick={() => setDupesOnly((d) => !d)}>
-          DUPES
-        </button>
         {(['number', 'rarity', 'newest', 'recent', 'name', 'count'] as SortMode[]).map((s) => (
           <button key={s} className={chip(sort === s)} onClick={() => setSort(s)}>
             {SORT_LABEL[s]}
@@ -201,7 +161,7 @@ export function CardsScreen({ ownedCards, dust, pendingPackCount, onSelectCard, 
                     owned={owned}
                     setTotal={FULL_CATALOG.length}
                     favorite={favorites.has(card.id)}
-                    onSelect={() => onSelectCard(card)}
+                    onSelect={() => onSelectCard(card, entries.map((e) => e.card))}
                   />
                 ))}
               </div>
