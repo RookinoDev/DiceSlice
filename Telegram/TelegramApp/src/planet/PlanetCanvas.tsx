@@ -1,7 +1,7 @@
 // Three.js replacement for PixelPlanetGenerator's quad-stack + orthographic camera approach
 // (Assets/PixelPlanets/Scripts/PixelPlanetGenerator.cs MakeLayer/MakeMat/Update).
 import { useEffect, useRef } from 'react'
-import { WebGLRenderer, WebGLRenderTarget, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, Vector4, DoubleSide, NoBlending, type Material, type IUniform } from 'three'
+import { WebGLRenderer, WebGLRenderTarget, Scene, OrthographicCamera, PlaneGeometry, Mesh, ShaderMaterial, Vector2, Vector4, DoubleSide, NoBlending, AdditiveBlending, NormalBlending, type Material, type IUniform } from 'three'
 import { planetVertexShader } from './glsl/common'
 import { outlinePostFragmentShader, outlinePostVertexShader } from './shaders/outlinePost'
 import { noAtmosphereFragmentShader } from './shaders/noAtmosphere'
@@ -15,6 +15,7 @@ import { lavaRiversFragmentShader } from './shaders/lavaRivers'
 import { asteroidFragmentShader } from './shaders/asteroid'
 import { planetCracksFragmentShader, MAX_CRACK_IMPACTS } from './shaders/planetCracks'
 import { featureDecalFragmentShader, MAX_FEATURES } from './shaders/featureDecal'
+import { rimAtmosphereFragmentShader } from './shaders/rimAtmosphere'
 import { RING_SCALE, planetMaxScale, type PlanetProfile } from './planetProfiles'
 import type { RGB } from './themes'
 
@@ -44,6 +45,9 @@ interface LayerSpec {
   isStorm?: boolean
   /** Cracks overlay (#65): receives recorded impact points via the impulse API. */
   isCracks?: boolean
+  /** Atmosphere rim glow: additive so it brightens what's behind it like real light scattering,
+   * instead of alpha-compositing a flat color over it. */
+  isAdditive?: boolean
 }
 
 function buildLayers(profile: PlanetProfile): LayerSpec[] {
@@ -347,6 +351,59 @@ function buildFeatureLayer(profile: PlanetProfile, baseLayers: LayerSpec[]): Lay
   }
 }
 
+// Atmospheric fresnel rim (docs/CARD_SYSTEM_PLAN.md §1's "Avoiding repetition" table): a soft
+// glow hugging the limb, colored per object - but derived automatically from each profile's own
+// light surface tone rather than hand-authored per body, since the roster is ~1100+ objects.
+// This happens to reproduce the plan's own worked examples for free: Earth's water tone is
+// already cyan-blue, Mars' ground is already a dusty rust-pink, Titan's haze is already orange -
+// the rim just borrows that same color, brightened toward white the way real scattered light
+// reads paler than the surface under it. Airless bodies (bare rock/asteroids) get no rim at all.
+const ATMOSPHERE_STRENGTH: Partial<Record<PlanetProfile['kind'], number>> = {
+  terranWet: 0.55,
+  gasGiant: 0.4,
+  iceWorld: 0.45,
+  lavaWorld: 0.5,
+  nebula: 0.3,
+}
+
+function atmosphereBaseColor(profile: PlanetProfile): RGB | null {
+  switch (profile.kind) {
+    case 'terranWet':
+      return profile.waterColors[0]
+    case 'gasGiant':
+      return profile.lightColors[0]
+    case 'iceWorld':
+      return profile.landColors[0]
+    case 'lavaWorld':
+      return profile.lavaColors[0]
+    case 'nebula':
+      return profile.innerColors[0]
+    default:
+      return null
+  }
+}
+
+function buildAtmosphereLayer(profile: PlanetProfile, allLayers: LayerSpec[]): LayerSpec | null {
+  const strength = ATMOSPHERE_STRENGTH[profile.kind]
+  const base = strength ? atmosphereBaseColor(profile) : null
+  if (!strength || !base) return null
+  const glow: RGB = [Math.min(1, base[0] * 0.6 + 0.4), Math.min(1, base[1] * 0.6 + 0.4), Math.min(1, base[2] * 0.6 + 0.4)]
+  return {
+    fragmentShader: rimAtmosphereFragmentShader,
+    isAdditive: true,
+    // No mesh scale here on purpose - see rimAtmosphere.ts's header comment on why the glow
+    // hugs the limb from inside the existing disc instead of trying to bleed past it.
+    uniforms: {
+      uRimColor: { value: new Vector4(glow[0], glow[1], glow[2], strength) },
+      uRimWidth: { value: 0.05 },
+    },
+    timeRate: 0,
+    // On top of literally everything, including the crack overlay - real atmospheric glow sits
+    // in front of surface damage, not behind it.
+    renderOrder: allLayers.reduce((max, l) => Math.max(max, l.renderOrder), 0) + 1,
+  }
+}
+
 /** Imperative handle for hit-reaction physics - see PlanetCanvas's onReady prop. */
 export interface PlanetImpulseApi {
   /** Push the planet away from a tap/hit at (x,y) canvas-relative px. strength ~0.02 (light tap) to ~0.15 (big hit). */
@@ -402,6 +459,8 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
     const featureLayer = buildFeatureLayer(profile, layers)
     if (featureLayer) layers.push(featureLayer)
     if (profile.kind !== 'gasGiant' && profile.kind !== 'nebula') layers.push(buildCrackLayer(profile))
+    const atmosphereLayer = buildAtmosphereLayer(profile, layers)
+    if (atmosphereLayer) layers.push(atmosphereLayer)
     const crackUniforms = layers.find((l) => l.isCracks)?.uniforms ?? null
     // Widen the frustum to the largest layer scale so a gas giant's ring is captured in full
     // instead of clipped at the frame edge. The canvas box itself doesn't change size (it's
@@ -422,6 +481,7 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
         transparent: true,
         depthWrite: false,
         side: DoubleSide,
+        blending: layer.isAdditive ? AdditiveBlending : NormalBlending,
       })
       const mesh = new Mesh(geometry, material)
       mesh.renderOrder = layer.renderOrder

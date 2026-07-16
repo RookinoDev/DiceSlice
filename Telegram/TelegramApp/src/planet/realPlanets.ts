@@ -41,14 +41,77 @@ export const REGULAR_PLANETS: RealPlanet[] = [
     },
   ]),
   rock('PHOBOS', 6.3, [[0.16, 0.14, 0.13], [0.35, 0.31, 0.28], [0.52, 0.47, 0.43]], 42),
-  noAtmo('CERES', 7.9, [[0.35, 0.34, 0.32], [0.24, 0.23, 0.22], [0.13, 0.13, 0.12]], [[0.85, 0.84, 0.78], [0.55, 0.54, 0.5]], 45, 7), // bright Occator-style spots
-  rock('VESTA', 8.6, [[0.3, 0.26, 0.19], [0.55, 0.48, 0.36], [0.75, 0.68, 0.52]], 48),
+  withFeatures(noAtmo('CERES', 7.9, [[0.35, 0.34, 0.32], [0.24, 0.23, 0.22], [0.13, 0.13, 0.12]], [[0.85, 0.84, 0.78], [0.55, 0.54, 0.5]], 45, 7), [
+    {
+      id: 'occator-crater',
+      label: 'Occator Crater',
+      fact: 'Holds the brightest spots in the asteroid belt - reflective deposits of sodium carbonate left behind by ancient briny water.',
+      uv: [0.42, 0.55],
+      radius: [0.07, 0.07],
+      angle: 0,
+      color: [0.88, 0.89, 0.86],
+    },
+  ]),
+  withFeatures(rock('VESTA', 8.6, [[0.3, 0.26, 0.19], [0.55, 0.48, 0.36], [0.75, 0.68, 0.52]], 48), [
+    {
+      id: 'rheasilvia',
+      label: 'Rheasilvia',
+      fact: "A crater 500 km across - nearly as wide as Vesta itself - punched out by an ancient impact that nearly shattered the asteroid.",
+      uv: [0.5, 0.85],
+      radius: [0.22, 0.16],
+      angle: 0,
+      color: [0.22, 0.19, 0.14],
+    },
+  ]),
   // — Jovian & Saturnian moons —
-  lava('IO', 2.9, [[0.82, 0.72, 0.3], [0.65, 0.52, 0.2], [0.42, 0.32, 0.1]], [[0.55, 0.42, 0.15], [0.3, 0.2, 0.06]], [[1.0, 0.62, 0.08], [0.85, 0.38, 0.03], [0.6, 0.18, 0.01]], 0.6),
+  withFeatures(lava('IO', 2.9, [[0.82, 0.72, 0.3], [0.65, 0.52, 0.2], [0.42, 0.32, 0.1]], [[0.55, 0.42, 0.15], [0.3, 0.2, 0.06]], [[1.0, 0.62, 0.08], [0.85, 0.38, 0.03], [0.6, 0.18, 0.01]], 0.6), [
+    {
+      id: 'loki-patera',
+      label: 'Loki Patera',
+      fact: 'The most powerful volcano in the Solar System - a lava lake wider than Lake Superior that periodically overturns and glows anew.',
+      uv: [0.32, 0.6],
+      radius: [0.1, 0.09],
+      angle: 0,
+      color: [1.0, 0.5, 0.1],
+    },
+  ]),
   ice('EUROPA', 3.7, [[0.92, 0.89, 0.83], [0.8, 0.75, 0.68], [0.65, 0.58, 0.5]], [[0.62, 0.42, 0.3], [0.48, 0.3, 0.2], [0.32, 0.18, 0.12]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // tan lineae over cream ice
-  noAtmo('GANYMEDE', 4.8, [[0.55, 0.5, 0.44], [0.4, 0.36, 0.31], [0.24, 0.21, 0.18]], [[0.68, 0.64, 0.58], [0.3, 0.27, 0.23]], 50, 10),
-  noAtmo('CALLISTO', 5.2, [[0.36, 0.31, 0.26], [0.25, 0.21, 0.17], [0.14, 0.11, 0.09]], [[0.6, 0.56, 0.5], [0.28, 0.24, 0.2]], 60, 6), // dark, densely speckled
-  terran('TITAN', 6.1, [[0.28, 0.18, 0.06], [0.2, 0.12, 0.04], [0.1, 0.06, 0.02]], [[0.55, 0.38, 0.12], [0.68, 0.48, 0.16], [0.78, 0.58, 0.22], [0.85, 0.66, 0.3]], [[0.92, 0.7, 0.35], [0.82, 0.58, 0.25], [0.68, 0.45, 0.18], [0.52, 0.33, 0.12]], { landCutoff: 0.45, cloudCover: 0.85 }), // orange haze, dark methane lakes
+  withFeatures(noAtmo('GANYMEDE', 4.8, [[0.55, 0.5, 0.44], [0.4, 0.36, 0.31], [0.24, 0.21, 0.18]], [[0.68, 0.64, 0.58], [0.3, 0.27, 0.23]], 50, 10), [
+    {
+      id: 'galileo-regio',
+      label: 'Galileo Regio',
+      fact: 'A vast, ancient dark terrain scarred with concentric grooves - among the oldest surfaces in the Solar System, over 4 billion years old.',
+      uv: [0.62, 0.45],
+      radius: [0.17, 0.14],
+      angle: 0,
+      color: [0.32, 0.29, 0.24],
+    },
+  ]),
+  withFeatures(noAtmo('CALLISTO', 5.2, [[0.36, 0.31, 0.26], [0.25, 0.21, 0.17], [0.14, 0.11, 0.09]], [[0.6, 0.56, 0.5], [0.28, 0.24, 0.2]], 60, 6), [
+    {
+      id: 'valhalla',
+      label: 'Valhalla',
+      fact: 'The largest known impact structure in the Solar System - a bullseye of concentric rings spanning over 3,800 km.',
+      uv: [0.4, 0.5],
+      radius: [0.2, 0.2],
+      angle: 0,
+      color: [0.5, 0.47, 0.42],
+    },
+  ]), // dark, densely speckled
+  withFeatures(
+    terran('TITAN', 6.1, [[0.28, 0.18, 0.06], [0.2, 0.12, 0.04], [0.1, 0.06, 0.02]], [[0.55, 0.38, 0.12], [0.68, 0.48, 0.16], [0.78, 0.58, 0.22], [0.85, 0.66, 0.3]], [[0.92, 0.7, 0.35], [0.82, 0.58, 0.25], [0.68, 0.45, 0.18], [0.52, 0.33, 0.12]], { landCutoff: 0.45, cloudCover: 0.85 }), // orange haze, dark methane lakes
+    [
+      {
+        id: 'kraken-mare',
+        label: 'Kraken Mare',
+        fact: 'A sea of liquid methane and ethane larger than the Caspian Sea - the largest known body of liquid anywhere but Earth.',
+        uv: [0.55, 0.2],
+        radius: [0.2, 0.13],
+        angle: 0,
+        color: [0.12, 0.08, 0.03],
+      },
+    ],
+  ),
   withFeatures(
     ice('ENCELADUS', 7.4, [[0.96, 0.97, 0.99], [0.86, 0.89, 0.94], [0.72, 0.77, 0.86]], [[0.55, 0.72, 0.88], [0.38, 0.55, 0.75], [0.22, 0.36, 0.58]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // blue tiger stripes on white
     [
@@ -80,7 +143,17 @@ export const REGULAR_PLANETS: RealPlanet[] = [
       },
     ],
   ),
-  noAtmo('CHARON', 3.4, [[0.58, 0.55, 0.53], [0.44, 0.41, 0.4], [0.27, 0.25, 0.24]], [[0.5, 0.32, 0.24], [0.26, 0.15, 0.1]], 48, 8), // gray, reddish polar stain
+  withFeatures(noAtmo('CHARON', 3.4, [[0.58, 0.55, 0.53], [0.44, 0.41, 0.4], [0.27, 0.25, 0.24]], [[0.5, 0.32, 0.24], [0.26, 0.15, 0.1]], 48, 8), [
+    {
+      id: 'mordor-macula',
+      label: 'Mordor Macula',
+      fact: 'Its dark red north polar cap, likely stained by tholins - organic compounds that escaped Pluto as gas and froze onto Charon.',
+      uv: [0.5, 0.14],
+      radius: [0.24, 0.17],
+      angle: 0,
+      color: [0.32, 0.15, 0.1],
+    },
+  ]),
   ice('HAUMEA', 4.5, [[0.93, 0.94, 0.96], [0.82, 0.84, 0.88], [0.68, 0.71, 0.78]], [[0.6, 0.65, 0.75], [0.45, 0.5, 0.62], [0.3, 0.34, 0.46]], FAINT_WHITE_CLOUDS, NO_CLOUDS),
   noAtmo('MAKEMAKE', 5.6, [[0.6, 0.42, 0.3], [0.46, 0.3, 0.2], [0.3, 0.18, 0.11]], [[0.4, 0.26, 0.17], [0.2, 0.12, 0.07]], 50, 7),
   ice('ERIS', 6.8, [[0.95, 0.95, 0.97], [0.85, 0.86, 0.9], [0.72, 0.74, 0.8]], [[0.66, 0.7, 0.78], [0.5, 0.55, 0.65], [0.35, 0.4, 0.5]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // one of the most reflective bodies known
@@ -99,7 +172,17 @@ export const REGULAR_PLANETS: RealPlanet[] = [
   rock("HALLEY'S COMET", 8.1, [[0.1, 0.1, 0.12], [0.28, 0.29, 0.33], [0.62, 0.66, 0.74]], 40), // dirty snowball, ice glints on black
   rock('67P', 9.6, [[0.09, 0.08, 0.08], [0.24, 0.22, 0.21], [0.44, 0.41, 0.39]], 44), // the Rosetta comet
   rock("'OUMUAMUA", 1.8, [[0.24, 0.14, 0.08], [0.46, 0.3, 0.18], [0.68, 0.5, 0.32]], 38), // the interstellar visitor
-  noAtmo('IAPETUS', 2.7, [[0.85, 0.83, 0.78], [0.62, 0.58, 0.52], [0.36, 0.32, 0.28]], [[0.14, 0.1, 0.07], [0.06, 0.04, 0.03]], 46, 12), // two-tone: bright ice, coal-dark plains
+  withFeatures(noAtmo('IAPETUS', 2.7, [[0.85, 0.83, 0.78], [0.62, 0.58, 0.52], [0.36, 0.32, 0.28]], [[0.14, 0.1, 0.07], [0.06, 0.04, 0.03]], 46, 12), [
+    {
+      id: 'equatorial-ridge',
+      label: 'Equatorial Ridge',
+      fact: 'A mountain ridge over 1,300 km long and up to 20 km high runs along the equator, giving Iapetus a walnut-like shape unique among moons.',
+      uv: [0.5, 0.5],
+      radius: [0.42, 0.03],
+      angle: 0,
+      color: [0.5, 0.47, 0.42],
+    },
+  ]), // two-tone: bright ice, coal-dark plains
   noAtmo('TITANIA', 3.9, [[0.6, 0.56, 0.54], [0.46, 0.42, 0.41], [0.28, 0.25, 0.24]], [[0.5, 0.44, 0.42], [0.24, 0.2, 0.19]], 48, 8),
 ]
 
