@@ -2,10 +2,13 @@
 // tilt/wobble/zoom (underdamped, so releases bounce); tap flips with a squash beat; pinch or
 // wheel zooms; per-variant CSS effects layer under the WebGL holo overlay (holo+ variants).
 // EXPLORE opens the live object viewer (ObjectViewer.tsx) for the body itself.
+// Fix #18 (fix-plan.docx): rebuilt as its own tall modal instead of <Sheet> - the front face
+// carries the planet + physical data, the back carries story + facts, split by content type
+// rather than mirroring the same cramped layout on both sides.
 import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from 'react'
-import { Sheet } from '../Sheet'
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, RARITY_GEM, collectionNo } from './cardTheme'
+import { CloseIcon } from '../icons'
 import cornerOrnament from '../../assets/cards/frame-corner-ornament.png'
 import type { CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
@@ -176,7 +179,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, card?.id])
 
-  if (!card) return null
+  if (!open || !card) return null
   const color = RARITY_COLOR[card.rarity]
   const locked = !owned
   const variantClass = owned && owned.bestVariant !== 'standard' ? `card-detail-flip--${owned.bestVariant}` : ''
@@ -254,171 +257,185 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
     target.current.scale = Math.min(ZOOM_MAX, Math.max(1, target.current.scale - e.deltaY * 0.002))
   }
 
+  const closeAndReset = () => {
+    audio.click()
+    hapticTap()
+    setFlipped(false)
+    onClose()
+  }
+
   return (
-    <Sheet
-      open={open}
-      onClose={() => {
-        setFlipped(false)
-        onClose()
-      }}
-      title={locked ? 'UNDISCOVERED' : card.name}
-    >
-      <div className="card-detail-stage">
-        <div
-          ref={wrapRef}
-          className="card-detail-tilt"
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          onWheel={onWheel}
-        >
-          <div
-            className={`card-detail-flip cf-${card.rarity} ${flipped ? 'card-detail-flip--back' : ''} ${variantClass} ${rarityClass}`}
-            style={{ '--rarity-color': color } as CSSProperties}
-          >
-            <div className="card-detail-face card-detail-face--front" ref={frontFaceRef}>
-              <div className="card-detail-top-row">
-                <div className="card-detail-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
-                {!locked && owned && <div className="card-detail-rarity-tag">{VARIANT_LABEL[owned.bestVariant].toUpperCase()}</div>}
-              </div>
-              {locked ? (
-                <div className="card-detail-art-wrap" ref={artWrapRef}>
-                  <div className="card-art card-art-ghost card-detail-art" />
-                </div>
-              ) : (
-                <div className="card-detail-art-wrap" ref={artWrapRef}>
-                  <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
-                </div>
-              )}
-              {!locked && owned && variantRank(owned.bestVariant) >= variantRank('holo') && holoHole && (
-                <div
-                  className="card-detail-holo-mask"
-                  style={
-                    {
-                      '--holo-hole-left': holoHole.left,
-                      '--holo-hole-top': holoHole.top,
-                      '--holo-hole-width': holoHole.width,
-                      '--holo-hole-height': holoHole.height,
-                    } as CSSProperties
-                  }
-                >
-                  <Suspense fallback={null}>
-                    <HoloOverlay rarity={card.rarity} lightRef={holoLightRef} className="card-detail-holo-overlay" />
-                  </Suspense>
-                </div>
-              )}
-              {!locked && (
-                <button
-                  className={`card-detail-fav-btn ${isFavorite ? 'card-detail-fav-btn--active' : ''}`}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIsFavorite(toggleFavorite(card.id))
-                    audio.click()
-                    hapticTap()
-                  }}
-                  aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-                >
-                  {isFavorite ? '♥' : '♡'}
-                </button>
-              )}
-              <div className="card-detail-name-row">
-                <div className="card-detail-name">{locked ? '???' : card.name}</div>
-                <div className="card-detail-type-tag">{locked ? 'UNDISCOVERED' : card.classification}</div>
-              </div>
-              {!locked && (
-                <div className="card-detail-physical">
-                  {Object.entries(card.physical).map(([label, value]) => (
-                    <div key={label} className="card-detail-physical-row">
-                      <span>{label}</span>
-                      <span>{value}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {owned && (
-                <div className="card-detail-edition-row">
-                  <div>
-                    <div className="card-detail-edition-label">MINT Nº</div>
-                    <div className="card-detail-edition-value">
-                      #{String(owned.bestSerial).padStart(4, '0')}
-                      {owned.count > 1 ? ` · ×${owned.count} owned` : ''}
-                    </div>
-                  </div>
-                  <img src={RARITY_GEM[card.rarity]} className="card-detail-edition-gem" alt="" />
-                </div>
-              )}
-              {!locked && <div className="card-detail-flavor-box">&ldquo;{card.flavor}&rdquo;</div>}
-              <div className="card-detail-bottom-row">
-                {!locked && (
-                  <button
-                    className="card-detail-explore-btn"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      hapticAction()
-                      onExplore()
-                    }}
-                  >
-                    EXPLORE
-                  </button>
-                )}
-                {!locked && <div className="card-detail-flip-hint">TAP TO FLIP · DRAG TO TILT · PINCH TO ZOOM</div>}
-              </div>
-              {!locked && (card.rarity === 'legendary' || card.rarity === 'ultra') && (
-                <>
-                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tl" alt="" />
-                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tr" alt="" />
-                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--bl" alt="" />
-                  <img src={cornerOrnament} className="card-frame-corner card-frame-corner--br" alt="" />
-                </>
-              )}
-            </div>
-            <div className="card-detail-face card-detail-face--back">
-              {locked ? (
-                <div className="card-detail-locked-body">Defeat the right boss to discover this card.</div>
-              ) : (
-                <>
-                  <div className="card-detail-section-label">FACTS</div>
-                  <ul className="card-detail-facts">
-                    {card.facts.map((f) => (
-                      <li key={f}>{f}</li>
-                    ))}
-                  </ul>
-                  {card.discovery && <div className="card-detail-discovery">{card.discovery}</div>}
-                </>
-              )}
-            </div>
+    <div className="card-detail-backdrop" onClick={closeAndReset}>
+      <div className="card-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="card-detail-topbar">
+          <div className="card-detail-rarity-pill" style={{ '--rarity-color': color } as CSSProperties}>
+            {locked ? 'LOCKED' : card.rarity.toUpperCase()}
+          </div>
+          <div className="card-detail-collection-no">{collectionNo(card.no, FULL_CATALOG.length)}</div>
+          <div className="card-detail-topbar-right">
+            {!locked && (
+              <button
+                className={`card-detail-fav-btn ${isFavorite ? 'card-detail-fav-btn--active' : ''}`}
+                onClick={() => {
+                  setIsFavorite(toggleFavorite(card.id))
+                  audio.click()
+                  hapticTap()
+                }}
+                aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                {isFavorite ? '♥' : '♡'}
+              </button>
+            )}
+            <button className="card-detail-close-btn" onClick={closeAndReset} aria-label="Close">
+              <CloseIcon />
+            </button>
           </div>
         </div>
-        <ParticleLayer containerRef={particlesRef} />
-      </div>
-      <div className="card-detail-nav-row">
-        <button
-          className="card-detail-nav-btn card-detail-nav-btn--close"
-          onClick={() => {
-            audio.click()
-            hapticTap()
-            setFlipped(false)
-            onClose()
-          }}
-        >
-          CLOSE
-        </button>
-        {hasNext && onNext && (
-          <button
-            className="card-detail-nav-btn card-detail-nav-btn--next"
-            onClick={() => {
-              audio.click()
-              hapticTap()
-              onNext()
-            }}
+
+        <div className="card-detail-stage">
+          <div
+            ref={wrapRef}
+            className="card-detail-tilt"
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            onWheel={onWheel}
           >
-            NEXT
+            <div
+              className={`card-detail-flip cf-${card.rarity} ${flipped ? 'card-detail-flip--back' : ''} ${variantClass} ${rarityClass}`}
+              style={{ '--rarity-color': color } as CSSProperties}
+            >
+              <div className="card-detail-face card-detail-face--front" ref={frontFaceRef}>
+                {locked ? (
+                  <div className="card-detail-art-wrap" ref={artWrapRef}>
+                    <div className="card-art card-art-ghost card-detail-art" />
+                  </div>
+                ) : (
+                  <div className="card-detail-art-wrap" ref={artWrapRef}>
+                    <CardArt cardName={card.name} mode="focused" className="card-detail-art" />
+                  </div>
+                )}
+                {!locked && owned && variantRank(owned.bestVariant) >= variantRank('holo') && holoHole && (
+                  <div
+                    className="card-detail-holo-mask"
+                    style={
+                      {
+                        '--holo-hole-left': holoHole.left,
+                        '--holo-hole-top': holoHole.top,
+                        '--holo-hole-width': holoHole.width,
+                        '--holo-hole-height': holoHole.height,
+                      } as CSSProperties
+                    }
+                  >
+                    <Suspense fallback={null}>
+                      <HoloOverlay rarity={card.rarity} lightRef={holoLightRef} className="card-detail-holo-overlay" />
+                    </Suspense>
+                  </div>
+                )}
+
+                <div className="card-detail-hero-footer">
+                  <div className="card-detail-hero-tag">LIVE 3D · DRAG TO ORBIT · PINCH TO ZOOM</div>
+                  {!locked && (
+                    <button
+                      className="card-detail-explore-btn"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        hapticAction()
+                        onExplore()
+                      }}
+                    >
+                      EXPLORE
+                    </button>
+                  )}
+                </div>
+
+                <div className="card-detail-name-block">
+                  <div className="card-detail-name">{locked ? '???' : card.name}</div>
+                  <div className="card-detail-type-tag">{locked ? 'UNDISCOVERED' : card.classification}</div>
+                </div>
+
+                {!locked && owned && (
+                  <div className="card-detail-variant-tag">{VARIANT_LABEL[owned.bestVariant].toUpperCase()}</div>
+                )}
+
+                {!locked && (
+                  <div className="card-detail-stat-grid">
+                    {Object.entries(card.physical).map(([label, value]) => (
+                      <div key={label} className="card-detail-stat-card">
+                        <div className="card-detail-stat-k">{label}</div>
+                        <div className="card-detail-stat-v">{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {owned && (
+                  <div className="card-detail-edition-row">
+                    <div>
+                      <div className="card-detail-edition-label">MINT Nº</div>
+                      <div className="card-detail-edition-value">
+                        #{String(owned.bestSerial).padStart(4, '0')}
+                        {owned.count > 1 ? ` · ×${owned.count} owned` : ''}
+                      </div>
+                    </div>
+                    <img src={RARITY_GEM[card.rarity]} className="card-detail-edition-gem" alt="" />
+                  </div>
+                )}
+
+                {!locked && <div className="card-detail-flip-hint">TAP CARD TO FLIP · STORY &amp; FACTS ON BACK</div>}
+
+                {!locked && (card.rarity === 'legendary' || card.rarity === 'ultra') && (
+                  <>
+                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tl" alt="" />
+                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tr" alt="" />
+                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--bl" alt="" />
+                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--br" alt="" />
+                  </>
+                )}
+              </div>
+              <div className="card-detail-face card-detail-face--back">
+                {locked ? (
+                  <div className="card-detail-locked-body">Defeat the right boss to discover this card.</div>
+                ) : (
+                  <>
+                    <div className="card-detail-back-hint">TAP TO FLIP BACK</div>
+                    <div className="card-detail-section-label">Story</div>
+                    <div className="card-detail-flavor-box">&ldquo;{card.flavor}&rdquo;</div>
+                    <div className="card-detail-section-label">Facts</div>
+                    <ul className="card-detail-facts">
+                      {card.facts.map((f) => (
+                        <li key={f}>{f}</li>
+                      ))}
+                    </ul>
+                    {card.discovery && <div className="card-detail-discovery">{card.discovery}</div>}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <ParticleLayer containerRef={particlesRef} />
+        </div>
+
+        <div className="card-detail-nav-row">
+          <button className="card-detail-nav-btn card-detail-nav-btn--close" onClick={closeAndReset}>
+            CLOSE
           </button>
-        )}
+          {hasNext && onNext && (
+            <button
+              className="card-detail-nav-btn card-detail-nav-btn--next"
+              onClick={() => {
+                audio.click()
+                hapticTap()
+                onNext()
+              }}
+            >
+              NEXT
+            </button>
+          )}
+        </div>
       </div>
-    </Sheet>
+    </div>
   )
 }

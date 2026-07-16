@@ -3013,19 +3013,123 @@
 }
 
 /* -- Card detail sheet: flip + drag tilt -- */
+/* Fix #18: CardDetailSheet is its own tall modal now, not <Sheet> - a gap above shows the app
+   behind it (per the approved mockup), rounded corners on every side, height fit to content
+   with a safety-net max-height rather than the old 80vh-capped bottom sheet. */
+.card-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(6, 8, 16, 0.72);
+  animation: sb-fade-in 0.18s ease-out;
+}
+.card-detail-modal {
+  width: 100%;
+  max-width: 420px;
+  height: 88vh;
+  max-height: 92vh;
+  background: var(--palette-bg);
+  border-radius: 26px;
+  box-shadow: 0 -12px 60px rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: sb-sheet-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.card-detail-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 16px 16px 6px;
+}
+.card-detail-rarity-pill {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rarity-color, var(--palette-cyan)) 22%, transparent);
+  color: var(--rarity-color, var(--palette-cyan-label));
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.card-detail-collection-no {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--palette-text-dim);
+}
+.card-detail-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-detail-fav-btn,
+.card-detail-close-btn {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--palette-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.2, 1.4, 0.4, 1), color 0.15s ease;
+}
+.card-detail-fav-btn:active,
+.card-detail-close-btn:active {
+  transform: scale(0.85);
+}
+.card-detail-fav-btn--active {
+  color: var(--palette-magenta);
+  text-shadow: 0 0 8px rgba(226, 79, 255, 0.8);
+  animation: fav-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes fav-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-detail-fav-btn--active {
+    animation: none;
+  }
+}
+
 .card-detail-stage {
   position: relative;
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px;
 }
 .card-detail-tilt {
   perspective: 900px;
+  height: 100%;
   /* NO transform transition here: the rAF spring in CardDetailSheet.tsx owns this transform
      every frame - a CSS transition would fight it and double-animate. */
   touch-action: none;
 }
 .card-detail-nav-row {
+  flex-shrink: 0;
   display: flex;
   gap: 10px;
-  margin-top: 12px;
+  padding: 12px 16px calc(14px + env(safe-area-inset-bottom, 0px));
 }
 .card-detail-nav-btn {
   flex: 1;
@@ -3160,18 +3264,12 @@
 }
 .card-detail-flip {
   position: relative;
-  /* Taller than a standard 0.7 TCG ratio - the front face now carries art + stat table +
-     mint row + flavor quote in one view (Card Anatomy v2), so it needs the extra height to
-     give the art window real presence instead of being squeezed to a sliver.
-     #16 fix: with only width capped (100%/340px) and height purely aspect-ratio-derived, a
-     0.58 ratio at 340px wide is 586px tall - taller than .sheet-panel's own 80vh cap minus its
-     header/padding on anything but a tall phone, forcing a scroll to see the rest of the card.
-     Capping width by 36vh too (36vh * (1/0.58) ~= 62vh tall at most) means the card shrinks to
-     fit short viewports instead of overflowing, while still hitting the full 340px/586px size
-     on any screen tall enough to afford it. */
-  width: min(100%, 340px, 36vh);
-  aspect-ratio: 0.58;
-  margin: 0 auto;
+  /* Fills whatever height .card-detail-stage/.card-detail-tilt actually has (fit to the modal,
+     see #18 fix) instead of a fixed TCG aspect-ratio - the front face now carries a lot more
+     (art + hero actions + name + stat grid + mint row) than a single fixed ratio could hold
+     for both faces at once without either cramming the front or leaving the back mostly empty. */
+  width: 100%;
+  height: 100%;
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
   border-radius: 18px;
@@ -3185,7 +3283,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 16px;
+  padding: 14px 16px;
   border-radius: 18px;
   border: 2px solid var(--rarity-color, rgba(255, 255, 255, 0.15));
   background: var(--palette-sheet);
@@ -3193,9 +3291,7 @@
   backface-visibility: hidden;
 }
 .card-detail-face--front {
-  /* #21 fix: the art window went from flex-filling all remaining height to a fixed square -
-     a safety net in case that leaves the fixed-height content below it slightly taller than
-     the card, same as the back face already had. */
+  /* Safety net only - spacing below is tuned to fit a real mobile viewport with zero scroll. */
   overflow-y: auto;
 }
 .card-detail-face--back {
@@ -3203,15 +3299,15 @@
   overflow-y: auto;
   align-items: stretch;
 }
-/* #21 fix: square window (was flex:1, filling all remaining card height at whatever ratio that
-   left) sized to a fraction of the card's own width, not the leftover vertical space - and the
-   planet inside stays at 80% of THIS smaller box, so it renders visibly smaller too. */
+/* The art window sits at a fixed fraction of the card's own width (not the old flex:1 filling
+   all leftover height) so it stays a compact, consistent hero size regardless of how much data
+   is below it - a smaller, deliberate object rather than the dominant element on the face. */
 .card-detail-art-wrap {
   position: relative;
-  width: 50%;
+  width: 34%;
   aspect-ratio: 1;
   flex-shrink: 0;
-  margin: 0 auto 4px;
+  margin: 2px auto 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -3248,103 +3344,107 @@
   height: 100%;
   display: block;
 }
-.card-detail-fav-btn {
-  /* #22 fix: top-right used to collide with the variant/rarity tag that now lives in
-     .card-detail-top-row (added by the Card Anatomy v2 redesign) - both absolutely positioned
-     at the same corner. Bottom-right is clear: .card-detail-bottom-row's content is centered,
-     never reaching the corners. */
-  position: absolute;
-  bottom: 14px;
-  right: 14px;
-  width: 30px;
-  height: 30px;
-  border: none;
+
+/* Below the art: a short hint + EXPLORE, then name/type, then physical data as a real grid,
+   then the mint row - each section its own visual block instead of a tight vertical list. */
+.card-detail-hero-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  /* User-requested extra clearance between the planet and this hint text specifically. */
+  margin-top: 20px;
+}
+.card-detail-hero-tag {
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--palette-text-dimmer);
+}
+.card-detail-explore-btn {
+  flex-shrink: 0;
+  padding: 5px 14px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--palette-text-secondary);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  transition: transform 0.15s cubic-bezier(0.2, 1.4, 0.4, 1), color 0.15s ease;
+  border: 1px solid color-mix(in srgb, var(--rarity-color, var(--palette-cyan-label)) 60%, transparent);
+  background: color-mix(in srgb, var(--palette-sheet) 70%, black 30%);
+  color: var(--rarity-color, var(--palette-cyan-label));
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  backdrop-filter: blur(4px);
 }
-.card-detail-fav-btn:active {
-  transform: scale(0.85);
-}
-.card-detail-fav-btn--active {
-  color: var(--palette-magenta);
-  text-shadow: 0 0 8px rgba(226, 79, 255, 0.8);
-  animation: fav-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
-}
-@keyframes fav-pop {
-  0% {
-    transform: scale(0.6);
-  }
-  60% {
-    transform: scale(1.25);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .card-detail-fav-btn--active {
-    animation: none;
-  }
+.card-detail-explore-btn:active {
+  transform: scale(0.94);
 }
 
-.card-detail-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+.card-detail-name-block {
   width: 100%;
-  margin-bottom: 6px;
+  text-align: center;
+  margin-top: 10px;
 }
-.card-detail-rarity-tag {
-  padding: 3px 9px;
+.card-detail-name {
+  font-family: var(--font-display);
+  font-weight: 700;
+  /* font-size/letter-spacing come from the card-frame block further down (shared with the
+     grid item's own title treatment). */
+  color: var(--palette-text-primary);
+}
+.card-detail-type-tag {
+  margin-top: 2px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--rarity-color, var(--palette-text-dim));
+}
+.card-detail-variant-tag {
+  margin-top: 4px;
+  padding: 2px 9px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--rarity-color, transparent) 22%, transparent);
   color: var(--rarity-color);
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
 }
 
-/* Card Anatomy v2: header (no. + variant badge) -> ringed art window -> name/type ->
-   stat table -> mint/edition row -> flavor quote, all on one face - matches a real
-   collectible's single-glance layout instead of splitting identity across a flip. */
-.card-detail-top-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+.card-detail-stat-grid {
   width: 100%;
-  margin-bottom: 4px;
+  display: grid;
+  /* 3 columns: the common case (real-planet cards) is exactly 3 stats, so this is 1 row instead
+     of 2 - matters a lot for fitting shorter phones without scrolling (fix #18). */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
 }
-.card-detail-name-row {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  width: 100%;
+.card-detail-stat-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
+  padding: 6px 8px;
 }
-.card-detail-type-tag {
-  flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--palette-text-dim);
+.card-detail-stat-k {
   font-family: var(--font-display);
-  font-size: 9px;
-  letter-spacing: 0.06em;
+  font-size: 8.5px;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
+  color: var(--palette-text-dimmer);
 }
+.card-detail-stat-v {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11.5px;
+  line-height: 1.25;
+  color: var(--palette-text-primary);
+}
+
 .card-detail-edition-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  margin-top: 6px;
+  margin-top: 8px;
   padding-top: 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -3366,43 +3466,24 @@
   object-fit: contain;
   flex-shrink: 0;
 }
+/* Fix #18: story + facts now live on the back face only (was a duplicate of the front's
+   cramped layout) - a lot more breathing room since it no longer shares space with stats. */
 .card-detail-flavor-box {
-  margin-top: 6px;
-  padding: 6px 10px;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
   background: rgba(255, 255, 255, 0.03);
+  border-inline-start: 2px solid var(--rarity-color, rgba(255, 255, 255, 0.2));
   font-style: italic;
-  font-size: 12px;
-  line-height: 1.4;
+  font-size: 13px;
+  line-height: 1.5;
   color: var(--palette-text-secondary);
 }
-.card-detail-bottom-row {
-  margin-top: auto;
-  padding-top: 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.card-detail-name {
+.card-detail-back-hint {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 17px;
-  text-align: center;
-  color: var(--palette-text-primary);
-}
-.card-detail-no {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 13px;
-  letter-spacing: 0.05em;
-  color: var(--palette-text-dim);
-}
-.card-detail-gem {
-  width: 13px;
-  height: 13px;
-  object-fit: contain;
-  flex-shrink: 0;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--palette-text-dimmer);
+  margin-bottom: 10px;
 }
 /* Legendary/Ultra only: real corner filigree layered over the CSS frame gradient - an L-shaped
    bracket mirrored into all 4 corners from one source asset (see cardTheme.ts's RARITY_GEM
@@ -3434,32 +3515,13 @@
   right: 4px;
   transform: scale(-1, -1);
 }
-.card-detail-mint {
-  margin-top: 8px;
-  font-family: var(--font-display);
-  font-size: 11px;
-  color: var(--palette-cyan-label);
-}
 .card-detail-flip-hint {
+  margin-top: auto;
+  padding-top: 10px;
   font-family: var(--font-display);
   font-size: 9.5px;
   letter-spacing: 0.12em;
   color: var(--palette-text-dimmer);
-}
-.card-detail-explore-btn {
-  flex-shrink: 0;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--rarity-color, var(--palette-cyan-label)) 60%, transparent);
-  background: color-mix(in srgb, var(--palette-sheet) 70%, black 30%);
-  color: var(--rarity-color, var(--palette-cyan-label));
-  font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  backdrop-filter: blur(4px);
-}
-.card-detail-explore-btn:active {
-  transform: scale(0.94);
 }
 .card-detail-locked-body {
   margin: auto;
@@ -3468,57 +3530,27 @@
   color: var(--palette-text-secondary);
   font-size: 13px;
 }
-.card-detail-classification {
-  font-family: var(--font-display);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  color: var(--rarity-color);
-  text-transform: uppercase;
-}
-.card-detail-flavor {
-  margin: 6px 0 12px;
-  font-style: italic;
-  font-size: 13px;
-  color: var(--palette-text-secondary);
-}
 .card-detail-section-label {
+  align-self: flex-start;
   font-family: var(--font-display);
   font-size: 10px;
   letter-spacing: 0.1em;
   color: var(--palette-text-dimmer);
-  margin: 10px 0 6px;
-}
-.card-detail-physical {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.card-detail-physical-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  padding: 2px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-}
-.card-detail-physical-row span:first-child {
-  color: var(--palette-text-dim);
-}
-.card-detail-physical-row span:last-child {
-  font-family: var(--font-display);
-  font-weight: 600;
-  color: var(--palette-text-primary);
+  margin: 14px 0 6px;
 }
 .card-detail-facts {
+  align-self: stretch;
   margin: 0;
   padding-left: 16px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--palette-text-secondary);
-  line-height: 1.5;
+  line-height: 1.6;
 }
 .card-detail-facts li + li {
-  margin-top: 6px;
+  margin-top: 8px;
 }
 .card-detail-discovery {
+  align-self: stretch;
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
