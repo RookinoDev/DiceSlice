@@ -1,6 +1,6 @@
 // Ported from GamePhone.dc.html's app shell + its real toast/celebration state machine.
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
-import type { BigNumber } from '../game/core/BigNumber'
+import { BigNumber } from '../game/core/BigNumber'
 import type { GameSession, DailyPreview } from '../game/gameplay/GameSession'
 import { buildMainViewModel } from '../game/ui/MainPresenter'
 import { nowUnixSeconds } from '../game/persistence/localStorageSave'
@@ -81,11 +81,17 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const { ref: shellRef, triggerShake } = useScreenShake<HTMLDivElement>()
   const { containerRef: rewardParticlesRef, spawn: spawnRewardParticle } = useParticles()
 
+  // Reward-magnitude baseline for the coin-spill FX below - an exponential moving average of
+  // recent rewards, so "this kill's coin burst" always reads as big/small relative to what's
+  // typical *right now*, at any point in the game's exponential economy (a flat coin count
+  // would look identical for a 10-gold kill and a 10-billion-gold one).
+  const rewardBaselineRef = useRef<BigNumber | null>(null)
+
   // Resource Vacuum / Multi-Wave Collection / Final Resource Impact (#27-30): reward "coins"
   // fly from the planet to the gold pill (cross-component landmarks, see combatFx/landmarks.ts).
   // No-ops gracefully if either landmark isn't mounted (e.g. a kill happens while off the
   // Combat tab, or before TopBar has laid out) - purely decorative, never blocks the real reward.
-  const spawnResourceVacuum = (big: boolean) => {
+  const spawnResourceVacuum = (intensity: number) => {
     const origin = getLandmarkRect('planet')
     const dest = getLandmarkRect('gold-pill')
     const shellRect = shellRef.current?.getBoundingClientRect()
@@ -96,10 +102,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     const destX = dest.left + dest.width / 2 - shellRect.left
     const destY = dest.top + dest.height / 2 - shellRect.top
     const travelMs = 480
-    // #8 fix: every destruction now sends a proper 8-12 coin flourish (was 1 coin for a normal
-    // kill, only boss kills got a multi-wave burst), and the gold pill ticks on EACH arrival
-    // instead of only the last one.
-    const waveCount = big ? 12 : 8 + Math.floor(Math.random() * 3)
+    // User-requested: the coin count AND size now scale with how big this reward is relative
+    // to recent rewards (intensity, computed by the caller), instead of a flat 8-12 regardless
+    // of the actual amount.
+    const waveCount = Math.round(7 + intensity * 6)
+    const coinPx = Math.round(8 + intensity * 4)
 
     for (let i = 0; i < waveCount; i++) {
       setTimeout(() => {
@@ -110,7 +117,12 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           x: originX + jitterX,
           y: originY + jitterY,
           durationMs: travelMs,
-          style: { '--tx': `${destX - originX - jitterX}px`, '--ty': `${destY - originY - jitterY}px` } as CSSProperties,
+          style: {
+            width: `${coinPx}px`,
+            height: `${coinPx}px`,
+            '--tx': `${destX - originX - jitterX}px`,
+            '--ty': `${destY - originY - jitterY}px`,
+          } as CSSProperties,
         })
         setTimeout(() => {
           const el = getLandmarkElement('gold-pill')
@@ -205,7 +217,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       }),
       session.taps.onDamageDealt.on(() => audio.tap()),
       session.onReward.on(({ planet, gold }) => {
-        spawnResourceVacuum(planet.isBoss)
+        const baseline = rewardBaselineRef.current
+        const rawRatio = baseline && baseline.gt(BigNumber.Zero) ? gold.div(baseline).toNumber() : 1
+        const intensity = Math.max(0.4, Math.min(4, Number.isFinite(rawRatio) ? rawRatio : 1))
+        rewardBaselineRef.current = baseline ? baseline.mul(BigNumber.from(0.85)).add(gold.mul(BigNumber.from(0.15))) : gold
+        spawnResourceVacuum(intensity)
         if (planet.isBoss) {
           showToast(`BOSS DEFEATED · +${gold.toShortString()} Stardust`)
           // Death Silence (#46): a beat of hush before the boom lands, so it reads as an impact.
