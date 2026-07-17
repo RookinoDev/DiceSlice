@@ -1212,8 +1212,21 @@
   flex-shrink: 0;
   padding: 0;
 }
+/* User-requested: off-cooldown-and-ready-to-tap now pulses (scale), not just a static border
+   color change - distinct from --active's glow-only pulse below (mutually exclusive states:
+   canActivate() is false while a duration skill is active, see SkillService.ts). */
 .skill-slot.ready {
   border-color: rgba(255, 178, 56, 0.5);
+  animation: skill-ready-pulse 1.3s ease-in-out infinite;
+}
+@keyframes skill-ready-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
 }
 /* #4 fix: a currently-active buff (Overdrive etc.) reads as "on and boosting you" - a bright
    pulsing ring - instead of the dark cooldown-wipe treatment meant for "recharging". */
@@ -2503,7 +2516,8 @@
   .dot-cards,
   .bottomnav-icon--pulse,
   .combat-tap-upgrade.affordable,
-  .skill-slot--active {
+  .skill-slot--active,
+  .skill-slot.ready {
     animation: none;
   }
   .topbar-icon-btn,
