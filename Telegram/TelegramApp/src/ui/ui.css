@@ -3027,17 +3027,16 @@
   animation: sb-fade-in 0.18s ease-out;
 }
 .card-detail-modal {
+  /* User-requested: fullscreen instead of a floating sheet, so there's real room for a bigger
+     planet without the front face needing to scroll. */
   width: 100%;
-  max-width: 420px;
-  height: 88vh;
-  max-height: 92vh;
+  height: 100%;
   background: var(--palette-bg);
-  border-radius: 26px;
-  box-shadow: 0 -12px 60px rgba(0, 0, 0, 0.55);
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  animation: sb-sheet-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+  animation: sb-fade-in 0.18s ease-out;
 }
 .card-detail-topbar {
   flex-shrink: 0;
@@ -3045,7 +3044,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 16px 16px 6px;
+  padding: calc(16px + env(safe-area-inset-top, 0px)) 16px 6px;
 }
 .card-detail-rarity-pill {
   padding: 4px 12px;
@@ -3304,7 +3303,9 @@
    is below it - a smaller, deliberate object rather than the dominant element on the face. */
 .card-detail-art-wrap {
   position: relative;
-  width: 34%;
+  /* Fullscreen modal gives real headroom now - the window itself grows, not just the fill
+     inside it, so the planet reads bigger in absolute terms too. */
+  width: 54%;
   aspect-ratio: 1;
   flex-shrink: 0;
   margin: 2px auto 0;
