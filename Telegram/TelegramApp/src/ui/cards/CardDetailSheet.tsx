@@ -61,6 +61,9 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
   const drag = useRef({ active: false, startX: 0, startY: 0, moved: 0, lastX: 0, lastDx: 0 })
   const pointers = useRef(new Map<number, { x: number; y: number }>())
   const pinchStart = useRef<{ dist: number; scale: number } | null>(null)
+  // Guards against a fast repeat tap firing NEXT twice before the card-swap re-render lands,
+  // which read as "it skipped several cards" - one real tap should only ever advance by one.
+  const lastNextAtRef = useRef(0)
   // Spring state lives in refs - the rAF loop writes transforms directly, zero re-renders.
   const cur = useRef<SpringState>({ ...REST })
   const vel = useRef<SpringState>({ rx: 0, ry: 0, rz: 0, scale: 0 })
@@ -424,6 +427,9 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
             <button
               className="card-detail-nav-btn card-detail-nav-btn--next"
               onClick={() => {
+                const now = performance.now()
+                if (now - lastNextAtRef.current < 350) return
+                lastNextAtRef.current = now
                 audio.click()
                 hapticTap()
                 onNext()
