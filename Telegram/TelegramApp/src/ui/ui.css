@@ -3305,7 +3305,7 @@
   position: relative;
   /* Fullscreen modal gives real headroom now - the window itself grows, not just the fill
      inside it, so the planet reads bigger in absolute terms too. */
-  width: 54%;
+  width: 68%;
   aspect-ratio: 1;
   flex-shrink: 0;
   margin: 2px auto 0;
@@ -3313,11 +3313,11 @@
   align-items: center;
   justify-content: center;
 }
-/* User-requested: planet should read bigger inside the same square window - a thin margin still
-   shows the starfield backdrop (Card Anatomy pass) but the sphere itself now dominates the frame. */
+/* Window grew but the fill backed off a touch (96% -> 90%) so the sphere still reads as an
+   object floating in its frame instead of edge-to-edge wallpaper. */
 .card-detail-art {
-  width: 96%;
-  height: 96%;
+  width: 90%;
+  height: 90%;
   display: block;
 }
 /* #23 fix: the shader used to sit directly over .card-detail-art (the live planet render),
@@ -3372,7 +3372,10 @@
 .card-detail-name-block {
   width: 100%;
   text-align: center;
-  margin-top: 10px;
+  /* User-requested: push all the text content as far down as the fullscreen face allows,
+     rather than clustering it right under the art with dead space left at the bottom. */
+  margin-top: auto;
+  padding-top: 10px;
 }
 .card-detail-name {
   font-family: var(--font-display);
