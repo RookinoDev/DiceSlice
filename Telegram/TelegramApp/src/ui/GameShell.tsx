@@ -113,12 +113,16 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     const originY = origin.top + origin.height / 2 - shellRect.top
     const destX = dest.left + dest.width / 2 - shellRect.left
     const destY = dest.top + dest.height / 2 - shellRect.top
-    const travelMs = 480
+    const travelMs = 560
     // User-requested: the coin count AND size now scale with how big this reward is relative
     // to recent rewards (intensity, computed by the caller), instead of a flat 8-12 regardless
-    // of the actual amount.
-    const waveCount = Math.round(7 + intensity * 6)
-    const coinPx = Math.round(8 + intensity * 4)
+    // of the actual amount. Sizes bumped up again (was 8-24px) - too subtle to read against the
+    // much bigger destruction burst added alongside it, especially starting on the same frame
+    // as that burst's flash. START_DELAY_MS lets the coins begin their own beat just after the
+    // flash instead of launching into the same instant as the explosion.
+    const waveCount = Math.round(10 + intensity * 6)
+    const coinPx = Math.round(14 + intensity * 6)
+    const START_DELAY_MS = 160
 
     for (let i = 0; i < waveCount; i++) {
       setTimeout(() => {
@@ -143,7 +147,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           void el.offsetWidth
           el.classList.add('fx-gold-punch')
         }, travelMs)
-      }, i * 70)
+      }, START_DELAY_MS + i * 70)
     }
   }
 

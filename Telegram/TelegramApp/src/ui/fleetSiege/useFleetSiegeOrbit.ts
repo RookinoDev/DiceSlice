@@ -53,8 +53,9 @@ const TAP_RIPPLE_SPEED_MULT = 0.3
 const TAP_RIPPLE_DURATION_S = 0.22
 const BIG_HIT_RIPPLE_SPEED_MULT = 1.0
 const BIG_HIT_RIPPLE_DURATION_S = 0.45
-/** User-requested: ships orbit "several times faster" while Fleet Surge (SkillType.BattleCry) is active. */
-const FLEET_SURGE_SPEED_MULT = 3.5
+/** User-requested: ships orbit "several times faster" while Fleet Surge (SkillType.BattleCry) is
+ * active - 3.5x read as merely "double speed" in practice, pushed higher. */
+const FLEET_SURGE_SPEED_MULT = 6
 
 // -- Engine trail pool: a fixed set of DOM nodes created once and only ever repositioned/
 // recolored/faded, never created or destroyed per-emission (see registerTrail/step below). --

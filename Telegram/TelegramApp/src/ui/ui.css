@@ -855,7 +855,9 @@
   height: 9px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, var(--palette-gold-light), var(--palette-gold-deep));
-  box-shadow: 0 0 6px rgba(255, 178, 56, 0.6);
+  /* Bumped up (was 0 0 6px / 0.6 alpha) - the coin itself can be small on a real phone screen,
+     but a bright glow around it reads clearly even at a glance. */
+  box-shadow: 0 0 14px rgba(255, 178, 56, 0.85);
   animation-name: fx-travel;
   animation-timing-function: ease-in;
   animation-fill-mode: forwards;
