@@ -12,7 +12,7 @@ import { CloseIcon } from '../icons'
 import cornerOrnament from '../../assets/cards/frame-corner-ornament.png'
 import type { CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
-import { VARIANT_LABEL, variantRank } from '../../game/cards/variants'
+import { variantRank } from '../../game/cards/variants'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
 import { loadFavorites, recordCardView, toggleFavorite } from '../../game/cards/cardPrefs'
 import { audio } from '../../game/audio/AudioManager'
@@ -338,7 +338,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                 )}
 
                 <div className="card-detail-hero-footer">
-                  <div className="card-detail-hero-tag">LIVE 3D · DRAG TO ORBIT · PINCH TO ZOOM</div>
                   {EXPLORE_ENABLED && !locked && (
                     <button
                       className="card-detail-explore-btn"
@@ -358,10 +357,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                   <div className="card-detail-name">{locked ? '???' : card.name}</div>
                   <div className="card-detail-type-tag">{locked ? 'UNDISCOVERED' : card.classification}</div>
                 </div>
-
-                {!locked && owned && (
-                  <div className="card-detail-variant-tag">{VARIANT_LABEL[owned.bestVariant].toUpperCase()}</div>
-                )}
 
                 {!locked && (
                   <div className="card-detail-stat-grid">

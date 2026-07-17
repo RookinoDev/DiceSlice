@@ -3345,21 +3345,13 @@
   display: block;
 }
 
-/* Below the art: a short hint + EXPLORE, then name/type, then physical data as a real grid,
-   then the mint row - each section its own visual block instead of a tight vertical list. */
+/* EXPLORE's home when re-enabled (see EXPLORE_ENABLED in CardDetailSheet.tsx) - empty and
+   zero-height while the feature is off. */
 .card-detail-hero-footer {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  /* User-requested extra clearance between the planet and this hint text specifically. */
-  margin-top: 20px;
-}
-.card-detail-hero-tag {
-  font-family: var(--font-display);
-  font-size: 9px;
-  letter-spacing: 0.1em;
-  color: var(--palette-text-dimmer);
 }
 .card-detail-explore-btn {
   flex-shrink: 0;
@@ -3396,17 +3388,6 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--rarity-color, var(--palette-text-dim));
-}
-.card-detail-variant-tag {
-  margin-top: 4px;
-  padding: 2px 9px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--rarity-color, transparent) 22%, transparent);
-  color: var(--rarity-color);
-  font-family: var(--font-display);
-  font-size: 9.5px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
 }
 
 .card-detail-stat-grid {
