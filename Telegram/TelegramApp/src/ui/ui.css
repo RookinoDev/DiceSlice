@@ -3312,12 +3312,11 @@
   align-items: center;
   justify-content: center;
 }
-/* The sphere reads as an object FLOATING in the frame, not wallpaper filling it - shrunk off
-   full-bleed so the starfield backdrop (see .card-detail-art-wrap's background, Card Anatomy
-   pass) shows as a visible margin all round, same as the grid orb already does. */
+/* User-requested: planet should read bigger inside the same square window - a thin margin still
+   shows the starfield backdrop (Card Anatomy pass) but the sphere itself now dominates the frame. */
 .card-detail-art {
-  width: 80%;
-  height: 80%;
+  width: 96%;
+  height: 96%;
   display: block;
 }
 /* #23 fix: the shader used to sit directly over .card-detail-art (the live planet render),

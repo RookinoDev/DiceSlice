@@ -51,6 +51,9 @@ interface SpringState {
 
 const REST: SpringState = { rx: 0, ry: 0, rz: 0, scale: 1 }
 
+// ponytail: EXPLORE (live ObjectViewer) disabled per user request - flip back on when that flow is ready.
+const EXPLORE_ENABLED = false
+
 export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext, hasNext }: CardDetailSheetProps) {
   const [flipped, setFlipped] = useState(false)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -336,7 +339,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
 
                 <div className="card-detail-hero-footer">
                   <div className="card-detail-hero-tag">LIVE 3D · DRAG TO ORBIT · PINCH TO ZOOM</div>
-                  {!locked && (
+                  {EXPLORE_ENABLED && !locked && (
                     <button
                       className="card-detail-explore-btn"
                       onPointerDown={(e) => e.stopPropagation()}
