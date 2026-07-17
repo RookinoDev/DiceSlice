@@ -303,6 +303,55 @@
   animation: sb-pulse-dot 1.6s ease-in-out infinite;
 }
 
+/* Boss-kill "new card pack" callout - drops from off-screen top, holds, slides back up. Base
+   rule has no transform of its own (only the keyframe moves it) so prefers-reduced-motion can
+   just disable the animation and leave it sitting visible in place, same idiom as .combo-chip. */
+.pack-earned-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(180deg, rgba(255, 178, 56, 0.96), rgba(255, 178, 56, 0.22));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: pack-banner-drop 1.7s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+.pack-earned-banner-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: #1b0620;
+}
+.pack-earned-banner-icon {
+  color: #1b0620;
+  font-size: 14px;
+}
+@keyframes pack-banner-drop {
+  0% {
+    transform: translateY(-100%);
+  }
+  10%,
+  85% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pack-earned-banner {
+    animation: none;
+  }
+}
+
 /* -- Toast (lowest-ceremony feedback tier) -- */
 .toast {
   position: absolute;

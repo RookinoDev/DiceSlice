@@ -19,6 +19,7 @@ import { getLandmarkRect, getLandmarkElement } from './combatFx/landmarks'
 import { TopBar } from './TopBar'
 import { BottomNav, type NavTab } from './BottomNav'
 import { Toast } from './Toast'
+import { PackEarnedBanner } from './PackEarnedBanner'
 import { FloatingNumbers } from './FloatingNumbers'
 import { useFloatingNumbers } from './useFloatingNumbers'
 import { CombatScreen } from './screens/CombatScreen'
@@ -78,6 +79,17 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
   const [packSheetOpen, setPackSheetOpen] = useState(false)
   const [toastText, setToastText] = useState<string | null>(null)
   const toastTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  // "New Card Pack" banner (boss kill) - a key bump forces a remount so back-to-back boss kills
+  // each replay the full drop-down animation instead of the second one being a no-op state set.
+  const [packBannerKey, setPackBannerKey] = useState(0)
+  const [packBannerVisible, setPackBannerVisible] = useState(false)
+  const packBannerTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const showPackBanner = () => {
+    setPackBannerKey((k) => k + 1)
+    setPackBannerVisible(true)
+    clearTimeout(packBannerTimeout.current)
+    packBannerTimeout.current = setTimeout(() => setPackBannerVisible(false), 1800)
+  }
   const { ref: shellRef, triggerShake } = useScreenShake<HTMLDivElement>()
   const { containerRef: rewardParticlesRef, spawn: spawnRewardParticle } = useParticles()
 
@@ -230,6 +242,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           hapticSuccess()
           triggerShake('big')
           spawnPackDrop()
+          showPackBanner()
         } else {
           showToast(`PLANET DESTROYED · +${gold.toShortString()} Stardust`)
           // Calm Before Destruction (#64): a shorter hush than the boss's, same reasoning.
@@ -391,6 +404,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         onDailyClick={() => setDailyOpen(true)}
       />
       <Toast text={toastText} />
+      <PackEarnedBanner key={packBannerKey} visible={packBannerVisible} />
 
       <div className={`game-shell-content ${tab === 'combat' ? 'combat-active' : ''}`}>
         {tab === 'combat' && (
