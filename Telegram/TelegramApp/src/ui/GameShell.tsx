@@ -7,7 +7,7 @@ import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import type { OfflineReport } from '../game/useGameSession'
 import type { PurchaseGrant } from '../game/monetization/purchases'
 import { audio } from '../game/audio/AudioManager'
-import { bindTelegramBackButton, getStartParam, getTelegramUser, hapticSuccess } from '../telegram'
+import { bindTelegramBackButton, getStartParam, getTelegramUser, hapticAction, hapticSuccess } from '../telegram'
 import { fetchPublicProfile, type PublicProfile, type ShowcaseEntry } from '../game/profileApi'
 import { fetchCollection, fetchPendingPacks, type OpenPackResult, type OwnedCard, type PendingPack } from '../game/cards/cardsApi'
 import { summarizeCollection } from '../game/cards/collectionSummary'
@@ -219,6 +219,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           // Calm Before Destruction (#64): a shorter hush than the boss's, same reasoning.
           audio.silence(80)
           audio.explosion()
+          hapticAction()
         }
       }),
       // No toast here - the always-visible Combat eyebrow already communicates a boss

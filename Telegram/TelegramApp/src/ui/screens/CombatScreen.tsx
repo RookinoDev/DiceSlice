@@ -43,9 +43,10 @@ const HP_BAR_SHAKE_DROP = 0.04
 const HP_FILL_CATCH_UP_RATE = 10
 /** Rare-roll odds for the Secret Rare Destruction variant - cosmetic lottery, not gameplay. */
 const SECRET_DESTRUCTION_CHANCE = 1 / 300
-/** #6 fix: how long the destroyed planet's visual holds before the next one enters - display
- * only, EnemyController has already spawned the next planet synchronously with zero delay. */
-const DESTRUCTION_PAUSE_MS = 1500
+/** User-requested: no hold at all - the next planet swaps in immediately (EnemyController has
+ * already spawned it synchronously with zero delay; this used to add a display-only pause on
+ * top of that, which is exactly what shouldn't happen anymore). */
+const DESTRUCTION_PAUSE_MS = 0
 /** #7 fix: the next planet's scale/fade/flash entrance duration. */
 const PLANET_ENTRANCE_MS = 460
 
@@ -99,12 +100,14 @@ function destructionPreset(overkillRatio: number, secret: boolean): DestructionP
   return 'normal'
 }
 
+// User-requested: juicier bursts now that the next planet swaps in immediately (no more 1.5s
+// hold for the explosion to read against) - counts/spread bumped up a tier across the board.
 const DESTRUCTION_CONFIG: Record<DestructionPreset, { count: number; distMin: number; distMax: number; duration: number }> = {
-  normal: { count: 6, distMin: 24, distMax: 46, duration: 480 },
-  fragmentation: { count: 12, distMin: 30, distMax: 70, duration: 560 },
-  split: { count: 14, distMin: 40, distMax: 90, duration: 620 },
-  implosion: { count: 18, distMin: 50, distMax: 110, duration: 760 },
-  secret: { count: 24, distMin: 40, distMax: 120, duration: 800 },
+  normal: { count: 10, distMin: 26, distMax: 56, duration: 500 },
+  fragmentation: { count: 18, distMin: 34, distMax: 84, duration: 580 },
+  split: { count: 20, distMin: 44, distMax: 104, duration: 640 },
+  implosion: { count: 26, distMin: 56, distMax: 128, duration: 780 },
+  secret: { count: 34, distMin: 46, distMax: 140, duration: 820 },
 }
 
 function spawnDestructionBurst(spawn: ReturnType<typeof useParticles>['spawn'], x: number, y: number, color: string, preset: DestructionPreset) {
