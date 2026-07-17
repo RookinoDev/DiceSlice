@@ -586,7 +586,18 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, p
           x: ship.x,
           y: ship.y,
           durationMs: spec.travelMs,
-          style: { width: `${spec.sizePx}px`, height: `${spec.sizePx}px`, background: spec.color, boxShadow: `0 0 ${spec.sizePx}px ${spec.color}`, '--tx': `${tx}px`, '--ty': `${ty}px` } as CSSProperties,
+          // .siege-proj has no fixed animation-duration (travelMs varies per ship archetype) -
+          // same bug class as .fx-coin/.fx-pack-drop (see ui.css): without this, the animation
+          // defaults to 0s and the projectile is invisible the entire time it exists.
+          style: {
+            width: `${spec.sizePx}px`,
+            height: `${spec.sizePx}px`,
+            background: spec.color,
+            boxShadow: `0 0 ${spec.sizePx}px ${spec.color}`,
+            '--tx': `${tx}px`,
+            '--ty': `${ty}px`,
+            animationDuration: `${spec.travelMs}ms`,
+          } as CSSProperties,
         })
       }
 
