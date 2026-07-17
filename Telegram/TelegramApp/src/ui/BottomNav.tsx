@@ -68,9 +68,9 @@ export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPre
                 onSelect(t.tab)
               }}
             >
-              <span className="bottomnav-icon">
+              <span className={`bottomnav-icon ${t.tab === 'cards' && t.dot ? 'bottomnav-icon--pulse' : ''}`}>
                 <Icon color={color} />
-                {t.dot && <span className="dot dot-prestige" />}
+                {t.dot && <span className={`dot ${t.tab === 'cards' ? 'dot-cards' : 'dot-prestige'}`} />}
               </span>
               <span className="bottomnav-label" style={{ color }}>
                 {t.label.toUpperCase()}
