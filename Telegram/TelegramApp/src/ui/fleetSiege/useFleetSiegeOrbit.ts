@@ -25,6 +25,7 @@
 // root layer element itself or this breaks (it would trap children in its own context instead).
 import { useEffect, useRef, type CSSProperties, type RefObject } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
+import { SkillType } from '../../game/config/SkillDefinition'
 import type { PlanetImpulseApi } from '../../planet/PlanetCanvas'
 import { projectileSpecForShip, type FleetProjectileSpec } from './fleetProjectileSpecs'
 import { shipTierVisualForIndex } from '../shipTierVisuals'
@@ -52,6 +53,8 @@ const TAP_RIPPLE_SPEED_MULT = 0.3
 const TAP_RIPPLE_DURATION_S = 0.22
 const BIG_HIT_RIPPLE_SPEED_MULT = 1.0
 const BIG_HIT_RIPPLE_DURATION_S = 0.45
+/** User-requested: ships orbit "several times faster" while Fleet Surge (SkillType.BattleCry) is active. */
+const FLEET_SURGE_SPEED_MULT = 3.5
 
 // -- Engine trail pool: a fixed set of DOM nodes created once and only ever repositioned/
 // recolored/faded, never created or destroyed per-emission (see registerTrail/step below). --
@@ -307,6 +310,9 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
       const bigHitRipple = bigHitRippleT < 1 ? 1 + BIG_HIT_RIPPLE_SPEED_MULT * easeInOutPulse(bigHitRippleT) : 1
 
       const nowSeconds = now / 1000
+      // Fleet Surge (BattleCry) - session is a stable, live-mutable object across this loop's
+      // lifetime (see effect dep below), so reading it fresh every frame needs no extra ref.
+      const fleetSurgeMult = s.skills.isActive(SkillType.BattleCry) ? FLEET_SURGE_SPEED_MULT : 1
 
       for (const [index, ship] of shipsRef.current) {
         // Organic, non-robotic pacing: a smooth per-ship sine wobble on top of its own constant
@@ -322,7 +328,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
         const burstSpeedMult = 1 + (BURST_SPEED_MULT - 1) * burstPulse
         const burstScalePunch = 1 + BURST_SCALE_PUNCH * burstPulse
 
-        const effectiveSpeed = ship.params.angularSpeed * formationRef.current.speed * flyby * wobble * burstSpeedMult * tapRipple * bigHitRipple
+        const effectiveSpeed = ship.params.angularSpeed * formationRef.current.speed * flyby * wobble * burstSpeedMult * tapRipple * bigHitRipple * fleetSurgeMult
 
         if (!reducedMotionRef.current) {
           ship.angle += dt * effectiveSpeed
