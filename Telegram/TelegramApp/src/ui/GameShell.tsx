@@ -129,36 +129,38 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       setTimeout(() => {
         const jitterX = (Math.random() - 0.5) * 26
         const jitterY = (Math.random() - 0.5) * 26
-        // User-requested: coins spin while they travel - 2-3 full turns, random direction, so
-        // the whole burst doesn't spin in lockstep.
-        const spinTurns = 2 + Math.random()
-        const spinDeg = (Math.random() < 0.5 ? -1 : 1) * spinTurns * 360
-        // Pop phase target: a controlled radial burst off the planet (each coin its own angle/
-        // distance) before the collect phase pulls it to the gold pill - see fx-coin-travel.
-        const popAngle = Math.random() * Math.PI * 2
+        // Pop phase target: biased UPWARD (reference-GIF motion) - straight up +-55deg spread,
+        // each coin its own distance, before the collect phase bends it toward the gold pill.
+        const popAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.9
         const popDist = 30 + Math.random() * 34
+        // Slight per-coin timing variation: travel duration and vertical-flip speed both vary
+        // a touch so a burst reads organic, not a lockstep formation (see fx-coin-flip).
+        const coinTravelMs = Math.round(travelMs * (0.9 + Math.random() * 0.25))
+        const flipMs = Math.round(240 + Math.random() * 140)
         spawnRewardParticle({
           className: 'fx-coin',
           x: originX + jitterX,
           y: originY + jitterY,
-          durationMs: travelMs,
+          durationMs: coinTravelMs,
           style: {
             width: `${coinPx}px`,
             height: `${coinPx}px`,
+            animationDuration: `${coinTravelMs}ms`,
             '--px': `${Math.cos(popAngle) * popDist}px`,
             '--py': `${Math.sin(popAngle) * popDist}px`,
             '--tx': `${destX - originX - jitterX}px`,
             '--ty': `${destY - originY - jitterY}px`,
-            '--spin': `${spinDeg}deg`,
+            '--flip-dur': `${flipMs}ms`,
           } as CSSProperties,
         })
         setTimeout(() => {
+          spawnRewardParticle({ className: 'fx-coin-sparkle', x: destX, y: destY, durationMs: 260 })
           const el = getLandmarkElement('gold-pill')
           if (!el) return
           el.classList.remove('fx-gold-punch')
           void el.offsetWidth
           el.classList.add('fx-gold-punch')
-        }, travelMs)
+        }, coinTravelMs)
       }, START_DELAY_MS + i * 70)
     }
   }
