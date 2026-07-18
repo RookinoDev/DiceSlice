@@ -113,7 +113,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     const originY = origin.top + origin.height / 2 - shellRect.top
     const destX = dest.left + dest.width / 2 - shellRect.left
     const destY = dest.top + dest.height / 2 - shellRect.top
-    const travelMs = 560
+    // Must match .fx-coin's animation-duration in ui.css (pop phase + collect phase).
+    const travelMs = 680
     // User-requested: the coin count AND size now scale with how big this reward is relative
     // to recent rewards (intensity, computed by the caller), instead of a flat 8-12 regardless
     // of the actual amount. Sizes bumped up again (was 8-24px) - too subtle to read against the
@@ -132,6 +133,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         // the whole burst doesn't spin in lockstep.
         const spinTurns = 2 + Math.random()
         const spinDeg = (Math.random() < 0.5 ? -1 : 1) * spinTurns * 360
+        // Pop phase target: a controlled radial burst off the planet (each coin its own angle/
+        // distance) before the collect phase pulls it to the gold pill - see fx-coin-travel.
+        const popAngle = Math.random() * Math.PI * 2
+        const popDist = 30 + Math.random() * 34
         spawnRewardParticle({
           className: 'fx-coin',
           x: originX + jitterX,
@@ -140,6 +145,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           style: {
             width: `${coinPx}px`,
             height: `${coinPx}px`,
+            '--px': `${Math.cos(popAngle) * popDist}px`,
+            '--py': `${Math.sin(popAngle) * popDist}px`,
             '--tx': `${destX - originX - jitterX}px`,
             '--ty': `${destY - originY - jitterY}px`,
             '--spin': `${spinDeg}deg`,

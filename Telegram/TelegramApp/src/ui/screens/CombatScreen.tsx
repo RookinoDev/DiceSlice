@@ -253,6 +253,15 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       spawnParticle({ className: 'fx-destruct-flash', x, y, durationMs: 260 })
       spawnParticle({ className: 'fx-destruct-shock', x, y, durationMs: 520 })
       spawnDestructionBurst(spawnParticle, x, y, materialRef.current.debrisColor, preset)
+      // Second explosion layer, slightly offset in time: a follow-up ring plus a small gold
+      // spark burst so the destruction reads as staged (boom... BOOM) rather than one frame of
+      // everything at once. spawn() no-ops safely if the screen unmounted mid-delay.
+      const debrisColor = materialRef.current.debrisColor
+      setTimeout(() => {
+        spawnParticle({ className: 'fx-destruct-shock', x, y, durationMs: 460 })
+        spawnDestructionBurst(spawnParticle, x, y, '#FFD873', 'normal')
+        spawnDebris(spawnParticle, x, y, debrisColor)
+      }, 130)
       if (secret) {
         clearTimeout(recordTimeout.current)
         setRecordText('★ RARE DESTRUCTION ★')
