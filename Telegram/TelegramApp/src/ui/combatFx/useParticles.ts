@@ -31,7 +31,20 @@ export function useParticles() {
     el.className = spec.className
     el.style.left = `${spec.x}px`
     el.style.top = `${spec.y}px`
-    if (spec.style) Object.assign(el.style, spec.style as Record<string, string>)
+    // ROOT CAUSE of "particles spawn but never travel": Object.assign(el.style, {...}) silently
+    // fails for CSS custom properties (--tx/--ty/--rot/--ang) - it sets a plain JS expando
+    // property readable via bracket notation (el.style['--tx']) but never reaches the real
+    // CSSOM, so getPropertyValue('--tx') (what a CSS var() lookup actually uses) returns ''. The
+    // keyframes then fall back to their 0px default and the particle just fades in place at its
+    // spawn point. Custom properties need the real setProperty() API; everything else (width,
+    // boxShadow, animationDuration, ...) works fine via direct assignment.
+    if (spec.style) {
+      for (const [key, value] of Object.entries(spec.style)) {
+        if (value == null) continue
+        if (key.startsWith('--')) el.style.setProperty(key, String(value))
+        else (el.style as unknown as Record<string, string>)[key] = String(value)
+      }
+    }
     container.appendChild(el)
     setTimeout(() => el.remove(), spec.durationMs)
   }, [])
