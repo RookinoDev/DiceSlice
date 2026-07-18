@@ -61,7 +61,7 @@ describe('economy curves match the documented Unity formulas', () => {
     const ships = buildDefaultShips()
     expect(ships).toHaveLength(cfg.shipCount)
     expect(ships[0].baseCost).toBe(50)
-    expect(ships[0].baseDps).toBe(5)
+    expect(ships[0].baseDps).toBe(8)
   })
 
   it('ship cooldown drops at breakpoints and floors at the configured minimum', () => {

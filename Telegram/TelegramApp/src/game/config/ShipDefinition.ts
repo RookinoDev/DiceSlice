@@ -37,7 +37,13 @@ const BASE_COSTS = [
   4.95e16, 2.46e17,
 ]
 
-const FIRST_DPS = 5.0
+// User-reported: ships felt weak vs. tapping - bumped from 5.0 (see BalanceConfig.shipDamagePerLevel
+// for the matching per-level growth change; that one's the *within-a-ship* upgrade curve).
+const FIRST_DPS = 8.0
+// Deliberately NOT tied to BalanceConfig.shipDamagePerLevel (1.5) - this one sets how much
+// stronger each successive SHIP's starting DPS is (roster progression), not how a single owned
+// ship scales as you level it up. Left at the original value so buffing ship upgrades doesn't
+// also blow up the ship-to-ship escalation, which wasn't part of the reported complaint.
 const DAMAGE_PER_LEVEL = 1.27
 const CHAIN_LEVELS = 10 // "next ship ~ prev at lvl 10"
 const CHAIN_FACTOR = Math.pow(DAMAGE_PER_LEVEL, CHAIN_LEVELS) // ~10.92

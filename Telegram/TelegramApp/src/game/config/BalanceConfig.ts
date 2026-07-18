@@ -122,8 +122,14 @@ export const defaultBalanceConfig: BalanceConfig = {
   shipBaseCostGrowthMax: 8.9,
   shipCount: 19,
 
-  shipBaseDpsFirst: 5.0,
-  shipDamagePerLevel: 1.27,
+  shipBaseDpsFirst: 8.0,
+  // User-reported: ships felt weak vs. tapping. Tap damage grows up to 2.1x/level early
+  // (decaying toward 1.15x) against a cost that only grows 1.12x/level - ships grew a flat
+  // 1.27x/level against a 1.075x/level cost, a much smaller damage-per-stardust improvement
+  // each level. Raised to narrow that gap (not fully match tap's early spike, which is meant
+  // to taper off - ships are a permanent compounding rate, so matching 2.1x forever would have
+  // made them absurd at high levels).
+  shipDamagePerLevel: 1.5,
   shipArchetypeCooldowns: [0.5, 1.0, 2.0],
 
   shipCooldownBreakpoints: [100, 200, 300, 400, 500],
