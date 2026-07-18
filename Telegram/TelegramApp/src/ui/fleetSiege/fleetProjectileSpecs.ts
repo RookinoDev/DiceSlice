@@ -21,6 +21,10 @@ export interface FleetProjectileSpec {
   shake: boolean
   /** How many projectile puffs one hit spawns (pulse/shard fire in a cluster). */
   shots: number
+  /** User-requested: every ship's shot reads as its own, not just its tier's - a small
+   *  deterministic hue-rotate (applied as a CSS filter) on top of the tier color, so ships
+   *  sharing a tier (and therefore a base color) still look distinct from each other. */
+  hueShiftDeg: number
 }
 
 const BEAM_NAMES = new Set(['Worldbreaker', 'Starbreaker Prime'])
@@ -36,7 +40,11 @@ export function projectileSpecForShip(index: number, def: ShipDefinition): Fleet
   if (BEAM_NAMES.has(def.shipName)) shape = 'beam'
   else if (def.archetype === ShipArchetype.Fast) shape = 'dart'
   else if (def.archetype === ShipArchetype.Heavy) shape = 'orb'
-  else shape = MEDIUM_SUBSHAPES[index % MEDIUM_SUBSHAPES.length]
+  // Bug fix: Medium ships sit at indices 1,4,7,10,13,16 (every 3rd slot) - `index % 3` was
+  // therefore the SAME value for every one of them (1 % 3 always equals 1), so all six
+  // "sub-flavors" collapsed onto a single shape despite the comment's intent. Dividing by 3
+  // first turns that into a real 0..5 counter before cycling through the three sub-shapes.
+  else shape = MEDIUM_SUBSHAPES[Math.floor(index / 3) % MEDIUM_SUBSHAPES.length]
 
   const isHeavy = def.archetype === ShipArchetype.Heavy || shape === 'beam'
   return {
@@ -51,5 +59,9 @@ export function projectileSpecForShip(index: number, def: ShipDefinition): Fleet
     impulseStrength: isHeavy ? 0.025 : 0,
     shake: SHAKE_NAMES.has(def.shipName),
     shots: shape === 'pulse' ? 2 : shape === 'shard' ? 3 : 1,
+    // Deterministic, evenly-spread across a tier's few ships (37 is coprime with the small tier
+    // sizes here, so consecutive indices don't land near each other) - kept within +-45deg so it
+    // stays a variant of the tier's color family rather than jumping to an unrelated hue.
+    hueShiftDeg: ((index * 37) % 91) - 45,
   }
 }

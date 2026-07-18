@@ -578,7 +578,13 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, p
           x: ship.x,
           y: ship.y,
           durationMs: 260,
-          style: { width: `${len}px`, background: spec.color, boxShadow: `0 0 6px ${spec.color}`, '--ang': `${angleDeg}deg` } as CSSProperties,
+          style: {
+            width: `${len}px`,
+            background: spec.color,
+            boxShadow: `0 0 6px ${spec.color}`,
+            '--ang': `${angleDeg}deg`,
+            filter: `hue-rotate(${spec.hueShiftDeg}deg)`,
+          } as CSSProperties,
         })
       } else {
         spawn({
@@ -597,6 +603,7 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, p
             '--tx': `${tx}px`,
             '--ty': `${ty}px`,
             animationDuration: `${spec.travelMs}ms`,
+            filter: `hue-rotate(${spec.hueShiftDeg}deg)`,
           } as CSSProperties,
         })
       }

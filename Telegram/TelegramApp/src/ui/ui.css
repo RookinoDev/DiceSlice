@@ -861,7 +861,11 @@
   /* Bumped up (was 0 0 6px / 0.6 alpha) - the coin itself can be small on a real phone screen,
      but a bright glow around it reads clearly even at a glance. */
   box-shadow: 0 0 14px rgba(255, 178, 56, 0.85);
-  animation-name: fx-travel;
+  /* User-requested: coins spin as they travel - own keyframe (not the shared fx-travel, which
+     .siege-proj also rides without wanting rotation) combining translate+rotate in one
+     transform, same technique as fx-fly-fade's debris rotation. --spin set per-coin in
+     GameShell.tsx for a bit of organic variety (direction/turn count). */
+  animation-name: fx-coin-travel;
   /* ROOT CAUSE of "coins are invisible": this class never had an animation-duration, so it
      defaulted to 0s - animation-fill-mode:forwards then immediately snapped to the 100% keyframe
      (opacity:0, fully translated) on the very first frame, before anyone could ever see it. Was
@@ -870,6 +874,19 @@
   animation-duration: 560ms;
   animation-timing-function: ease-in;
   animation-fill-mode: forwards;
+}
+@keyframes fx-coin-travel {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0deg);
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--tx, 0px), var(--ty, 0px)) rotate(var(--spin, 720deg));
+    opacity: 0;
+  }
 }
 
 .combat-planet.hit {

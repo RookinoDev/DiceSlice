@@ -128,6 +128,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       setTimeout(() => {
         const jitterX = (Math.random() - 0.5) * 26
         const jitterY = (Math.random() - 0.5) * 26
+        // User-requested: coins spin while they travel - 2-3 full turns, random direction, so
+        // the whole burst doesn't spin in lockstep.
+        const spinTurns = 2 + Math.random()
+        const spinDeg = (Math.random() < 0.5 ? -1 : 1) * spinTurns * 360
         spawnRewardParticle({
           className: 'fx-coin',
           x: originX + jitterX,
@@ -138,6 +142,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
             height: `${coinPx}px`,
             '--tx': `${destX - originX - jitterX}px`,
             '--ty': `${destY - originY - jitterY}px`,
+            '--spin': `${spinDeg}deg`,
           } as CSSProperties,
         })
         setTimeout(() => {
