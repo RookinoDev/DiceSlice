@@ -12,8 +12,16 @@ export type OverdrivePhase = 'idle' | 'countdown' | 'active' | 'ending'
 
 const BEAT_MS = 150
 
+// Ceremony start-to-active takes BEAT_MS*3+350ms (~800ms) - the safety net below is deliberately
+// much longer so it never races the real sequence, only catches genuinely stuck cases.
+const CEREMONY_MAX_MS = 2500
+
 export function useOverdriveJuice(s: GameSession) {
-  const [phase, setPhase] = useState<OverdrivePhase>('idle')
+  // Bug fix: mounting always started at 'idle' regardless of the REAL skill's current state, so
+  // switching tabs mid-buff (unmounting CombatScreen) and back lost all cosmetic feedback for
+  // the remainder of that buff window - sync from the real session on first mount instead of
+  // assuming nothing is happening.
+  const [phase, setPhase] = useState<OverdrivePhase>(() => (s.skills.isActive(SkillType.Overdrive) ? 'active' : 'idle'))
   const [countdownText, setCountdownText] = useState('')
   const timeouts = useRef<ReturnType<typeof setTimeout>[]>([])
 
@@ -24,6 +32,15 @@ export function useOverdriveJuice(s: GameSession) {
     }
     const after = (ms: number, fn: () => void) => {
       timeouts.current.push(setTimeout(fn, ms))
+    }
+    // Belt-and-suspenders: whatever else happens (a race we haven't found, a browser timer
+    // getting coalesced/dropped after the tab was backgrounded, ...), the countdown text can
+    // never visibly stick around longer than this - always resolves to a clean resting state.
+    const armSafetyNet = () => {
+      after(CEREMONY_MAX_MS, () => {
+        setCountdownText('')
+        setPhase(s.skills.isActive(SkillType.Overdrive) ? 'active' : 'idle')
+      })
     }
 
     const offs = [
@@ -50,11 +67,13 @@ export function useOverdriveJuice(s: GameSession) {
           setPhase('active')
           setCountdownText('')
         })
+        armSafetyNet()
       }),
       s.skills.onExpired.on((t) => {
         if (t !== SkillType.Overdrive) return
         clearAllTimeouts()
         setPhase('ending')
+        setCountdownText('')
         audio.overdriveEnd()
         after(400, () => setPhase('idle'))
       }),

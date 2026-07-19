@@ -78,13 +78,17 @@ export function artifactBonusAt(def: ArtifactDefinition, level: number): number 
 
 export function buildDefaultArtifacts(c: BalanceConfig): ArtifactDefinition[] {
   return [
+    // User-requested buff: was sharing the same firstLevelBonus/bonusPerLevel as Stellar
+    // Engine/Kinetic Lens despite Fleet DPS being the artifact with the least payoff (compounds
+    // with per-ship level scaling instead of standing alone the way gold/tap damage do) - now
+    // roughly 1.75x the level-1 jump and 2x the per-level growth of its siblings.
     createArtifact(
       ArtifactEffect.Dps,
       'Singularity Core',
       c.artifactBaseCost,
       c.artifactCostGrowth,
-      c.artifactFirstLevelBonus,
-      c.artifactBonusPerLevel,
+      0.35,
+      0.08,
       'Ancient reactor core. Increases total Fleet DPS.',
     ),
     createArtifact(

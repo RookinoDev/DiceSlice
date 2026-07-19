@@ -47,6 +47,9 @@ interface GameShellProps {
   claimedGrants: PurchaseGrant[]
   /** Bumped by useGameSession whenever the session is rebooted from a better cloud save. */
   cloudRestores: number
+  /** Force an immediate cloud-save push instead of waiting for the periodic timer - used right
+   *  after a boss kill so the server-side pack grant isn't stuck behind a minute-long wait. */
+  syncNow: (keepalive?: boolean) => Promise<void>
 }
 
 // Human-readable label for a purchase grant's toast announcement, keyed by the same
@@ -56,7 +59,7 @@ const GRANT_LABELS: Record<string, string> = {
   stardust_pack_500: '+500 Stardust',
 }
 
-export function GameShell({ session, offline, claimedGrants, cloudRestores }: GameShellProps) {
+export function GameShell({ session, offline, claimedGrants, cloudRestores, syncNow }: GameShellProps) {
   const [tab, setTab] = useState<NavTab>('combat')
   const [prestigeConfirmOpen, setPrestigeConfirmOpen] = useState(false)
   const [missionsOpen, setMissionsOpen] = useState(false)
@@ -263,6 +266,15 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
           triggerShake('big')
           spawnPackDrop()
           showPackBanner()
+          // Bug fix: pack grants only ever happened server-side during a cloud-save sync, which
+          // was on a 60s timer (see CLOUD_PUSH_SECONDS) - a player switching straight to the
+          // Cards tab after a kill would almost always miss their own just-earned pack and have
+          // to wait up to a minute. Force the push now instead of waiting for the timer, then
+          // refetch once the server (which grants synchronously within that same request,
+          // before responding) has actually seen it.
+          syncNow()
+            .then(refreshCards)
+            .catch(() => {}) // offline/unreachable: the periodic sync will pick it up later
         } else {
           showToast(`PLANET DESTROYED · +${gold.toShortString()} Stardust`)
           // Calm Before Destruction (#64): a shorter hush than the boss's, same reasoning.

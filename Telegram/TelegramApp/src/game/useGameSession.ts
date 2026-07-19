@@ -87,11 +87,13 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
   // it was written before this device claimed them).
   const claimedGrantsRef = useRef<PurchaseGrant[]>([])
 
-  /** Write localStorage now and, once cloud sync is up, mirror the same snapshot there. */
-  const syncNow = (keepalive = false) => {
+  /** Write localStorage now and, once cloud sync is up, mirror the same snapshot there. Resolves
+   *  once the cloud push settles (or immediately if cloud sync isn't ready) - callers that need
+   *  to know "the server has seen this" (e.g. refetching pack grants right after) can await it. */
+  const syncNow = async (keepalive = false): Promise<void> => {
     const state = captureSave(activeSessionRef.current)
     writeSave(state)
-    if (cloudReadyRef.current) pushCloudSave(import.meta.env.VITE_API_URL, state, keepalive)
+    if (cloudReadyRef.current) await pushCloudSave(import.meta.env.VITE_API_URL, state, keepalive)
   }
 
   useEffect(() => {
@@ -226,5 +228,5 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     () => versionRef.current,
   )
 
-  return { session, offline, claimedGrants, cloudRestores }
+  return { session, offline, claimedGrants, cloudRestores, syncNow }
 }

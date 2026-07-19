@@ -7,6 +7,7 @@ import type { GameSession } from '../../game/gameplay/GameSession'
 import { hapticAction } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
 import { shipTierVisualForIndex } from '../shipTierVisuals'
+import { BigNumber } from '../../game/core/BigNumber'
 
 interface FleetRowProps {
   session: GameSession
@@ -33,7 +34,8 @@ export function FleetRow({ session: s, index, onToast }: FleetRowProps) {
           {tier.tierLabel.toUpperCase()}
           {owned ? ` · LV.${ships.levelOf(index)}` : ''}
         </div>
-        <div className="row-detail accent">{owned ? `${ships.shipDps(index).toShortString()} DPS/s` : 'Ready to deploy'}</div>
+        {/* Was "DPS/s" - DPS already means "per second", the extra unit was a redundant typo. */}
+        <div className="row-detail accent">{owned ? `${ships.shipDps(index).toShortString()} DPS` : 'Ready to deploy'}</div>
       </div>
       <button
         className={`row-action ${afford ? 'affordable' : ''}`}
@@ -46,6 +48,9 @@ export function FleetRow({ session: s, index, onToast }: FleetRowProps) {
         }}
       >
         <div className="row-action-label">{owned ? 'UPGRADE' : 'BUY'}</div>
+        {/* User-requested: show what buying/upgrading actually gets you, not just what it
+            costs - the DPS number already shown above only ever reflected the CURRENT level. */}
+        <div className="row-action-dps">+{ships.nextLevelDps(index).sub(owned ? ships.shipDps(index) : BigNumber.Zero).toShortString()} DPS</div>
         <div className="row-action-cost">{ships.nextCost(index).toShortString()} G</div>
       </button>
     </div>

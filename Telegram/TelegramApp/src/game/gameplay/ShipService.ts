@@ -60,8 +60,18 @@ export class ShipService {
   }
 
   shipDps(i: number): BigNumber {
+    return this.shipDpsAtLevel(i, this.levels[i])
+  }
+
+  /** DPS this ship would have at the next level (level+1, or 1 if not yet owned) - lets the
+   *  Fleet screen show "+X DPS" on the buy/upgrade button instead of only the current output. */
+  nextLevelDps(i: number): BigNumber {
+    return this.shipDpsAtLevel(i, Math.max(1, this.levels[i] + 1))
+  }
+
+  private shipDpsAtLevel(i: number, level: number): BigNumber {
     return shipEffectiveDps(
-      this.levels[i],
+      level,
       this.ships[i].baseHitDamage,
       this.ships[i].baseCooldown,
       this.cfg.shipDamagePerLevel,
@@ -96,10 +106,12 @@ export class ShipService {
     return n
   }
 
-  /** Reset every ship to unowned (used by prestige). */
+  /** Prestige reset: owned ships (level > 0) drop back to level 1, not unowned - a player who
+   *  bought a ship keeps it, they just lose the levels invested in it. Ships never bought stay
+   *  unowned (0). Previously reset everyone to 0, silently taking ships away on every prestige. */
   resetLevels(): void {
     for (let i = 0; i < this.levels.length; i++) {
-      this.levels[i] = 0
+      this.levels[i] = this.levels[i] > 0 ? 1 : 0
       this.timers[i] = 0
     }
   }
