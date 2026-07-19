@@ -16,8 +16,8 @@ import { asteroidFragmentShader } from './shaders/asteroid'
 import { planetCracksFragmentShader, MAX_CRACK_IMPACTS } from './shaders/planetCracks'
 import { featureDecalFragmentShader, MAX_FEATURES } from './shaders/featureDecal'
 import { rimAtmosphereFragmentShader } from './shaders/rimAtmosphere'
-import { RING_SCALE, planetMaxScale, type PlanetProfile } from './planetProfiles'
-import type { RGB } from './themes'
+import { RING_SCALE, planetMaxScale, type MoonSpec, type PlanetProfile } from './planetProfiles'
+import { themesNoAtmo, type RGB } from './themes'
 
 // Matches PixelPlanetGenerator.TR(factor) = (2*round(50)/0.2)*factor = 500*factor, evaluated
 // for the factors actually used in the generator (0.02 for most layers, 0.01 for clouds,
@@ -404,6 +404,52 @@ function buildAtmosphereLayer(profile: PlanetProfile, allLayers: LayerSpec[]): L
   }
 }
 
+// Orbiting moons (ported from Unity's Moon struct/AddMoon/Update - see planetProfiles.ts's
+// MoonSpec doc comment). Each moon reuses the bare-rock noAtmosphere shader at a small scale,
+// same as Unity reused its NoAtmosphere quad for moons - a real body's moons don't need their
+// own shader kind, just a themed rock palette. Deterministic per-moon: `frac` below is the same
+// seed->0..1 technique realPlanets.ts's withMoons uses, so the same moon always gets the same
+// theme, never Math.random().
+function frac(x: number): number {
+  return x - Math.floor(x)
+}
+
+interface MoonMesh {
+  mesh: Mesh
+  spec: MoonSpec
+}
+
+function buildMoonMeshes(moons: MoonSpec[] | undefined, geometry: PlaneGeometry, scene: Scene): MoonMesh[] {
+  if (!moons || moons.length === 0) return []
+  return moons.map((spec) => {
+    const theme = themesNoAtmo[Math.floor(frac(spec.seed * 13.7) * themesNoAtmo.length)]
+    const material = new ShaderMaterial({
+      vertexShader: planetVertexShader,
+      fragmentShader: noAtmosphereFragmentShader,
+      uniforms: {
+        uRotation: { value: 0 },
+        uLightOrigin: { value: new Vector2(0.36, 0.31) },
+        uTimeSpeed: { value: 0.2 },
+        uSize: { value: 30 + frac(spec.seed * 4.1) * 30 },
+        uSeed: { value: spec.seed },
+        uPlanetTime: { value: 0 },
+        uRandMod: { value: new Vector2(1, 1) },
+        uLightBorder1: { value: 0.4 },
+        uLightBorder2: { value: 0.6 },
+        uColors: { value: colorsToVec4(theme.slice(0, 3)) },
+      },
+      transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
+      blending: NormalBlending,
+    })
+    const mesh = new Mesh(geometry, material)
+    mesh.scale.set(spec.scale, spec.scale, 1)
+    scene.add(mesh)
+    return { mesh, spec }
+  })
+}
+
 /** Imperative handle for hit-reaction physics - see PlanetCanvas's onReady prop. */
 export interface PlanetImpulseApi {
   /** Push the planet away from a tap/hit at (x,y) canvas-relative px. strength ~0.02 (light tap) to ~0.15 (big hit). */
@@ -490,6 +536,9 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
       return mesh
     })
     const timeAccum = layers.map(() => Math.random() * 1000)
+    const moonMeshes = buildMoonMeshes(profile.moons, geometry, scene)
+    const moonAngles = moonMeshes.map((m) => m.spec.phase)
+    const moonTimeAccum = moonMeshes.map(() => Math.random() * 1000)
 
     // Toon outline post-pass (ported from Unity's CameraOutline - see shaders/outlinePost.ts):
     // the planet renders into an offscreen target, then a fullscreen quad runs edge detection
@@ -646,6 +695,23 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
         if (uniforms.uTilt) uniforms.uTilt.value = userTilt
       })
 
+      // Moon orbits (#68): elliptical position each frame, front/behind faked via renderOrder +
+      // a small perspective scale swap - same trick Unity's Moon.Update used, no true z-depth.
+      moonMeshes.forEach((moon, i) => {
+        moonAngles[i] += dt * moon.spec.speed
+        moonTimeAccum[i] += dt * TIME_RATE_BASE
+        const ang = moonAngles[i]
+        const depth = Math.sin(ang)
+        const x = Math.cos(ang) * moon.spec.orbitRadiusX
+        const y = depth * moon.spec.orbitRadiusY
+        moon.mesh.position.set(x + impulseOffset.x, y + impulseOffset.y, 0)
+        moon.mesh.renderOrder = depth < 0 ? -1 : 100
+        moon.mesh.scale.setScalar(moon.spec.scale * (0.85 + 0.15 * (depth * 0.5 + 0.5)))
+        const moonUniforms = (moon.mesh.material as ShaderMaterial).uniforms
+        moonUniforms.uRotation.value = rotation
+        moonUniforms.uPlanetTime.value = moonTimeAccum[i]
+      })
+
       renderer.setRenderTarget(renderTarget)
       renderer.render(scene, camera)
       renderer.setRenderTarget(null)
@@ -658,6 +724,7 @@ export function PlanetCanvas({ profile, className, onReady, hpFraction }: Planet
       cancelAnimationFrame(raf)
       resizeObserver.disconnect()
       meshes.forEach((mesh) => (mesh.material as Material).dispose())
+      moonMeshes.forEach((moon) => (moon.mesh.material as Material).dispose())
       postMaterial.dispose()
       renderTarget.dispose()
       geometry.dispose()

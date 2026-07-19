@@ -54,6 +54,29 @@ export interface FeatureSpec {
   color: RGB
 }
 
+/**
+ * An orbiting moon (docs list item "bring back moons"), ported from Unity's Moon struct
+ * (PixelPlanetGenerator.cs's AddMoon/Update) - a small bare-rock body on a tilted elliptical
+ * orbit, front/behind depth faked via render order instead of true 3D. Unlike Unity's version
+ * (fully randomized count per rarity roll, no connection to real data), the web roster only
+ * gives moons to real solar-system planets that actually have them, sized to the real count
+ * (capped for screen readability - see realPlanets.ts's withMoons).
+ */
+export interface MoonSpec {
+  /** Deterministic per-moon seed (drives its rock theme pick + shader noise) - NOT randomized
+   *  per render, so the same planet always shows the same moons in the same place. */
+  seed: number
+  /** Moon radius as a fraction of the parent planet's own base (1x) radius. */
+  scale: number
+  /** Orbit ellipse semi-axes, in multiples of the parent planet's base radius. */
+  orbitRadiusX: number
+  orbitRadiusY: number
+  /** Radians/second; negative = reverse orbit direction. */
+  speed: number
+  /** Starting angle (radians) around the ellipse, so multiple moons don't line up. */
+  phase: number
+}
+
 export interface NoAtmosphereProfile {
   kind: 'noAtmosphere'
   seed: number
@@ -65,6 +88,7 @@ export interface NoAtmosphereProfile {
   craterSize: number
   craterTimeSpeed: number
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 export interface TerranWetProfile {
@@ -83,6 +107,7 @@ export interface TerranWetProfile {
   cloudSpeed: number
   cloudCurve: number
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 export interface GasGiantProfile {
@@ -103,6 +128,7 @@ export interface GasGiantProfile {
   ringColors?: RGB[]
   ringDarkColors?: RGB[]
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 /** A surfaceless wisp: stacked cloud shells with nothing underneath (nebulae, supernova remnants). */
@@ -120,6 +146,7 @@ export interface NebulaProfile {
   outerCover: number
   cloudSize: number
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 export interface IceWorldProfile {
@@ -137,6 +164,7 @@ export interface IceWorldProfile {
   cloudSpeed: number
   cloudCurve: number
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 export interface LavaWorldProfile {
@@ -153,6 +181,7 @@ export interface LavaWorldProfile {
   riverCutoff: number
   lavaTimeSpeed: number
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 export interface AsteroidProfile {
@@ -163,6 +192,7 @@ export interface AsteroidProfile {
   colors: RGB[]
   size: number
   features?: FeatureSpec[]
+  moons?: MoonSpec[]
 }
 
 export type PlanetProfile = NoAtmosphereProfile | TerranWetProfile | GasGiantProfile | IceWorldProfile | LavaWorldProfile | AsteroidProfile | NebulaProfile
@@ -291,5 +321,11 @@ export const RING_SCALE = 3
 
 /** How many multiples of the base 1x sphere size this profile's largest layer needs on screen. */
 export function planetMaxScale(profile: PlanetProfile): number {
-  return profile.kind === 'gasGiant' && profile.ring ? RING_SCALE : 1
+  const ringScale = profile.kind === 'gasGiant' && profile.ring ? RING_SCALE : 1
+  const moons = profile.moons
+  if (!moons || moons.length === 0) return ringScale
+  // Widest moon orbit (either axis) plus its own radius, so a wide ellipse never clips at the
+  // frustum edge - same reasoning as the ring above, just a smaller typical multiple.
+  const moonScale = moons.reduce((max, m) => Math.max(max, m.orbitRadiusX + m.scale, m.orbitRadiusY + m.scale), 1)
+  return Math.max(ringScale, moonScale)
 }

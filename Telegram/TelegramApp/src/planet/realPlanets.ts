@@ -5,7 +5,7 @@
 // stars, then nebulae, galaxies, and finally black holes. Everything is deterministic:
 // the same sector always shows the same object with the same look.
 import { blackHole, FAINT_WHITE_CLOUDS, galaxy, gas, ice, lava, nebula, NO_CLOUDS, noAtmo, rock, star, terran, type RealPlanet } from './profileBuilders'
-import type { FeatureSpec } from './planetProfiles'
+import type { FeatureSpec, MoonSpec } from './planetProfiles'
 import { GENERATED_BOSSES, GENERATED_REGULAR } from './rosterGen'
 
 export type { RealPlanet } from './profileBuilders'
@@ -19,6 +19,39 @@ function withFeatures(planet: RealPlanet, features: FeatureSpec[]): RealPlanet {
   return { name: planet.name, profile: { ...planet.profile, features } }
 }
 
+/** 0..1 deterministic pseudo-random derived from a seed multiple - no Math.random(), so the
+ *  same planet always renders the same moons in the same place (matches the rest of this
+ *  file's "everything is deterministic" contract). */
+function frac(x: number): number {
+  return x - Math.floor(x)
+}
+
+/**
+ * Moons, real data (docs list item "bring back moons... with data we have from real planets").
+ * Unlike Unity's fully-randomized moon count (see planetProfiles.ts's MoonSpec doc comment),
+ * `realCount` here is the body's actual real moon count - only planets that really have moons
+ * get any, and Mercury/Venus (zero real moons) simply never call this. Rendered count is capped
+ * at 4 for screen readability (Jupiter's real 95 and Saturn's 146 would be unreadable clutter on
+ * a phone screen) - the same practical cap Unity's own version used (max 3), just sourced from
+ * real counts instead of a rarity-tier dice roll.
+ */
+function withMoons(planet: RealPlanet, realCount: number): RealPlanet {
+  const n = Math.min(realCount, 4)
+  const baseSeed = planet.profile.seed
+  const moons: MoonSpec[] = Array.from({ length: n }, (_, i) => {
+    const s = baseSeed + i * 3.7 + 1
+    return {
+      seed: s,
+      scale: 0.12 + frac(s * 7.13) * 0.09,
+      orbitRadiusX: 1.5 + i * 0.32 + frac(s * 3.31) * 0.18,
+      orbitRadiusY: 1.0 + i * 0.2 + frac(s * 5.77) * 0.14,
+      speed: (0.22 + frac(s * 11.9) * 0.28) * (i % 2 === 0 ? 1 : -1),
+      phase: (i / n) * Math.PI * 2 + frac(s * 2.13) * 0.5,
+    }
+  })
+  return { name: planet.name, profile: { ...planet.profile, moons } }
+}
+
 /**
  * Regular-sector roster: the journey outward. Rocky inner worlds, the great moons,
  * dwarf planets of the Kuiper belt, then real confirmed exoplanets.
@@ -27,19 +60,25 @@ export const REGULAR_PLANETS: RealPlanet[] = [
   // — Inner solar system —
   noAtmo('MERCURY', 3.1, [[0.62, 0.58, 0.54], [0.46, 0.42, 0.39], [0.28, 0.25, 0.23]], [[0.38, 0.35, 0.32], [0.18, 0.16, 0.15]], 55, 14),
   gas('VENUS', 1.7, [[0.93, 0.87, 0.7], [0.85, 0.76, 0.55], [0.72, 0.6, 0.4]], [[0.6, 0.48, 0.3], [0.45, 0.34, 0.2], [0.3, 0.22, 0.12]], { bands: 0.5, gasTimeSpeed: 0.05 }),
-  terran('EARTH', 4.2, [[0.05, 0.12, 0.4], [0.08, 0.2, 0.55], [0.03, 0.06, 0.22]], [[0.1, 0.3, 0.1], [0.18, 0.48, 0.16], [0.35, 0.58, 0.22], [0.62, 0.55, 0.28]], [[0.9, 0.92, 0.95], [0.75, 0.78, 0.85], [0.58, 0.63, 0.72], [0.4, 0.44, 0.52]], { landCutoff: 0.6, cloudCover: 1.15 }),
+  withMoons(
+    terran('EARTH', 4.2, [[0.05, 0.12, 0.4], [0.08, 0.2, 0.55], [0.03, 0.06, 0.22]], [[0.1, 0.3, 0.1], [0.18, 0.48, 0.16], [0.35, 0.58, 0.22], [0.62, 0.55, 0.28]], [[0.9, 0.92, 0.95], [0.75, 0.78, 0.85], [0.58, 0.63, 0.72], [0.4, 0.44, 0.52]], { landCutoff: 0.6, cloudCover: 1.15 }),
+    1,
+  ),
   noAtmo('LUNA', 2.4, [[0.72, 0.72, 0.72], [0.55, 0.55, 0.55], [0.3, 0.3, 0.3]], [[0.48, 0.48, 0.48], [0.22, 0.22, 0.22]], 48, 12),
-  withFeatures(noAtmo('MARS', 5.8, [[0.72, 0.36, 0.16], [0.55, 0.25, 0.1], [0.34, 0.13, 0.05]], [[0.45, 0.18, 0.07], [0.24, 0.08, 0.03]], 52, 9), [
-    {
-      id: 'valles-marineris',
-      label: 'Valles Marineris',
-      fact: 'A canyon system over 4,000 km long and up to 7 km deep - it would stretch across the continental United States.',
-      uv: [0.56, 0.48],
-      radius: [0.22, 0.04],
-      angle: 0.15,
-      color: [0.26, 0.09, 0.05],
-    },
-  ]),
+  withMoons(
+    withFeatures(noAtmo('MARS', 5.8, [[0.72, 0.36, 0.16], [0.55, 0.25, 0.1], [0.34, 0.13, 0.05]], [[0.45, 0.18, 0.07], [0.24, 0.08, 0.03]], 52, 9), [
+      {
+        id: 'valles-marineris',
+        label: 'Valles Marineris',
+        fact: 'A canyon system over 4,000 km long and up to 7 km deep - it would stretch across the continental United States.',
+        uv: [0.56, 0.48],
+        radius: [0.22, 0.04],
+        angle: 0.15,
+        color: [0.26, 0.09, 0.05],
+      },
+    ]),
+    2,
+  ),
   rock('PHOBOS', 6.3, [[0.16, 0.14, 0.13], [0.35, 0.31, 0.28], [0.52, 0.47, 0.43]], 42),
   withFeatures(noAtmo('CERES', 7.9, [[0.35, 0.34, 0.32], [0.24, 0.23, 0.22], [0.13, 0.13, 0.12]], [[0.85, 0.84, 0.78], [0.55, 0.54, 0.5]], 45, 7), [
     {
@@ -129,19 +168,22 @@ export const REGULAR_PLANETS: RealPlanet[] = [
   noAtmo('MIMAS', 8.2, [[0.68, 0.67, 0.66], [0.52, 0.51, 0.5], [0.32, 0.31, 0.3]], [[0.44, 0.43, 0.42], [0.2, 0.2, 0.19]], 46, 18), // one giant crater
   // — Kuiper belt & beyond —
   ice('TRITON', 1.3, [[0.88, 0.82, 0.78], [0.76, 0.68, 0.64], [0.6, 0.52, 0.48]], [[0.66, 0.5, 0.44], [0.5, 0.36, 0.3], [0.34, 0.22, 0.18]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // pinkish nitrogen ice
-  withFeatures(
-    ice('PLUTO', 2.2, [[0.85, 0.72, 0.58], [0.72, 0.58, 0.44], [0.55, 0.42, 0.3]], [[0.32, 0.18, 0.12], [0.22, 0.11, 0.07], [0.12, 0.05, 0.03]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // tan with dark maculae
-    [
-      {
-        id: 'tombaugh-regio',
-        label: 'Tombaugh Regio',
-        fact: "A vast plain of frozen nitrogen nicknamed \"the heart\", informally honoring Clyde Tombaugh, who discovered Pluto in 1930.",
-        uv: [0.44, 0.54],
-        radius: [0.22, 0.18],
-        angle: 0,
-        color: [0.94, 0.87, 0.73],
-      },
-    ],
+  withMoons(
+    withFeatures(
+      ice('PLUTO', 2.2, [[0.85, 0.72, 0.58], [0.72, 0.58, 0.44], [0.55, 0.42, 0.3]], [[0.32, 0.18, 0.12], [0.22, 0.11, 0.07], [0.12, 0.05, 0.03]], FAINT_WHITE_CLOUDS, NO_CLOUDS), // tan with dark maculae
+      [
+        {
+          id: 'tombaugh-regio',
+          label: 'Tombaugh Regio',
+          fact: "A vast plain of frozen nitrogen nicknamed \"the heart\", informally honoring Clyde Tombaugh, who discovered Pluto in 1930.",
+          uv: [0.44, 0.54],
+          radius: [0.22, 0.18],
+          angle: 0,
+          color: [0.94, 0.87, 0.73],
+        },
+      ],
+    ),
+    4,
   ),
   withFeatures(noAtmo('CHARON', 3.4, [[0.58, 0.55, 0.53], [0.44, 0.41, 0.4], [0.27, 0.25, 0.24]], [[0.5, 0.32, 0.24], [0.26, 0.15, 0.1]], 48, 8), [
     {
@@ -192,36 +234,48 @@ export const REGULAR_PLANETS: RealPlanet[] = [
  * galaxies and black holes reuse the ring quad as their disk.
  */
 export const BOSS_PLANETS: RealPlanet[] = [
-  withFeatures(
-    gas('JUPITER', 1.5, [[0.9, 0.78, 0.62], [0.82, 0.62, 0.44], [0.68, 0.44, 0.28]], [[0.5, 0.28, 0.14], [0.32, 0.15, 0.06], [0.18, 0.07, 0.02]], { bands: 2.4, gasTimeSpeed: 0.16 }),
-    [
-      {
-        id: 'great-red-spot',
-        label: 'Great Red Spot',
-        fact: 'A storm wider than Earth that has raged for at least 190 years, and possibly since the 1600s.',
-        uv: [0.36, 0.4],
-        radius: [0.17, 0.09],
-        angle: 0.08,
-        color: [0.82, 0.36, 0.22],
-      },
-    ],
+  withMoons(
+    withFeatures(
+      gas('JUPITER', 1.5, [[0.9, 0.78, 0.62], [0.82, 0.62, 0.44], [0.68, 0.44, 0.28]], [[0.5, 0.28, 0.14], [0.32, 0.15, 0.06], [0.18, 0.07, 0.02]], { bands: 2.4, gasTimeSpeed: 0.16 }),
+      [
+        {
+          id: 'great-red-spot',
+          label: 'Great Red Spot',
+          fact: 'A storm wider than Earth that has raged for at least 190 years, and possibly since the 1600s.',
+          uv: [0.36, 0.4],
+          radius: [0.17, 0.09],
+          angle: 0.08,
+          color: [0.82, 0.36, 0.22],
+        },
+      ],
+    ),
+    4, // real count 95, capped - the four Galilean moons are the ones anyone actually recognizes
   ),
-  withFeatures(
-    gas('SATURN', 2.8, [[0.9, 0.84, 0.64], [0.8, 0.7, 0.5], [0.64, 0.54, 0.34]], [[0.47, 0.37, 0.21], [0.3, 0.22, 0.11], [0.16, 0.11, 0.05]], { bands: 1.4, ring: true }),
-    [
-      {
-        id: 'saturn-hexagon',
-        label: 'The Hexagon',
-        fact: 'A persistent six-sided jet stream around the north pole, wide enough to fit four Earths.',
-        uv: [0.5, 0.83],
-        radius: [0.13, 0.11],
-        angle: 0,
-        color: [0.26, 0.56, 0.56],
-      },
-    ],
+  withMoons(
+    withFeatures(
+      gas('SATURN', 2.8, [[0.9, 0.84, 0.64], [0.8, 0.7, 0.5], [0.64, 0.54, 0.34]], [[0.47, 0.37, 0.21], [0.3, 0.22, 0.11], [0.16, 0.11, 0.05]], { bands: 1.4, ring: true }),
+      [
+        {
+          id: 'saturn-hexagon',
+          label: 'The Hexagon',
+          fact: 'A persistent six-sided jet stream around the north pole, wide enough to fit four Earths.',
+          uv: [0.5, 0.83],
+          radius: [0.13, 0.11],
+          angle: 0,
+          color: [0.26, 0.56, 0.56],
+        },
+      ],
+    ),
+    4, // real count 146, capped
   ),
-  gas('URANUS', 3.3, [[0.68, 0.88, 0.9], [0.52, 0.78, 0.82], [0.36, 0.62, 0.7]], [[0.24, 0.48, 0.58], [0.14, 0.34, 0.44], [0.07, 0.2, 0.3]], { bands: 0.4, gasTimeSpeed: 0.05 }), // near-featureless cyan
-  gas('NEPTUNE', 4.1, [[0.3, 0.5, 0.92], [0.2, 0.38, 0.76], [0.12, 0.26, 0.58]], [[0.07, 0.16, 0.42], [0.04, 0.09, 0.28], [0.01, 0.04, 0.15]], { bands: 1.1, gasTimeSpeed: 0.2 }), // fastest winds in the solar system
+  withMoons(
+    gas('URANUS', 3.3, [[0.68, 0.88, 0.9], [0.52, 0.78, 0.82], [0.36, 0.62, 0.7]], [[0.24, 0.48, 0.58], [0.14, 0.34, 0.44], [0.07, 0.2, 0.3]], { bands: 0.4, gasTimeSpeed: 0.05 }), // near-featureless cyan
+    4, // real count 27, capped
+  ),
+  withMoons(
+    gas('NEPTUNE', 4.1, [[0.3, 0.5, 0.92], [0.2, 0.38, 0.76], [0.12, 0.26, 0.58]], [[0.07, 0.16, 0.42], [0.04, 0.09, 0.28], [0.01, 0.04, 0.15]], { bands: 1.1, gasTimeSpeed: 0.2 }), // fastest winds in the solar system
+    2, // real count 14, capped lower - Triton (the big one) already exists as its own card
+  ),
   gas('HD 189733 B', 5.4, [[0.35, 0.55, 0.95], [0.24, 0.42, 0.82], [0.15, 0.3, 0.65]], [[0.09, 0.19, 0.48], [0.05, 0.11, 0.32], [0.02, 0.05, 0.18]], { bands: 1.8, gasTimeSpeed: 0.26 }), // cobalt blue, molten-glass rain
   gas('WASP-12B', 6.9, [[0.55, 0.3, 0.2], [0.4, 0.2, 0.12], [0.28, 0.12, 0.06]], [[0.16, 0.06, 0.03], [0.09, 0.03, 0.01], [0.04, 0.01, 0.0]], { bands: 1.2, gasTimeSpeed: 0.3 }), // pitch-black hot Jupiter being eaten by its star
   gas('51 PEGASI B', 7.7, [[0.85, 0.78, 0.68], [0.72, 0.64, 0.52], [0.56, 0.48, 0.38]], [[0.4, 0.33, 0.25], [0.26, 0.2, 0.14], [0.13, 0.1, 0.06]], { bands: 1.5 }), // the first exoplanet found around a sunlike star
