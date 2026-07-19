@@ -1,6 +1,10 @@
 // One collection grid cell. Owned-only by design: the collection never renders ghosts,
 // silhouettes, or locked placeholders - a card exists in the UI only once you own it.
-import type { CSSProperties } from 'react'
+// memo()d: rows remount constantly while the virtualized grid scrolls, but a given card's
+// props only change when the collection itself does - so cells skip re-rendering entirely
+// as the visible window shifts (onSelect takes the card as an argument for this reason:
+// a per-cell closure would defeat the memo).
+import { memo, type CSSProperties } from 'react'
 import type { CardDefinition } from '../../game/cards/catalog'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
 import { VARIANT_LABEL } from '../../game/cards/variants'
@@ -12,10 +16,10 @@ interface CardGridItemProps {
   owned: OwnedSummary
   setTotal: number
   favorite: boolean
-  onSelect: () => void
+  onSelect: (card: CardDefinition) => void
 }
 
-export function CardGridItem({ card, owned, setTotal, favorite, onSelect }: CardGridItemProps) {
+export const CardGridItem = memo(function CardGridItem({ card, owned, setTotal, favorite, onSelect }: CardGridItemProps) {
   const color = RARITY_COLOR[card.rarity]
   const variantClass = owned.bestVariant !== 'standard' ? `card-grid-item--${owned.bestVariant}` : ''
   // Legendary/ultra get a stronger, slowly pulsing glow so top-tier pulls stand out in the
@@ -23,7 +27,7 @@ export function CardGridItem({ card, owned, setTotal, favorite, onSelect }: Card
   const rarityClass = card.rarity === 'legendary' || card.rarity === 'ultra' ? `card-grid-item--rarity-${card.rarity}` : ''
 
   return (
-    <button className={`card-grid-item cf-${card.rarity} ${variantClass} ${rarityClass}`} style={{ '--rarity-color': color } as CSSProperties} onClick={onSelect}>
+    <button className={`card-grid-item cf-${card.rarity} ${variantClass} ${rarityClass}`} style={{ '--rarity-color': color } as CSSProperties} onClick={() => onSelect(card)}>
       <CardArt cardName={card.name} mode="grid" />
       {owned.bestVariant !== 'standard' && <div className="card-grid-variant">{VARIANT_LABEL[owned.bestVariant]}</div>}
       {owned.count > 1 && <div className="card-grid-count">×{owned.count}</div>}
@@ -35,4 +39,4 @@ export function CardGridItem({ card, owned, setTotal, favorite, onSelect }: Card
       <div className="card-grid-name">{card.name}</div>
     </button>
   )
-}
+})

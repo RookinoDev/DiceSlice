@@ -1,5 +1,5 @@
 // Ported from GamePhone.dc.html's app shell + its real toast/celebration state machine.
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { BigNumber } from '../game/core/BigNumber'
 import type { GameSession, DailyPreview } from '../game/gameplay/GameSession'
 import { buildMainViewModel } from '../game/ui/MainPresenter'
@@ -78,6 +78,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // The filtered/sorted list CardsScreen was showing when the card was opened - lets the
   // detail sheet's NEXT button browse without needing to re-derive filters up here.
   const [selectedCardList, setSelectedCardList] = useState<CardDefinition[]>([])
+  // Bumped when the card detail sheet closes - the only moment favorites/recent-views can
+  // have changed; CardsScreen (memo'd, see its perf notes) refreshes its prefs off this.
+  const [prefsVersion, setPrefsVersion] = useState(0)
   const [objectViewerOpen, setObjectViewerOpen] = useState(false)
   const [packSheetOpen, setPackSheetOpen] = useState(false)
   const [toastText, setToastText] = useState<string | null>(null)
@@ -427,11 +430,19 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab])
 
-  const handlePackOpened = (packId: number, result: OpenPackResult) => {
+  // Stable identities (useCallback): CardsScreen and PackOpeningOverlay are memo()d so the
+  // 60fps game-loop re-render of this shell skips them - inline closures here would undo that.
+  const handlePackOpened = useCallback((packId: number, result: OpenPackResult) => {
     setPendingPacks((prev) => prev.filter((p) => p.id !== packId))
     // instanceId -1 marks optimistic rows; the next refreshCards() replaces them with server truth.
     setOwnedCards((prev) => [...prev, ...result.cards.map((c) => ({ instanceId: -1, cardId: c.cardId, variant: c.variant, serial: c.serial, mintedAtMs: Date.now() }))])
-  }
+  }, [])
+  const handleSelectCard = useCallback((card: CardDefinition, list: CardDefinition[]) => {
+    setSelectedCard(card)
+    setSelectedCardList(list)
+  }, [])
+  const handleOpenPacks = useCallback(() => setPackSheetOpen(true), [])
+  const handleClosePackSheet = useCallback(() => setPackSheetOpen(false), [])
 
   // Profile deep link ("u_<id>" start param): open that player's profile on launch.
   // Falls back silently if the profile doesn't exist or the API is unreachable.
@@ -495,11 +506,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
             ownedCards={ownedCards}
             dust={dust}
             pendingPackCount={pendingPacks.length}
-            onSelectCard={(card, list) => {
-              setSelectedCard(card)
-              setSelectedCardList(list)
-            }}
-            onOpenPacks={() => setPackSheetOpen(true)}
+            prefsVersion={prefsVersion}
+            onSelectCard={handleSelectCard}
+            onOpenPacks={handleOpenPacks}
           />
         )}
       </div>
@@ -543,7 +552,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         card={selectedCard}
         owned={selectedCard ? (cardOwnedSummary.get(selectedCard.id) ?? null) : null}
         open={selectedCard !== null}
-        onClose={() => setSelectedCard(null)}
+        onClose={() => {
+          setSelectedCard(null)
+          setPrefsVersion((v) => v + 1)
+        }}
         onExplore={() => setObjectViewerOpen(true)}
         hasNext={selectedCardList.length > 1}
         onNext={() => {
@@ -554,7 +566,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         }}
       />
       <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
-      <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={() => setPackSheetOpen(false)} />
+      <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={handleClosePackSheet} />
     </div>
   )
 }

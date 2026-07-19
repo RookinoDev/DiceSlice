@@ -3026,26 +3026,38 @@
 .card-grid-item:active {
   transform: scale(0.97);
 }
+/* Grid-cell sheen: an OVERSIZED pseudo-element swept across via transform (composited on the
+   GPU), not a background-position animation (which repaints the cell every frame - with a
+   dozen holo cells visible at once that was a large chunk of the collection's scroll cost). */
 .card-grid-item--holo::after {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: 14px;
+  inset: -75%;
   background: linear-gradient(
     115deg,
-    transparent 12%,
-    rgba(255, 110, 110, 0.4) 24%,
-    rgba(255, 210, 90, 0.4) 32%,
-    rgba(130, 255, 150, 0.4) 40%,
-    rgba(100, 210, 255, 0.4) 48%,
-    rgba(200, 130, 255, 0.4) 56%,
-    transparent 70%
+    transparent 30%,
+    rgba(255, 110, 110, 0.4) 38%,
+    rgba(255, 210, 90, 0.4) 42%,
+    rgba(130, 255, 150, 0.4) 46%,
+    rgba(100, 210, 255, 0.4) 50%,
+    rgba(200, 130, 255, 0.4) 54%,
+    transparent 62%
   );
-  background-size: 260% 260%;
   mix-blend-mode: screen;
-  animation: card-holo-sheen 3.2s ease-in-out infinite;
+  animation: card-holo-sweep 3.2s ease-in-out infinite;
   pointer-events: none;
+  will-change: transform;
 }
+/* Diagonal sweep of the oversized layer - same visual as the old background-position slide. */
+@keyframes card-holo-sweep {
+  0% {
+    transform: translate(28%, -18%);
+  }
+  100% {
+    transform: translate(-28%, 18%);
+  }
+}
+/* Detail-face/pack usages still animate background-position (single elements, acceptable). */
 @keyframes card-holo-sheen {
   0% {
     background-position: 200% 0%;
@@ -3094,12 +3106,20 @@
 .card-grid-item--polychrome::after {
   content: '';
   position: absolute;
-  inset: 0;
-  border-radius: 14px;
+  /* Oversized + rotated via transform (composited), same reasoning as the holo sweep above -
+     rotating the conic wheel reads as the same cycling iridescence the old
+     background-position slide gave, at none of the per-frame repaint cost. */
+  inset: -40%;
   background: conic-gradient(from 0deg, rgba(255, 110, 110, 0.28), rgba(255, 210, 90, 0.28), rgba(130, 255, 150, 0.28), rgba(100, 210, 255, 0.28), rgba(200, 130, 255, 0.28), rgba(255, 110, 110, 0.28));
   mix-blend-mode: screen;
-  animation: card-holo-sheen 2.6s linear infinite;
+  animation: card-poly-spin 5.2s linear infinite;
   pointer-events: none;
+  will-change: transform;
+}
+@keyframes card-poly-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .card-grid-variant {

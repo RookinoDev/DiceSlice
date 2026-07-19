@@ -8,7 +8,7 @@
 // hides inside it) -> dealing (cards fly in face-down, staggered) -> reveal (tap: top card
 // lifts, flips with squash, lands with a thump; the back's edge glow is the rarity tell) ->
 // recap (best pull enthroned). CONTINUE loops to the next pack without leaving the overlay.
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { CardArt } from './CardArt'
 import { RARITY_COLOR } from './cardTheme'
 import { audio } from '../../game/audio/AudioManager'
@@ -42,11 +42,18 @@ type Phase =
   | { kind: 'reveal'; result: OpenPackResult; flipped: number; lifting: boolean }
   | { kind: 'recap'; result: OpenPackResult }
 
-export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, onClose }: PackOpeningOverlayProps) {
+// memo()d: GameShell re-renders every animation frame for the game loop; while a ceremony is
+// playing (all-CSS animations + its own phase state) none of those re-renders concern this
+// overlay, so with stable props it skips them entirely.
+export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, onClose }: PackOpeningOverlayProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'pack' })
   const [tearing, setTearing] = useState(false)
   const [tearProgress, setTearProgress] = useState(0)
-  const [shake, setShake] = useState(0)
+  // Screen shake as a class toggle cleared on animationend - the old `key={shake}` remount
+  // trick restarted the animation by rebuilding the ENTIRE overlay DOM (every pack card,
+  // every running CSS animation) right at the burst/legendary moment, a visible hitch on
+  // phones. Re-adding the class after animationend restarts it without touching the DOM tree.
+  const [shaking, setShaking] = useState(false)
   const tearRaf = useRef(0)
   const tearStart = useRef(0)
   const busy = useRef(false)
@@ -69,6 +76,13 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
     }
     return () => cancelAnimationFrame(tearRaf.current)
   }, [open])
+
+  // Computed once per recap (not re-sorted per card in the recap row's filter). Above the
+  // early return below - hooks must run unconditionally.
+  const bestPull = useMemo<MintedCard | null>(() => {
+    if (phase.kind !== 'recap') return null
+    return [...phase.result.cards].sort((a, b) => RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] || (b.variant === 'standard' ? 0 : 1) - (a.variant === 'standard' ? 0 : 1))[0]
+  }, [phase])
 
   // Deal timing: whooshes fire in sync with each card's CSS fly-in delay.
   useEffect(() => {
@@ -124,7 +138,7 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
     audio.packTear()
     setTimeout(() => audio.packBurst(), 90)
     hapticAction()
-    setShake((n) => n + 1)
+    setShaking(true)
     const r = await openPackRequest(apiBaseUrl, packId)
     busy.current = false
     setTearing(false)
@@ -153,7 +167,7 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
         audio.silence(170)
         audio.bossDown()
         hapticSuccess()
-        setShake((n) => n + 1)
+        setShaking(true)
       } else if (rank >= 3) {
         audio.prestige()
         hapticSuccess()
@@ -169,8 +183,6 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
     }, liftMs)
   }
 
-  const bestPull = (result: OpenPackResult): MintedCard =>
-    [...result.cards].sort((a, b) => RARITY_RANK[b.rarity] - RARITY_RANK[a.rarity] || (b.variant === 'standard' ? 0 : 1) - (a.variant === 'standard' ? 0 : 1))[0]
 
   const continueAfterRecap = () => {
     audio.click()
@@ -179,11 +191,15 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
     else onClose()
   }
 
-  const shakeClass = phase.kind === 'burst' ? 'pack-overlay--shake' : ''
   const topPendingRarity = phase.kind === 'reveal' && phase.flipped < phase.result.cards.length ? phase.result.cards[phase.flipped].rarity : null
 
   return (
-    <div key={shake} className={`pack-overlay ${shakeClass}`}>
+    <div
+      className={`pack-overlay ${shaking ? 'pack-overlay--shake' : ''}`}
+      onAnimationEnd={(e) => {
+        if (e.animationName === 'pack-overlay-shake') setShaking(false)
+      }}
+    >
       <div className={`pack-overlay-vignette ${topPendingRarity && RARITY_RANK[topPendingRarity] >= 3 ? 'pack-overlay-vignette--charged' : ''}`} />
 
       <div className="pack-overlay-header">
@@ -263,12 +279,12 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
         </div>
       )}
 
-      {phase.kind === 'recap' && (
+      {phase.kind === 'recap' && bestPull && (
         <div className="pack-overlay-stage pack-overlay-stage--recap">
-          <RecapBest card={bestPull(phase.result)} />
+          <RecapBest card={bestPull} />
           <div className="pack-recap-row">
             {phase.result.cards
-              .filter((c) => c !== bestPull(phase.result))
+              .filter((c) => c !== bestPull)
               .map((c, i) => (
                 <RecapMini key={`${c.cardId}-${c.serial}`} card={c} index={i} />
               ))}
@@ -280,7 +296,7 @@ export function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, o
       )}
     </div>
   )
-}
+})
 
 function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: { card: MintedCard; index: number; total: number; dealing: boolean; revealed: boolean; isTop: boolean; lifting: boolean }) {
   const def = cardById(card.cardId)
