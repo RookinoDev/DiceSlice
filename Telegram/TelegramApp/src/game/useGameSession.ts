@@ -16,6 +16,8 @@ const AUTOSAVE_SECONDS = 15
 const CLOUD_PUSH_SECONDS = 60
 /** Clamp a single frame's delta so a throttled/backgrounded tab can't apply one giant tick. */
 const MAX_FRAME_DELTA = 0.25
+/** How often React is told to re-render off the game loop (the sim itself ticks per frame). */
+const UI_NOTIFY_HZ = 20
 
 export interface OfflineReport {
   seconds: number
@@ -164,6 +166,7 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     let last = performance.now()
     let saveAccum = 0
     let cloudAccum = 0
+    let notifyAccum = 0
 
     const persist = () => {
       if (session !== activeSessionRef.current) return // stale loop after a cloud-restore swap
@@ -175,8 +178,19 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
       last = now
 
       session.tick(dt)
-      versionRef.current++
-      for (const fn of listenersRef.current) fn()
+
+      // The sim ticks every frame, but React is only NOTIFIED at UI_NOTIFY_HZ - re-rendering
+      // the entire shell 60x/s was the single largest main-thread cost of the combat screen,
+      // and nothing rendered through React needs frame-rate freshness: the HP bar fill is
+      // imperative (its own rAF, see CombatScreen), damage numbers/particles are event-driven,
+      // and what's left (currency text, cooldown wipes, timers) reads identically at 20Hz.
+      // The version bump stays inside the throttle so getSnapshot is stable between notifies.
+      notifyAccum += dt
+      if (notifyAccum >= 1 / UI_NOTIFY_HZ) {
+        notifyAccum = 0
+        versionRef.current++
+        for (const fn of listenersRef.current) fn()
+      }
 
       saveAccum += dt
       if (saveAccum >= AUTOSAVE_SECONDS) {
