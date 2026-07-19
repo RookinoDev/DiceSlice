@@ -186,6 +186,13 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   const materialRef = useRef(material)
   materialRef.current = material
   const [hpBarShake, setHpBarShake] = useState(0)
+  // Boss intro slam + sector milestone stamp: pure overlays keyed to force a fresh animation
+  // per occurrence; neither pauses gameplay (per the no-delay rule for planet swaps).
+  const [bossIntroKey, setBossIntroKey] = useState(0)
+  const [bossIntroName, setBossIntroName] = useState<string | null>(null)
+  const bossIntroTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const [sectorStamp, setSectorStamp] = useState<number | null>(null)
+  const sectorStampTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   // #3 fix: skill icons had no visible name and no touch-friendly way to read their
   // description (only a `title` tooltip, which mobile/touch never shows) - a small "?" opens
   // a sheet listing every skill's name+description instead.
@@ -345,9 +352,45 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   // bossSecondsLeft is Math.ceil'd in MainPresenter, so it only changes once per second -
   // this effect naturally fires once per final countdown second, no dedup ref needed.
   useEffect(() => {
-    if (vm.bossActive && vm.bossSecondsLeft > 0 && vm.bossSecondsLeft <= 5) audio.bossTick()
+    if (vm.bossActive && vm.bossSecondsLeft > 0 && vm.bossSecondsLeft <= 5) {
+      audio.bossTick()
+      // Timer-panic heartbeat under the tick: a low thump so the countdown is felt, not
+      // just heard, and losing to the timer reads as a near-miss instead of a surprise.
+      audio.heartbeat()
+      hapticTap()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [vm.bossActive, vm.bossSecondsLeft])
+
+  // Boss intro slam: the boss already existed the frame it spawned, but nothing announced it -
+  // a short dim + name slam-in overlay (gameplay keeps running underneath).
+  useEffect(() => {
+    return s.stage.onBossStarted.on(() => {
+      setBossIntroKey((k) => k + 1)
+      setBossIntroName(realPlanetForStage(s.stage.currentStage, s.bossStageInterval).name)
+      triggerShake('big')
+      hapticAction()
+      clearTimeout(bossIntroTimeout.current)
+      bossIntroTimeout.current = setTimeout(() => setBossIntroName(null), 1400)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s])
+
+  // Sector milestone stamp every 10th sector - visible chapter breaks in the endless climb.
+  useEffect(() => {
+    return s.stage.onStageEntered.on((stage) => {
+      if (stage % 10 !== 0) return
+      setSectorStamp(stage)
+      audio.prestige()
+      clearTimeout(sectorStampTimeout.current)
+      sectorStampTimeout.current = setTimeout(() => setSectorStamp(null), 1500)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s])
+  useEffect(() => () => {
+    clearTimeout(bossIntroTimeout.current)
+    clearTimeout(sectorStampTimeout.current)
+  }, [])
 
   // #2 fix: tightened from <=15 to <=5 - the pill redesign's ring is legible enough at a
   // glance that flagging urgency 15s out (a third of most boss timers) read as alarmist.
@@ -358,9 +401,20 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   return (
     <div
       ref={screenRef}
-      className={`screen combat-screen ${comboTierClass(tapStreak)} ${overdriveActive ? 'combat-screen--overdrive' : ''} ${overdrivePanic ? 'combat-screen--overdrive-panic' : ''}`}
+      className={`screen combat-screen ${comboTierClass(tapStreak)} ${overdriveActive ? 'combat-screen--overdrive' : ''} ${overdrivePanic ? 'combat-screen--overdrive-panic' : ''} ${vm.bossActive && bossUrgent ? 'combat-screen--boss-panic' : ''}`}
     >
       <div className="combat-combo-backdrop" />
+      {bossIntroName && (
+        <div key={bossIntroKey} className="boss-intro">
+          <div className="boss-intro-label">⚠ BOSS ENCOUNTER ⚠</div>
+          <div className="boss-intro-name">{bossIntroName}</div>
+        </div>
+      )}
+      {sectorStamp !== null && (
+        <div key={sectorStamp} className="sector-stamp">
+          SECTOR {sectorStamp}
+        </div>
+      )}
       {overdrivePhase === 'countdown' && (
         <div key={overdriveCountdown} className={`overdrive-countdown ${overdriveCountdown === 'OVERDRIVE' ? 'overdrive-countdown--go' : ''}`}>
           {overdriveCountdown}
@@ -375,7 +429,13 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
               {/* #2 fix: a glass pill with a conic-gradient ring for "time left at a glance"
                   replaces the old bar+bold-number row, and sits beside the name instead of
                   stacked under it. */}
-              <div className={`combat-boss-timer-pill ${bossUrgent ? 'combat-boss-timer-pill--urgent' : ''}`} style={{ '--boss-pct': `${bossTimePct}%` } as CSSProperties}>
+              {/* key on the urgent pill: each final-5 second remounts it so the digit-pop
+                  animation replays per second, escalating with the heartbeat/tick. */}
+              <div
+                key={bossUrgent ? vm.bossSecondsLeft : 'calm'}
+                className={`combat-boss-timer-pill ${bossUrgent ? 'combat-boss-timer-pill--urgent' : ''}`}
+                style={{ '--boss-pct': `${bossTimePct}%` } as CSSProperties}
+              >
                 0:{String(vm.bossSecondsLeft).padStart(2, '0')}
               </div>
             </div>
@@ -445,6 +505,10 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
             material.playImpactSound()
             spawnParticle({ className: 'fx-tap-ghost', x, y, durationMs: 500, style: { '--tx': '0px', '--ty': '0px' } as CSSProperties })
             if (Math.random() < (overdriveActive ? 0.7 : 0.35)) spawnDebris(spawnParticle, x, y, material.debrisColor)
+            // Combo fever (x50+): every tap throws extra gold sparks on top of the planet's
+            // golden rim glow (see .combo-tier-3 .combat-planet in ui.css) - a visible "on
+            // fire" state worth protecting.
+            if (newStreak >= 50) spawnDebris(spawnParticle, x, y, '#FFD873')
           }}
           aria-label="Tap to attack"
         >

@@ -426,7 +426,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
   // happened in ShipService - this is purely the visual response, and only for ships currently
   // in the visible top-8 (an unseen ship's hits are invisible on purpose, never dropped).
   useEffect(() => {
-    return s.ships.onShipHit.on(({ index }) => {
+    return s.ships.onShipHit.on(({ index, isCrit }) => {
       const ship = shipsRef.current.get(index)
       const el = elByIndexRef.current.get(index)
       if (!ship || !el) return
@@ -450,7 +450,7 @@ export function useFleetSiegeOrbit({ session: s, planetRef, impulseApiRef, trigg
         const centerX = rect.left + rect.width / 2 - layerRect.left
         const centerY = rect.top + rect.height / 2 - layerRect.top
         const planetRadius = Math.min(rect.width, rect.height) / 2
-        fireProjectiles(ship, spawn, centerX, centerY, planetRadius)
+        fireProjectiles(ship, spawn, centerX, centerY, planetRadius, isCrit)
 
         if (ship.spec.impulseStrength > 0) {
           const angle = Math.random() * Math.PI * 2
@@ -547,9 +547,13 @@ function updateTrailPool(pool: TrailParticle[], now: number): void {
   }
 }
 
-function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, planetCenterX: number, planetCenterY: number, planetRadius: number) {
+function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, planetCenterX: number, planetCenterY: number, planetRadius: number, isCrit = false) {
   const { spec } = ship
   const jitterR = planetRadius / 8
+  // Crit shots (real Ancestral Beacon rolls, already shown as "CRIT!" floating text) read
+  // bigger in the world too: fatter projectile + always the full impact flash.
+  const sizePx = isCrit ? spec.sizePx * 1.6 : spec.sizePx
+  const impact = isCrit ? 'flash' : spec.impact
 
   // Muzzle flash: a bright ring punching outward right at the ship, so "this ship just fired"
   // is unmistakable even before the eye can track the (small, fast) projectile itself.
@@ -596,10 +600,10 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, p
           // same bug class as .fx-coin/.fx-pack-drop (see ui.css): without this, the animation
           // defaults to 0s and the projectile is invisible the entire time it exists.
           style: {
-            width: `${spec.sizePx}px`,
-            height: `${spec.sizePx}px`,
+            width: `${sizePx}px`,
+            height: `${sizePx}px`,
             background: spec.color,
-            boxShadow: `0 0 ${spec.sizePx}px ${spec.color}`,
+            boxShadow: `0 0 ${sizePx}px ${spec.color}`,
             '--tx': `${tx}px`,
             '--ty': `${ty}px`,
             animationDuration: `${spec.travelMs}ms`,
@@ -610,7 +614,7 @@ function fireProjectiles(ship: ShipState, spawn: (spec: ParticleSpec) => void, p
 
       setTimeout(
         () => {
-          if (spec.impact === 'flash') {
+          if (impact === 'flash') {
             spawn({ className: 'siege-impact-flash', x: destX, y: destY, durationMs: 260, style: { borderColor: spec.color } as CSSProperties })
           } else {
             spawn({ className: 'siege-impact-puff', x: destX, y: destY, durationMs: 200, style: { background: spec.color } as CSSProperties })

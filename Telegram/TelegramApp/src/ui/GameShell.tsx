@@ -155,6 +155,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
         })
         setTimeout(() => {
           spawnRewardParticle({ className: 'fx-coin-sparkle', x: destX, y: destY, durationMs: 260 })
+          // Payout ticker: pitch steps up through the batch, slot-machine style.
+          audio.coinTick(i + 1)
           const el = getLandmarkElement('gold-pill')
           if (!el) return
           el.classList.remove('fx-gold-punch')
@@ -287,10 +289,44 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session])
 
-  const handlePrestiged = (_relicsGained: BigNumber) => {
+  // Prestige supernova: the biggest decision in the game gets a real ceremony - white core
+  // flash + expanding ring + magenta starburst + relic text slam, all overlay-only (the reset
+  // itself already happened in PrestigeConfirmSheet before this fires).
+  const [supernova, setSupernova] = useState<{ key: number; relicsText: string } | null>(null)
+  const supernovaTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(supernovaTimeout.current), [])
+  const handlePrestiged = (relicsGained: BigNumber) => {
+    audio.silence(150)
     audio.prestige()
     hapticSuccess()
     triggerShake('big')
+    setSupernova((prev) => ({ key: (prev?.key ?? 0) + 1, relicsText: `+${relicsGained.toShortString()} RELICS` }))
+    clearTimeout(supernovaTimeout.current)
+    supernovaTimeout.current = setTimeout(() => setSupernova(null), 2000)
+    const shellRect = shellRef.current?.getBoundingClientRect()
+    if (shellRect) {
+      const cx = shellRect.width / 2
+      const cy = shellRect.height / 2
+      for (let i = 0; i < 22; i++) {
+        const angle = (i / 22) * Math.PI * 2
+        const dist = 120 + Math.random() * 140
+        spawnRewardParticle({
+          className: 'fx-debris',
+          x: cx,
+          y: cy,
+          durationMs: 900,
+          style: {
+            width: '7px',
+            height: '7px',
+            background: i % 3 === 0 ? '#FFFFFF' : 'var(--palette-magenta)',
+            animationDuration: '900ms',
+            '--tx': `${Math.cos(angle) * dist}px`,
+            '--ty': `${Math.sin(angle) * dist}px`,
+            '--rot': `${(Math.random() - 0.5) * 540}deg`,
+          } as CSSProperties,
+        })
+      }
+    }
   }
 
   const handleDailyClaimed = (result: DailyPreview) => {
@@ -423,6 +459,14 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores }: Ga
       />
       <Toast text={toastText} />
       <PackEarnedBanner key={packBannerKey} visible={packBannerVisible} />
+      {supernova && (
+        <div key={supernova.key} className="supernova-overlay">
+          <div className="supernova-flash" />
+          <div className="supernova-ring" />
+          <div className="supernova-text">SUPERNOVA</div>
+          <div className="supernova-relics">{supernova.relicsText}</div>
+        </div>
+      )}
 
       <div className={`game-shell-content ${tab === 'combat' ? 'combat-active' : ''}`}>
         {tab === 'combat' && (

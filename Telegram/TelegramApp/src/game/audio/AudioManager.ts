@@ -114,6 +114,13 @@ function comboTierClipName(tier: number): string {
   return `comboTier${Math.min(Math.max(1, tier), COMBO_TIER_CLIPS)}`
 }
 
+/** Coin-arrival ticker: a soft tick per collected coin, pitch stepping up through the batch
+ *  (slot-machine payout feel). Same pre-generated-tiers approach as the combo ladder. */
+const COIN_TICK_CLIPS = 6
+function coinTickClipName(step: number): string {
+  return `coinTick${Math.min(Math.max(1, step), COIN_TICK_CLIPS)}`
+}
+
 let clips: Record<string, Clip> | null = null
 
 function getClips(): Record<string, Clip> {
@@ -127,6 +134,7 @@ function getClips(): Record<string, Clip> {
     explosion: boom(0.3),
     bossStart: sweep(420, 900, 0.3), // rising - "incoming"
     bossTick: tone(1046, 0.05), // short high blip - urgency beep
+    heartbeat: boom(0.12), // low thump layered under bossTick in the final-5 countdown
     bossFail: sweep(520, 160, 0.35), // falling - "failed"
     bossDown: boom(0.55), // bigger boom than a normal kill
     purchase: twoTone(660, 990, 0.07), // ascending "cha-ching" for ship/artifact buys
@@ -152,6 +160,11 @@ function getClips(): Record<string, Clip> {
   for (let tier = 1; tier <= COMBO_TIER_CLIPS; tier++) {
     // ~12% frequency step per tier - a pleasant ascending run, not a harsh chromatic climb.
     clips[comboTierClipName(tier)] = tone(660 * Math.pow(1.12, tier - 1), 0.05)
+  }
+  for (let step = 1; step <= COIN_TICK_CLIPS; step++) {
+    // Short, bright, and quiet - many fire in quick succession, so each must stay a tick,
+    // not a note. ~8% pitch step keeps the rising-payout feel gentle.
+    clips[coinTickClipName(step)] = tone(1300 * Math.pow(1.08, step - 1), 0.03)
   }
   return clips
 }
@@ -207,6 +220,9 @@ export const audio = {
   impactLava: () => play('impactLava', 0.32),
   impactMetal: () => play('impactMetal', 0.3),
   combo: (tier: number) => play(comboTierClipName(tier), 0.22),
+  heartbeat: () => play('heartbeat', 0.5),
+  /** step 1..6+ - pitch rises through a collection batch, clamped at the top step. */
+  coinTick: (step: number) => play(coinTickClipName(step), 0.14),
   overdriveStart: () => play('overdriveStart', 0.55),
   overdriveBeat: () => play('overdriveBeat', 0.4),
   overdriveGo: () => play('overdriveGo', 0.55),
