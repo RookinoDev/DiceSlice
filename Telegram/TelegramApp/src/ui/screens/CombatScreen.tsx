@@ -33,6 +33,8 @@ const NORMAL_TAP_IMPULSE = 0.045
 const OVERDRIVE_TAP_IMPULSE = 0.075
 const SKILL_DAMAGE_IMPULSE = 0.11
 const COMBO_SOUND_STEP = 5
+/** Multi-touch tapping: this many fingers can tap the planet at once, each landing its own hit. */
+const MAX_CONCURRENT_TAP_POINTERS = 5
 /** Rapid-upgrade taps within this gap count toward the escalation streak. */
 const UPGRADE_ESCALATION_GAP_MS = 500
 /** Boss hull fraction below which Planetary Instability jitter/core-pulse kicks in. */
@@ -165,6 +167,10 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
   const lastUpgradeAt = useRef(0)
   const upgradeStreak = useRef(0)
   const lastImpactRef = useRef({ x: 0, y: 0 })
+  /** Multi-touch tapping: each finger that lands on the planet independently taps, up to
+   * MAX_CONCURRENT_TAP_POINTERS at once - tracked so extra fingers beyond that don't tap twice
+   * on their own pointerup/down noise, and so we know when to release the capped slot. */
+  const activeTapPointers = useRef<Set<number>>(new Set())
   // #6/#7 fix: the destroyed planet's visual (mesh + name) holds for a beat instead of
   // snapping straight to the next target the instant EnemyController spawns it - purely a
   // display decoupling, targetRef always tracks the real live target so the pause can read
@@ -487,7 +493,21 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
           ref={planetRef}
           className={`combat-planet ${destructionPhase !== 'idle' ? `combat-planet--${destructionPhase}` : ''}`}
           style={{ '--planet-scale': planetScale } as CSSProperties}
-          onClick={(e) => {
+          onPointerDown={(e) => {
+            // Multi-touch tapping (up to MAX_CONCURRENT_TAP_POINTERS fingers): pointerdown
+            // fires once per finger independently, unlike click which the browser collapses
+            // multiple simultaneous touches on one element down to a single event - each
+            // tracked pointer lands its own full tap.
+            if (activeTapPointers.current.size >= MAX_CONCURRENT_TAP_POINTERS) return
+            if (activeTapPointers.current.has(e.pointerId)) return
+            activeTapPointers.current.add(e.pointerId)
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId)
+            } catch {
+              // Capture is a nicety for cleanup if a finger slides off-element; a missing
+              // pointerup for it just leaves one slot stuck until pointercancel, never fatal.
+            }
+
             s.tap()
             const { count: newStreak, isMilestone } = registerTap()
             if (isMilestone) hapticAction()
@@ -510,6 +530,8 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
             // fire" state worth protecting.
             if (newStreak >= 50) spawnDebris(spawnParticle, x, y, '#FFD873')
           }}
+          onPointerUp={(e) => activeTapPointers.current.delete(e.pointerId)}
+          onPointerCancel={(e) => activeTapPointers.current.delete(e.pointerId)}
           aria-label="Tap to attack"
         >
           {/* #7 fix: a soft flash behind the planet as the next one enters. */}

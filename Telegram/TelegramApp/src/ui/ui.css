@@ -671,6 +671,9 @@
   border: none;
   cursor: pointer;
   padding: 0;
+  /* Multi-touch tapping: without this, the browser can eat a second/third simultaneous finger
+     as a pinch/pan gesture instead of dispatching it as its own pointerdown tap. */
+  touch-action: none;
   /* Base size fills whichever dimension of the wrap is smaller, matching a plain planet's size
      exactly. --planet-scale (1 normally, 3 for a gas giant's ring) then blows the box up
      around that same center point so the ring has room to render at full size instead of
