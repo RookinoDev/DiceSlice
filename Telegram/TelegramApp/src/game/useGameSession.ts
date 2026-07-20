@@ -13,11 +13,20 @@ import { fetchCloudSave, pickBetterSave, pushCloudSave } from './persistence/clo
 import { applyGrants, claimPendingPurchases, type PurchaseGrant } from './monetization/purchases'
 
 const AUTOSAVE_SECONDS = 15
-const CLOUD_PUSH_SECONDS = 60
+/** Safety-net periodic cloud push while playing (on top of the immediate per-event syncNow()
+ *  calls - boss kills, purchases, prestige) - catches anything else worth not losing. Lowered
+ *  from 60s so a delayed/failed immediate sync (e.g. a boss kill that raced a transient network
+ *  blip) doesn't leave a just-earned pack invisible for a full minute. */
+const CLOUD_PUSH_SECONDS = 20
 /** Clamp a single frame's delta so a throttled/backgrounded tab can't apply one giant tick. */
 const MAX_FRAME_DELTA = 0.25
 /** How often React is told to re-render off the game loop (the sim itself ticks per frame). */
 const UI_NOTIFY_HZ = 20
+/** Retry cadence for the initial cloud reconcile (see the useEffect below) if it fails - a cold
+ *  server start or a flaky connection on launch used to leave cloudReadyRef stuck false for the
+ *  rest of the session (every sync, immediate or periodic, silently no-ops on that gate) until
+ *  the player happened to background/foreground the app. */
+const RECONCILE_RETRY_MS = 10000
 
 export interface OfflineReport {
   seconds: number
@@ -100,13 +109,23 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
 
   useEffect(() => {
     let cancelled = false
+    let retryTimeout: ReturnType<typeof setTimeout> | undefined
 
     const reconcile = async () => {
       if (cloudReadyRef.current || reconcileInFlightRef.current) return
       reconcileInFlightRef.current = true
       try {
         const res = await fetchCloudSave(import.meta.env.VITE_API_URL)
-        if (cancelled || !res.ok) return // failed/offline: retry on next foreground, keep pushes disabled
+        if (cancelled) return
+        if (!res.ok) {
+          // Failed/offline: every sync (immediate per-event pushes AND the periodic timer)
+          // is gated on cloudReadyRef, so leaving this unset after one failed attempt used to
+          // disable cloud syncing - including pack grants - for the rest of the session unless
+          // the player happened to background/foreground the app. Retry on a short timer
+          // instead so a transient blip (cold server start, flaky connection) self-heals.
+          retryTimeout = setTimeout(reconcile, RECONCILE_RETRY_MS)
+          return
+        }
         cloudReadyRef.current = true
 
         const local = captureSave(activeSessionRef.current)
@@ -134,6 +153,7 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
       cancelled = true
+      clearTimeout(retryTimeout)
       document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [cfg])
