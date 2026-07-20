@@ -269,15 +269,26 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           triggerShake('big')
           spawnPackDrop()
           showPackBanner()
-          // Bug fix: pack grants only ever happened server-side during a cloud-save sync, which
-          // was on a 60s timer (see CLOUD_PUSH_SECONDS) - a player switching straight to the
-          // Cards tab after a kill would almost always miss their own just-earned pack and have
-          // to wait up to a minute. Force the push now instead of waiting for the timer, then
-          // refetch once the server (which grants synchronously within that same request,
-          // before responding) has actually seen it.
-          syncNow()
-            .then(refreshCards)
-            .catch(() => {}) // offline/unreachable: the periodic sync will pick it up later
+          // Pack grants are server-side, keyed off save.stats.bossesDefeated (see db.mjs's
+          // grantPacksFromSave) - forcing the push right here (rather than waiting for the 60s
+          // CLOUD_PUSH_SECONDS timer) lets the Cards tab show the pack immediately instead of up
+          // to a minute later.
+          //
+          // Bug fix: this event (onReward) fires from inside EnemyController.handleDestroyed,
+          // which emits onPlanetKilled (-> onReward, this handler) BEFORE it calls
+          // stageManager.notifyPlanetKilled() (-> onBossCleared -> stats.bossesDefeated++, see
+          // GameSession's constructor). Calling syncNow() directly here captured the save
+          // BEFORE that increment landed, so the very sync meant to reveal this boss's pack
+          // always uploaded the OLD bossesDefeated count - the server granted 0 packs, and the
+          // pack only ever showed up on a LATER sync (the next boss kill, or the 60s timer
+          // catching up). queueMicrotask defers just past the current synchronous call stack -
+          // by the time it runs, notifyPlanetKilled() (still part of that same stack) has always
+          // already finished, so the capture below sees the correct, just-incremented count.
+          queueMicrotask(() => {
+            syncNow()
+              .then(refreshCards)
+              .catch(() => {}) // offline/unreachable: the periodic sync will pick it up later
+          })
         } else {
           showToast(`PLANET DESTROYED · +${gold.toShortString()} Stardust`)
           // Calm Before Destruction (#64): a shorter hush than the boss's, same reasoning.
