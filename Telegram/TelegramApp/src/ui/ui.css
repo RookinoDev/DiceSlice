@@ -4379,7 +4379,17 @@
   white-space: nowrap;
 }
 .pack-overlay-continue {
-  width: min(80vw, 320px);
+  /* .sheet-button-primary sets flex:1 for its usual home, a horizontal .sheet-actions row,
+     where it means "share the row's width". Reused here inside .pack-overlay-stage--recap -
+     a COLUMN flex container - flex:1 instead meant "grow to fill the remaining column height",
+     ballooning this into a ~340px-tall button, taller than the enthroned best-pull card above
+     it. flex:none stops that; width/padding then bring it down to a normal pill CTA in line
+     with the compact recap cards instead of a near-full-bleed slab. */
+  flex: none;
+  align-self: center;
+  width: auto;
+  min-width: 200px;
+  padding: 13px 32px;
 }
 
 @media (prefers-reduced-motion: reduce) {
