@@ -50,15 +50,32 @@ test('upsertProfile keeps first_synced_at across identity updates and joins the 
   assert.equal(JSON.parse(second.save_json).stats.deepestStage, 90)
 })
 
-test('pack grants track boss-kill deltas from save syncs, idempotently', () => {
-  const save = (bosses, deepest) => ({ version: 1, highestStage: deepest, stats: { bossesDefeated: bosses, deepestStage: deepest } })
-  assert.equal(grantPacksFromSave(500, save(3, 20)), 3)
-  assert.equal(grantPacksFromSave(500, save(3, 20)), 0) // same save re-synced: nothing new
-  assert.equal(grantPacksFromSave(500, save(5, 60)), 2)
+test('pack grants track distinct boss-stage clears from save syncs, idempotently', () => {
+  // deepestBossCleared is a STAGE NUMBER (boss stage interval 5), not a raw count -
+  // floor(deepestBossCleared / 5) is how many distinct bosses that represents.
+  const save = (deepestBossCleared, deepest) => ({ version: 1, highestStage: deepest, stats: { deepestBossCleared, deepestStage: deepest } })
+  assert.equal(grantPacksFromSave(500, save(15, 20)), 3) // cleared boss stages 5, 10, 15
+  assert.equal(grantPacksFromSave(500, save(15, 20)), 0) // same save re-synced: nothing new
+  assert.equal(grantPacksFromSave(500, save(25, 60)), 2) // cleared 20, 25 too (5 uniques total)
   const packs = listUnopenedPacks(500)
   assert.equal(packs.length, 5)
   assert.equal(packs[0].type, 'meteor') // deepest 20 -> giants band
   assert.equal(packs[4].type, 'stellar') // deepest 60 -> star band
+})
+
+test('pack grants do not repeat for a boss stage re-cleared after a prestige reset', () => {
+  const save = (deepestBossCleared, deepest) => ({ version: 1, highestStage: deepest, stats: { deepestBossCleared, deepestStage: deepest } })
+  // First run: clear boss stages 5 and 10, then prestige (stage resets to 1 client-side,
+  // but deepestBossCleared - a lifetime high-water mark - stays at 10).
+  assert.equal(grantPacksFromSave(501, save(10, 12)), 2)
+  // Second run after prestige: re-clears boss stage 5 again (deepestBossCleared can't drop
+  // below its previous high-water mark, so the save still reports 10) - no new pack for the
+  // boss it's already gotten one from.
+  assert.equal(grantPacksFromSave(501, save(10, 6)), 0)
+  // Only once genuinely NEW ground is cleared (boss stage 15, past the old high-water mark
+  // of 10) does another pack land.
+  assert.equal(grantPacksFromSave(501, save(15, 16)), 1)
+  assert.equal(listUnopenedPacks(501).length, 3)
 })
 
 test('daily pack days (10/20/30) grant idempotently and re-grant after a streak reset', () => {
@@ -89,7 +106,7 @@ test('daily pack days: a single sync spanning multiple pack days grants all of t
 })
 
 test('openPack mints serialed cards once and refuses re-opens and foreign packs', () => {
-  grantPacksFromSave(600, { version: 1, highestStage: 10, stats: { bossesDefeated: 1, deepestStage: 10 } })
+  grantPacksFromSave(600, { version: 1, highestStage: 10, stats: { deepestBossCleared: 5, deepestStage: 10 } })
   const [pack] = listUnopenedPacks(600)
   const result = openPack(600, pack.id)
   assert.equal(result.packType, 'meteor')
@@ -103,7 +120,7 @@ test('openPack mints serialed cards once and refuses re-opens and foreign packs'
 })
 
 test('serials increment globally per card+variant', () => {
-  grantPacksFromSave(700, { version: 1, highestStage: 10, stats: { bossesDefeated: 10, deepestStage: 10 } })
+  grantPacksFromSave(700, { version: 1, highestStage: 10, stats: { deepestBossCleared: 50, deepestStage: 10 } })
   for (const pack of listUnopenedPacks(700)) openPack(700, pack.id)
   const owned = getCollection(700)
   assert.equal(owned.length, 30) // 10 meteor packs x 3 cards
@@ -128,7 +145,7 @@ test('claimPurchases grants each recorded purchase exactly once', () => {
 })
 
 test('minted cards carry a variant and getCollection exposes it', () => {
-  grantPacksFromSave(800, { version: 1, highestStage: 10, stats: { bossesDefeated: 1, deepestStage: 10 } })
+  grantPacksFromSave(800, { version: 1, highestStage: 10, stats: { deepestBossCleared: 5, deepestStage: 10 } })
   const [pack] = listUnopenedPacks(800)
   const { cards } = openPack(800, pack.id)
   for (const c of cards) assert.ok(typeof c.variant === 'string' && c.variant.length > 0)
@@ -140,7 +157,8 @@ test('minted cards carry a variant and getCollection exposes it', () => {
 // ~77-card pool, so ~180 legendary pulls exhaust it and must dupe.
 function grantManyPacks(userId, waves = 3) {
   for (let w = 1; w <= waves; w++) {
-    grantPacksFromSave(userId, { version: 1, highestStage: 145, stats: { bossesDefeated: w * 20, deepestStage: 145 } })
+    // w * 20 unique bosses -> w * 20 * 5 (BOSS_STAGE_INTERVAL) as a boss-stage number.
+    grantPacksFromSave(userId, { version: 1, highestStage: 145, stats: { deepestBossCleared: w * 100, deepestStage: 145 } })
     for (const pack of listUnopenedPacks(userId)) openPack(userId, pack.id)
   }
 }
@@ -197,7 +215,7 @@ test('craft mints a chosen card + variant for dust, refusing when broke', () => 
 })
 
 test('showcase stores only owned (card, variant) pairs and round-trips via profile', () => {
-  grantPacksFromSave(1100, { version: 1, highestStage: 10, stats: { bossesDefeated: 1, deepestStage: 10 } })
+  grantPacksFromSave(1100, { version: 1, highestStage: 10, stats: { deepestBossCleared: 5, deepestStage: 10 } })
   const [pack] = listUnopenedPacks(1100)
   const { cards } = openPack(1100, pack.id)
   const mine = cards.map((c) => ({ cardId: c.cardId, variant: c.variant }))

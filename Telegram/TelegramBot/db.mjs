@@ -184,16 +184,33 @@ function mintInstance(telegramUserId, cardId, variant, source, now) {
 
 /** Cap on packs granted per single save sync - a sanity brake, not a balance knob. */
 const MAX_PACKS_PER_SYNC = 20
+/** Mirrors TelegramApp's defaultBalanceConfig.bossStageInterval - small, rarely-changing
+ * value, kept in sync by hand same as this file already does for DAILY_PACK_DAYS below. */
+const BOSS_STAGE_INTERVAL = 5
 
 /**
- * Grants packs for boss kills revealed by a cloud-save sync: the delta between the
- * save's lifetime bossesDefeated and what we've granted for already. Pack type is
- * inferred from the save's deepest stage (recent bosses cluster near it). Trust model:
- * client-authoritative progress, server-authoritative grants - see the plan doc.
+ * Grants packs for boss kills revealed by a cloud-save sync: the delta between how many
+ * DISTINCT boss stages the save has ever cleared and what we've granted for already - one
+ * pack per boss, ever. Keyed off stats.deepestBossCleared (a lifetime high-water mark that
+ * only advances on an actual clear and never resets on prestige - see TelegramApp's
+ * LifetimeStats.ts) rather than a raw kill count, so replaying an already-cleared boss stage
+ * after a Stellar Ascension no longer re-grants a pack for it. pack_progress.bosses_granted
+ * still means "packs granted so far" either way, which is what makes this swap safe for
+ * players who already had packs granted under the old raw-count rule: a veteran who never
+ * prestige-farmed sees no change (their unique-boss count already equals their raw kill
+ * count); one who did sees their next sync compute zero new packs until their genuine
+ * unique-boss progress catches back up past what they'd already been granted - never a
+ * double grant, never a clawback.
+ *
+ * Pack type is inferred from the save's deepest stage (recent bosses cluster near it) -
+ * unrelated to the dedup rule above, so it still uses raw depth, not unique-boss count.
+ * Trust model: client-authoritative progress, server-authoritative grants - see the plan doc.
  */
 export function grantPacksFromSave(telegramUserId, save) {
-  const defeated = Number(save?.stats?.bossesDefeated)
-  if (!Number.isFinite(defeated) || defeated <= 0) return 0
+  const deepestBossCleared = Number(save?.stats?.deepestBossCleared)
+  if (!Number.isFinite(deepestBossCleared) || deepestBossCleared <= 0) return 0
+  const uniqueBossesCleared = Math.floor(deepestBossCleared / BOSS_STAGE_INTERVAL)
+  if (uniqueBossesCleared <= 0) return 0
   const deepest = Math.max(Number(save?.stats?.deepestStage) || 1, Number(save?.highestStage) || 1)
 
   const now = Date.now()
@@ -201,7 +218,7 @@ export function grantPacksFromSave(telegramUserId, save) {
   try {
     db.prepare('INSERT OR IGNORE INTO pack_progress (telegram_user_id) VALUES (?)').run(telegramUserId)
     const progress = db.prepare('SELECT bosses_granted FROM pack_progress WHERE telegram_user_id = ?').get(telegramUserId)
-    const delta = Math.min(Math.floor(defeated) - progress.bosses_granted, MAX_PACKS_PER_SYNC)
+    const delta = Math.min(uniqueBossesCleared - progress.bosses_granted, MAX_PACKS_PER_SYNC)
     if (delta <= 0) {
       db.exec('COMMIT')
       return 0

@@ -47,6 +47,22 @@ export function applySave(s: GameSession, st: SaveState): void {
     if (st.lastSaveUnixSeconds > 0) s.stats.firstPlayedUnixSeconds = st.lastSaveUnixSeconds
   }
   s.stats.deepestStage = Math.max(s.stats.deepestStage, st.highestStage)
+  // Pre-#pack-dedup save: deepestBossCleared wasn't tracked yet. Backfill the highest boss
+  // stage at-or-below deepestStage (reaching any stage past a boss REQUIRES having cleared
+  // it - see StageManager.notifyPlanetKilled) so a migrating veteran's already-earned packs
+  // aren't reinterpreted as "0 unique bosses cleared" and reset to zero. The server's own
+  // grant floor (pack_progress.bosses_granted) is the actual safety net against a double
+  // grant either way - see db.mjs's grantPacksFromSave.
+  if (!st.stats || st.stats.deepestBossCleared === undefined) {
+    let backfilled = 0
+    for (let stage = s.stats.deepestStage; stage >= 1; stage--) {
+      if (s.stage.isBossStage(stage)) {
+        backfilled = stage
+        break
+      }
+    }
+    s.stats.deepestBossCleared = backfilled
+  }
 }
 
 function captureShipLevels(s: GameSession): number[] {

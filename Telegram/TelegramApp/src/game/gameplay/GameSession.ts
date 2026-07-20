@@ -102,6 +102,12 @@ export class GameSession {
     // Lifetime profile counters - observe-only, never feed back into gameplay.
     this.enemy.onPlanetKilled.on(() => this.stats.planetsDestroyed++)
     this.stage.onBossCleared.on(() => this.stats.bossesDefeated++)
+    // One card pack per boss, ever (see LifetimeStats.ts's deepestBossCleared comment):
+    // onBossCleared only fires on an actual win, so replaying an already-cleared boss stage
+    // after a prestige reset never raises this past its previous high-water mark.
+    this.stage.onBossCleared.on((clearedStage) => {
+      if (clearedStage > this.stats.deepestBossCleared) this.stats.deepestBossCleared = clearedStage
+    })
     this.stage.onStageEntered.on((stage) => {
       if (stage > this.stats.deepestStage) this.stats.deepestStage = stage
     })
