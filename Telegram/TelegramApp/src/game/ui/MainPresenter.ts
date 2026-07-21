@@ -30,8 +30,6 @@ export interface ArtifactVm {
 /** Immutable snapshot the main screens render (no game-object refs -> easy to test). */
 export interface MainViewModel {
   stageLabel: string
-  /** sector/biome name, e.g. "OUTER ORBIT" */
-  zoneLabel: string
   isBoss: boolean
   bossActive: boolean
   bossSecondsLeft: number
@@ -68,15 +66,6 @@ export interface MainViewModel {
   showArtifacts: boolean
   /** near/at the unlock stage, or relics exist */
   showPrestige: boolean
-}
-
-/** Display-only zone/biome name for a stage (mirrors the planet-variant bands). */
-export function zoneName(stage: number): string {
-  if (stage < 10) return 'OUTER ORBIT'
-  if (stage < 25) return 'RED BELT'
-  if (stage < 50) return 'BROKEN MOONS'
-  if (stage < 100) return 'VOID FRONTIER'
-  return 'STELLAR CORE'
 }
 
 /** Maps a GameSession to a MainViewModel, mirroring MainPresenter.Build() from Unity. */
@@ -133,7 +122,6 @@ export function buildMainViewModel(s: GameSession): MainViewModel {
 
   return {
     stageLabel: p ? `Sector ${p.stage}` : '—',
-    zoneLabel: p ? zoneName(p.stage) : '',
     isBoss: p ? p.isBoss : false,
     bossActive: s.stage.bossActive,
     bossSecondsLeft: Math.ceil(s.stage.bossTimeLeft),

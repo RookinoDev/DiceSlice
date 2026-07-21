@@ -559,11 +559,20 @@
   font-weight: 700;
   font-size: 19px;
   color: var(--palette-text-primary);
+  /* Now the real object name (a handful of words at most, e.g. "OUTER ORBIT" before) - a
+     generated boss can run long ("CAT'S EYE NEBULA", "KEPLER-1926 B"). Truncate rather than
+     let it wrap or push the timer pill around; min-width:0 is what lets a flex child shrink
+     below its text's intrinsic width at all. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .combat-boss-name-row {
   display: flex;
   align-items: center;
   gap: 10px;
+  max-width: 100%;
 }
 /* #2 fix: glass pill, ring border = time remaining (conic-gradient, no separate bar element),
    translucent + blurred fill instead of the old opaque bar+bold-number row. */
@@ -575,6 +584,9 @@
   font-weight: 700;
   font-size: 13px;
   color: var(--palette-text-primary);
+  /* The functional half of .combat-boss-name-row - a long real object name must never be
+     what squeezes this. */
+  flex-shrink: 0;
   /* background-color can't be layered in a multi-background shorthand - a same-color
      linear-gradient() simulates the solid glass fill while staying a valid background-image,
      so it can sit alongside the conic-gradient ring (see the identical trick on

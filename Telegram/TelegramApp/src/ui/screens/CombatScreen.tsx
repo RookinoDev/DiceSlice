@@ -431,7 +431,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
           <div className="combat-boss-badge">
             <div className="combat-boss-label">BOSS ENCOUNTER</div>
             <div className="combat-boss-name-row">
-              <div className="combat-boss-name">{vm.zoneLabel || vm.stageLabel}</div>
+              <div className="combat-boss-name">{displayTarget.name}</div>
               {/* #2 fix: a glass pill with a conic-gradient ring for "time left at a glance"
                   replaces the old bar+bold-number row, and sits beside the name instead of
                   stacked under it. */}

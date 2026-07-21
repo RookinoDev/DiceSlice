@@ -60,6 +60,14 @@ export class SkillService {
   isActive(t: SkillType): boolean {
     return this.st(t).active > 0
   }
+  /** True while ANY skill is in its active-buff window - used to block Prestige mid-buff
+   *  (a fresh run should start clean, not with a leftover Overdrive/Battle Cry timer). */
+  hasAnyActive(): boolean {
+    for (const st of this.state.values()) {
+      if (st.active > 0) return true
+    }
+    return false
+  }
   cooldown(t: SkillType): number {
     return this.st(t).cooldown
   }

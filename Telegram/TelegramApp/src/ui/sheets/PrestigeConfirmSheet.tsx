@@ -12,9 +12,10 @@ interface PrestigeConfirmSheetProps {
   open: boolean
   onClose: () => void
   onPrestiged: (relicsGained: BigNumber) => void
+  onToast: (text: string) => void
 }
 
-export function PrestigeConfirmSheet({ session: s, open, onClose, onPrestiged }: PrestigeConfirmSheetProps) {
+export function PrestigeConfirmSheet({ session: s, open, onClose, onPrestiged, onToast }: PrestigeConfirmSheetProps) {
   const [gainedDone, setGainedDone] = useState<BigNumber | null>(null)
 
   // This component stays mounted across open/close cycles (only the Sheet's own subtree
@@ -31,6 +32,14 @@ export function PrestigeConfirmSheet({ session: s, open, onClose, onPrestiged }:
   }, [gainedDone])
 
   const handleConfirm = () => {
+    // A run should never reset mid-buff - Overdrive/Battle Cry/Drone Swarm/Midas Beam would
+    // otherwise carry a "still active" timer into a freshly reset run that no longer matches
+    // what's on screen. Block the action itself here (not the whole Prestige entry point,
+    // which stays reachable) and tell the player why.
+    if (s.skills.hasAnyActive()) {
+      onToast('POWERUPS ACTIVE — WAIT TO ASCEND')
+      return
+    }
     const gained = s.doPrestige()
     if (gained.gt(BigNumber.Zero)) {
       setGainedDone(gained)

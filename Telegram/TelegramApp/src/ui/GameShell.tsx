@@ -536,7 +536,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       />
       <ParticleLayer containerRef={rewardParticlesRef} className="fx-particle-layer--shell" />
 
-      <PrestigeConfirmSheet session={session} open={prestigeConfirmOpen} onClose={() => setPrestigeConfirmOpen(false)} onPrestiged={handlePrestiged} />
+      <PrestigeConfirmSheet session={session} open={prestigeConfirmOpen} onClose={() => setPrestigeConfirmOpen(false)} onPrestiged={handlePrestiged} onToast={showToast} />
       <MissionsSheet session={session} open={missionsOpen} onClose={() => setMissionsOpen(false)} onClaimed={() => showToast('MISSION COMPLETE')} />
       <DailyRewardSheet session={session} open={dailyOpen} onClose={() => setDailyOpen(false)} onClaimed={handleDailyClaimed} />
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
