@@ -74,6 +74,14 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const [dust, setDust] = useState(0)
   const [myShowcase, setMyShowcase] = useState<ShowcaseEntry[]>([])
   const [pendingPacks, setPendingPacks] = useState<PendingPack[]>([])
+  // Live mirror of pendingPacks.length for the boss-kill handler below: that handler is
+  // registered once per session (not re-registered on every pendingPacks change), so reading
+  // the state directly there would see whatever count was current when the effect last ran,
+  // not the count at the moment of THIS kill.
+  const pendingPacksRef = useRef<PendingPack[]>([])
+  useEffect(() => {
+    pendingPacksRef.current = pendingPacks
+  }, [pendingPacks])
   const [selectedCard, setSelectedCard] = useState<CardDefinition | null>(null)
   // The filtered/sorted list CardsScreen was showing when the card was opened - lets the
   // detail sheet's NEXT button browse without needing to re-derive filters up here.
@@ -267,26 +275,36 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           audio.bossDown()
           hapticSuccess()
           triggerShake('big')
-          spawnPackDrop()
-          showPackBanner()
-          // Pack grants are server-side, keyed off save.stats.bossesDefeated (see db.mjs's
-          // grantPacksFromSave) - forcing the push right here (rather than waiting for the 60s
-          // CLOUD_PUSH_SECONDS timer) lets the Cards tab show the pack immediately instead of up
-          // to a minute later.
+          // Pack grants are server-side, keyed off save.stats.deepestBossCleared - a boss stage
+          // already cleared before (e.g. replayed after a Prestige reset) genuinely earns
+          // nothing (see db.mjs's grantPacksFromSave and the one-pack-per-boss fix). The
+          // pack-drop flight + banner used to fire unconditionally on every boss kill, so a
+          // re-cleared boss showed the "new pack!" celebration for a pack that never arrived.
+          // Forcing the push right here (rather than waiting for the periodic CLOUD_PUSH_SECONDS
+          // timer) lets a REAL grant show up immediately instead of up to CLOUD_PUSH_SECONDS
+          // later; comparing the pack count before/after is what confirms this kill actually
+          // earned one before celebrating it.
           //
           // Bug fix: this event (onReward) fires from inside EnemyController.handleDestroyed,
           // which emits onPlanetKilled (-> onReward, this handler) BEFORE it calls
-          // stageManager.notifyPlanetKilled() (-> onBossCleared -> stats.bossesDefeated++, see
-          // GameSession's constructor). Calling syncNow() directly here captured the save
-          // BEFORE that increment landed, so the very sync meant to reveal this boss's pack
-          // always uploaded the OLD bossesDefeated count - the server granted 0 packs, and the
-          // pack only ever showed up on a LATER sync (the next boss kill, or the 60s timer
-          // catching up). queueMicrotask defers just past the current synchronous call stack -
-          // by the time it runs, notifyPlanetKilled() (still part of that same stack) has always
-          // already finished, so the capture below sees the correct, just-incremented count.
+          // stageManager.notifyPlanetKilled() (-> onBossCleared -> stats.deepestBossCleared
+          // bump, see GameSession's constructor). Calling syncNow() directly here captured the
+          // save BEFORE that update landed, so the very sync meant to reveal this boss's pack
+          // always uploaded the OLD count - the server granted 0 packs, and a real pack only
+          // ever showed up on a LATER sync (the next boss kill, or the timer catching up).
+          // queueMicrotask defers just past the current synchronous call stack - by the time it
+          // runs, notifyPlanetKilled() (still part of that same stack) has always already
+          // finished, so the capture below sees the correct, just-updated count.
+          const pendingPacksBefore = pendingPacksRef.current.length
           queueMicrotask(() => {
             syncNow()
               .then(refreshCards)
+              .then((packs) => {
+                if (packs.length > pendingPacksBefore) {
+                  spawnPackDrop()
+                  showPackBanner()
+                }
+              })
               .catch(() => {}) // offline/unreachable: the periodic sync will pick it up later
           })
         } else {
@@ -412,14 +430,17 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
 
   // Card packs + collection: fetched on mount and whenever the app regains foreground (a boss
   // kill's pack grant happens server-side during the next cloud-save sync, which may complete
-  // while this tab is backgrounded).
-  const refreshCards = () => {
+  // while this tab is backgrounded). Returns the freshly-fetched pack list (not just void) so
+  // the boss-kill handler below can tell whether THIS sync actually revealed a new one.
+  const refreshCards = async (): Promise<PendingPack[]> => {
     const apiUrl = import.meta.env.VITE_API_URL
     fetchCollection(apiUrl).then(({ cards, dust: dustBalance }) => {
       setOwnedCards(cards)
       setDust(dustBalance)
     })
-    fetchPendingPacks(apiUrl).then(setPendingPacks)
+    const packs = await fetchPendingPacks(apiUrl)
+    setPendingPacks(packs)
+    return packs
   }
   useEffect(() => {
     refreshCards()
