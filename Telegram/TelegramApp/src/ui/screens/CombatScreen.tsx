@@ -451,7 +451,9 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         )}
       </div>
 
-      <div className="combat-target-name">{displayTarget.name}</div>
+      {/* Boss encounters already show the name once, beside the timer, in .combat-boss-name
+          above - repeating it here would print it twice on screen. */}
+      {!vm.bossActive && <div className="combat-target-name">{displayTarget.name}</div>}
 
       {/* #1 fix: HP bar now sits right under the planet's name, not below the planet art. */}
       <div key={hpBarShake} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
