@@ -1,6 +1,23 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
-import { claimPurchases, craftCard, getCollection, getDust, getLeaderboard, getProfile, getSave, grantDailyPackFromSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, refineInstances, setShowcase, upsertProfile } from './db.mjs'
+import {
+  claimPurchases,
+  craftCard,
+  getCollection,
+  getDust,
+  getLeaderboard,
+  getProfile,
+  getSave,
+  grantDailyPackFromSave,
+  grantPacksFromSave,
+  listUnopenedPacks,
+  openPack,
+  putSave,
+  refineInstances,
+  setNotificationsEnabled,
+  setShowcase,
+  upsertProfile,
+} from './db.mjs'
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/stellar-breaker\.pages\.dev$/,
@@ -85,6 +102,23 @@ export function startServer(botToken, port) {
     if (req.method === 'OPTIONS') {
       res.writeHead(204)
       res.end()
+      return
+    }
+
+    // Push-notification opt-in/out (Settings > Notifications toggle), so the bot's idle
+    // reminder (see notifyIdlePlayers in index.mjs) can respect it without needing the save
+    // blob at all - fired only when the user actually flips the toggle, best-effort.
+    if (req.method === 'POST' && req.url === '/api/notification-prefs') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        setNotificationsEnabled(userId, !!body.enabled)
+        sendJson(res, 200, { ok: true })
+      } catch (e) {
+        console.error('[server] notification-prefs error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
       return
     }
 

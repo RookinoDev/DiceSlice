@@ -40,6 +40,17 @@ db.exec(`
   )
 `)
 
+// Phase 2 (engagement roadmap): referral tracking only - no rewards granted here (see
+// docs/CARD_SYSTEM_PLAN.md-adjacent Phase 3 for that). referred_user_id is the PRIMARY KEY so
+// first-touch wins: once someone's first /start carries a referrer, it can never be overwritten.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS referrals (
+    referred_user_id INTEGER PRIMARY KEY,
+    referrer_user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL
+  )
+`)
+
 // --- Collectible cards (see docs/CARD_SYSTEM_PLAN.md) ---
 // Instances are serial-numbered per (card, holo): mint #N is a real, ownable object.
 db.exec(`
@@ -121,6 +132,11 @@ db.exec(`
 if (!hasColumn('packs', 'quality')) db.exec(`ALTER TABLE packs ADD COLUMN quality REAL NOT NULL DEFAULT 0`)
 if (!hasColumn('pack_progress', 'dust')) db.exec(`ALTER TABLE pack_progress ADD COLUMN dust INTEGER NOT NULL DEFAULT 0`)
 if (!hasColumn('profiles', 'showcase')) db.exec(`ALTER TABLE profiles ADD COLUMN showcase TEXT`)
+// Phase 2: push notifications (re-engagement reminders, see notifyIdlePlayers in index.mjs).
+// Defaults match the client's prefs.ts default (notifications on) so a profile that's never
+// explicitly synced its preference is treated the same as one that has and left it on.
+if (!hasColumn('profiles', 'notifications_enabled')) db.exec(`ALTER TABLE profiles ADD COLUMN notifications_enabled INTEGER NOT NULL DEFAULT 1`)
+if (!hasColumn('profiles', 'last_notified_at')) db.exec(`ALTER TABLE profiles ADD COLUMN last_notified_at INTEGER`)
 
 /** Upsert the player's public identity (from Telegram-signed initData). Keeps first_synced_at. */
 export function upsertProfile(telegramUserId, { firstName, username, photoUrl }) {
@@ -144,6 +160,58 @@ export function getProfile(telegramUserId) {
     )
     .get(telegramUserId)
   return row ?? null
+}
+
+/**
+ * Records that `referredUserId` first opened the bot via `referrerUserId`'s share link.
+ * INSERT OR IGNORE: first touch wins, so once a user is recorded, later /start links from a
+ * different referrer are no-ops. Self-referral is also a no-op. Returns whether this call was
+ * the one that actually recorded it (false for both no-op cases above).
+ */
+export function recordReferral(referredUserId, referrerUserId) {
+  if (referredUserId === referrerUserId) return false
+  const result = db
+    .prepare('INSERT OR IGNORE INTO referrals (referred_user_id, referrer_user_id, created_at) VALUES (?, ?, ?)')
+    .run(referredUserId, referrerUserId, Date.now())
+  return result.changes > 0
+}
+
+/** How many people `telegramUserId` has referred, ever. */
+export function getReferralCount(telegramUserId) {
+  return db.prepare('SELECT COUNT(*) AS c FROM referrals WHERE referrer_user_id = ?').get(telegramUserId).c
+}
+
+/** Persists the Settings > Notifications toggle so the server can respect it when reminding idle players. */
+export function setNotificationsEnabled(telegramUserId, enabled) {
+  const now = Date.now()
+  db.prepare(`
+    INSERT INTO profiles (telegram_user_id, notifications_enabled, first_synced_at, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(telegram_user_id) DO UPDATE SET notifications_enabled = excluded.notifications_enabled, updated_at = excluded.updated_at
+  `).run(telegramUserId, enabled ? 1 : 0, now, now)
+}
+
+/**
+ * Users due for a re-engagement reminder: notifications on, cloud save older than `idleMs`
+ * (haven't opened the app in a while), and not reminded within the last `cooldownMs` (so a
+ * player who stays away for a week gets one nudge, not one per scheduler tick).
+ */
+export function getUsersDueForReengagement(idleMs, cooldownMs) {
+  const now = Date.now()
+  return db
+    .prepare(
+      `SELECT p.telegram_user_id AS telegramUserId
+       FROM profiles p JOIN saves s ON s.telegram_user_id = p.telegram_user_id
+       WHERE p.notifications_enabled = 1
+         AND s.updated_at < ?
+         AND (p.last_notified_at IS NULL OR p.last_notified_at < ?)`,
+    )
+    .all(now - idleMs, now - cooldownMs)
+    .map((r) => r.telegramUserId)
+}
+
+/** Marks a user as just-notified, starting their cooldown window (see getUsersDueForReengagement). */
+export function markNotified(telegramUserId) {
+  db.prepare('UPDATE profiles SET last_notified_at = ? WHERE telegram_user_id = ?').run(Date.now(), telegramUserId)
 }
 
 // Sort keys a leaderboard request may ask for, mapped to a SQL expression pulled straight out

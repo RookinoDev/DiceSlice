@@ -91,8 +91,13 @@ export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, owne
   const share = () => {
     audio.click()
     hapticAction()
+    // Personalized so a friend's first /start on this link carries the referral (see
+    // recordReferral in TelegramBot/db.mjs) - falls back to the bare link if, somehow, there's
+    // no local Telegram user id to attribute the referral to.
+    const myId = getTelegramUser()?.id
+    const link = myId ? `${BOT_LINK}?start=ref_${myId}` : BOT_LINK
     shareViaTelegram(
-      BOT_LINK,
+      link,
       `⭐ My Stellar Breaker record: Sector ${v.deepestStage} · ${v.planetsDestroyed.toLocaleString()} planets destroyed · ${v.prestigeCount} Stellar Ascensions. Think you can beat that?`,
     )
   }

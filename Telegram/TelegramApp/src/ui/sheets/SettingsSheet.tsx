@@ -3,11 +3,13 @@ import { useState } from 'react'
 import { prefs } from '../../game/prefs'
 import { audio } from '../../game/audio/AudioManager'
 import { deleteSave } from '../../game/persistence/localStorageSave'
+import { syncNotificationPrefs } from '../../game/notificationApi'
 import { Sheet } from '../Sheet'
 
 interface SettingsSheetProps {
   open: boolean
   onClose: () => void
+  apiBaseUrl: string | undefined
 }
 
 const APP_VERSION = '0.1.0'
@@ -20,7 +22,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
-export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
+export function SettingsSheet({ open, onClose, apiBaseUrl }: SettingsSheetProps) {
   const [musicOn, setMusicOn] = useState(!audio.musicMuted)
   const [sfxOn, setSfxOn] = useState(!audio.muted)
   const [notificationsOn, setNotificationsOn] = useState(prefs.notificationsEnabled)
@@ -60,6 +62,7 @@ export function SettingsSheet({ open, onClose }: SettingsSheetProps) {
           onToggle={() => {
             setNotificationsOn(!notificationsOn)
             prefs.notificationsEnabled = !notificationsOn
+            syncNotificationPrefs(apiBaseUrl, !notificationsOn)
           }}
         />
       </div>

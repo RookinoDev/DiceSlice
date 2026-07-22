@@ -6,7 +6,29 @@ import { join } from 'node:path'
 
 // Point db.mjs at a throwaway file before it opens its connection (module-load time).
 process.env.SQLITE_PATH = join(mkdtempSync(join(tmpdir(), 'sb-db-test-')), 'test.db')
-const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, getLeaderboard, grantPacksFromSave, grantDailyPackFromSave, listUnopenedPacks, openPack, getCollection, getDust, refineInstances, craftCard, setShowcase } = await import('./db.mjs')
+const {
+  recordPurchase,
+  claimPurchases,
+  putSave,
+  getSave,
+  upsertProfile,
+  getProfile,
+  getLeaderboard,
+  grantPacksFromSave,
+  grantDailyPackFromSave,
+  listUnopenedPacks,
+  openPack,
+  getCollection,
+  getDust,
+  refineInstances,
+  craftCard,
+  setShowcase,
+  recordReferral,
+  getReferralCount,
+  setNotificationsEnabled,
+  getUsersDueForReengagement,
+  markNotified,
+} = await import('./db.mjs')
 
 test('getSave returns null for a user who never synced', () => {
   assert.equal(getSave(111), null)
@@ -279,4 +301,39 @@ test('showcase stores only owned (card, variant) pairs and round-trips via profi
 
   assert.equal(setShowcase(1100, [{ cardId: 'earth', variant: 'polychrome' }]), false) // not owned
   assert.equal(setShowcase(1100, Array(9).fill(mine[0])), false) // over the cap
+})
+
+test('recordReferral is first-touch-wins and getReferralCount aggregates per referrer', () => {
+  assert.equal(recordReferral(3001, 3000), true) // 3000 referred 3001
+  assert.equal(recordReferral(3001, 9999), false) // already referred - first touch wins
+  assert.equal(recordReferral(3002, 3000), true) // 3000 referred 3002 too
+  assert.equal(getReferralCount(3000), 2)
+  assert.equal(getReferralCount(9999), 0) // blocked by first-touch above, never actually recorded
+})
+
+test('recordReferral rejects self-referral', () => {
+  assert.equal(recordReferral(3010, 3010), false)
+  assert.equal(getReferralCount(3010), 0)
+})
+
+test('getUsersDueForReengagement respects notifications_enabled, idle threshold, and cooldown', () => {
+  upsertProfile(3100, { firstName: 'Idle', username: null, photoUrl: null })
+  putSave(3100, JSON.stringify({ version: 1 }))
+
+  // Effectively-permissive idle/cooldown windows (negative = "even a future timestamp would
+  // count"), so this only exercises the notifications_enabled/idle/cooldown gates below, never
+  // flaking on the real (sub-millisecond) gap between putSave() and this call.
+  assert.ok(getUsersDueForReengagement(-60_000, -60_000).includes(3100))
+
+  setNotificationsEnabled(3100, false)
+  assert.ok(!getUsersDueForReengagement(-60_000, -60_000).includes(3100))
+  setNotificationsEnabled(3100, true)
+  assert.ok(getUsersDueForReengagement(-60_000, -60_000).includes(3100))
+
+  // Not idle enough: a save from moments ago is nowhere near a 10-minute-old threshold.
+  assert.ok(!getUsersDueForReengagement(600_000, -60_000).includes(3100))
+
+  // Within cooldown right after a fresh notification.
+  markNotified(3100)
+  assert.ok(!getUsersDueForReengagement(-60_000, 600_000).includes(3100))
 })
