@@ -2055,6 +2055,89 @@
   cursor: default;
 }
 
+/* -- Achievements sheet -- */
+.achievements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.achievement-category-header {
+  margin: 14px 0 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--palette-text-dim);
+}
+.achievement-category-header:first-child {
+  margin-top: 0;
+}
+.achievement-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: var(--palette-sheet-row);
+  margin-bottom: 6px;
+}
+.achievement-row--locked {
+  opacity: 0.55;
+}
+.achievement-tier-badge {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+}
+/* Deliberately distinct from --palette-gold (used elsewhere for currency/rarity) - these are
+   tier-rank colors on a dedicated badge, not reused semantic tokens. */
+.achievement-tier-badge--bronze {
+  background: color-mix(in srgb, #cd7f32 30%, transparent);
+  color: #e3a86b;
+}
+.achievement-tier-badge--silver {
+  background: color-mix(in srgb, #c8ccd6 30%, transparent);
+  color: #dfe2e8;
+}
+.achievement-tier-badge--gold {
+  background: color-mix(in srgb, var(--palette-gold) 30%, transparent);
+  color: var(--palette-gold-light);
+}
+.achievement-tier-badge--platinum {
+  background: color-mix(in srgb, var(--palette-cyan-light) 30%, transparent);
+  color: var(--palette-cyan-light);
+}
+.achievement-body {
+  flex: 1;
+  min-width: 0;
+}
+.achievement-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--palette-text-primary);
+}
+.achievement-description {
+  margin-top: 1px;
+  margin-bottom: 7px;
+  font-size: 11.5px;
+  color: var(--palette-text-secondary);
+}
+.achievement-progress-label {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--palette-text-dim);
+}
+
 /* -- Daily reward sheet -- */
 .daily-grid {
   display: flex;

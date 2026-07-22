@@ -32,6 +32,7 @@ import { MissionsSheet } from './sheets/MissionsSheet'
 import { DailyRewardSheet } from './sheets/DailyRewardSheet'
 import { SettingsSheet } from './sheets/SettingsSheet'
 import { ProfileSheet } from './sheets/ProfileSheet'
+import { AchievementsSheet } from './sheets/AchievementsSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
 import { ObjectViewer } from './cards/ObjectViewer'
@@ -66,6 +67,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const [dailyOpen, setDailyOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  // Both open ONLY from a button inside ProfileSheet (see the openSheet nesting below) - never
+  // true while profileOpen is false.
+  const [achievementsOpen, setAchievementsOpen] = useState(false)
   // A visited player's profile, opened via a "u_<id>" deep-link start param.
   const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
@@ -396,7 +400,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         : settingsOpen
           ? 'settings'
           : profileOpen
-            ? 'profile'
+            ? achievementsOpen
+              ? 'achievements'
+              : 'profile'
             : offlineOpen
               ? 'offline'
               : shipUnlock
@@ -418,7 +424,16 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       profile: () => {
         setProfileOpen(false)
         setVisitorProfile(null)
+        // Belt-and-suspenders: this only runs via the hardware BackButton (see
+        // bindTelegramBackButton below), but ProfileSheet's own X/backdrop calls its `onClose`
+        // prop directly, bypassing this map entirely - closing Profile through EITHER path must
+        // also close whatever's nested on top of it, or achievementsOpen is left true with
+        // profileOpen already false: orphaned on screen, and invisible to this same openSheet
+        // chain (it only checks achievementsOpen INSIDE the profileOpen branch), so the
+        // hardware back button would stop targeting it entirely.
+        setAchievementsOpen(false)
       },
+      achievements: () => setAchievementsOpen(false),
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
       cardDetail: () => setSelectedCard(null),
@@ -576,8 +591,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onClose={() => {
           setProfileOpen(false)
           setVisitorProfile(null)
+          setAchievementsOpen(false) // see the closers.profile comment above - same reasoning
         }}
+        onOpenAchievements={() => setAchievementsOpen(true)}
       />
+      <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
       <CardDetailSheet
