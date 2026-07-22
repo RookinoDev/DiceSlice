@@ -52,6 +52,31 @@ export function DailyGiftIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
   )
 }
 
+export function AchievementsIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M7 4h10v5a5 5 0 01-10 0V4z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M7 5H5a2.5 2.5 0 002.5 4.5M17 5h2a2.5 2.5 0 01-2.5 4.5" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path
+        d="M12 14v3.5M8.5 20.5h7M9.5 20.5c0-1.8.8-2.3 2.5-3 1.7.7 2.5 1.2 2.5 3"
+        stroke={color}
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+export function LeaderboardIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 20v-7M12 20V4M19 20v-9" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M2 20h20" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ color = '#8B93AC', size = 12 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 13 13">

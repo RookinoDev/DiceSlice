@@ -68,8 +68,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const [dailyOpen, setDailyOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  // Both open ONLY from a button inside ProfileSheet (see the openSheet nesting below) - never
-  // true while profileOpen is false.
+  // Both open directly from TopBar buttons, independent of profileOpen.
   const [achievementsOpen, setAchievementsOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   // A visited player's profile, opened via a "u_<id>" deep-link start param.
@@ -399,25 +398,25 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       ? 'missions'
       : dailyOpen
         ? 'daily'
-        : settingsOpen
-          ? 'settings'
-          : profileOpen
-            ? achievementsOpen
-              ? 'achievements'
-              : leaderboardOpen
-                ? 'leaderboard'
-                : 'profile'
-            : offlineOpen
-              ? 'offline'
-              : shipUnlock
-                ? 'shipUnlock'
-                : selectedCard
-                  ? objectViewerOpen
-                    ? 'objectViewer'
-                    : 'cardDetail'
-                  : packSheetOpen
-                    ? 'packOpen'
-                    : null
+        : achievementsOpen
+          ? 'achievements'
+          : leaderboardOpen
+            ? 'leaderboard'
+            : settingsOpen
+              ? 'settings'
+              : profileOpen
+                ? 'profile'
+                : offlineOpen
+                  ? 'offline'
+                  : shipUnlock
+                    ? 'shipUnlock'
+                    : selectedCard
+                      ? objectViewerOpen
+                        ? 'objectViewer'
+                        : 'cardDetail'
+                      : packSheetOpen
+                        ? 'packOpen'
+                        : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
@@ -428,15 +427,6 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       profile: () => {
         setProfileOpen(false)
         setVisitorProfile(null)
-        // Belt-and-suspenders: this only runs via the hardware BackButton (see
-        // bindTelegramBackButton below), but ProfileSheet's own X/backdrop calls its `onClose`
-        // prop directly, bypassing this map entirely - closing Profile through EITHER path must
-        // also close whatever's nested on top of it, or achievementsOpen is left true with
-        // profileOpen already false: orphaned on screen, and invisible to this same openSheet
-        // chain (it only checks achievementsOpen INSIDE the profileOpen branch), so the
-        // hardware back button would stop targeting it entirely.
-        setAchievementsOpen(false)
-        setLeaderboardOpen(false)
       },
       achievements: () => setAchievementsOpen(false),
       leaderboard: () => setLeaderboardOpen(false),
@@ -532,6 +522,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onProfileClick={() => setProfileOpen(true)}
         onNotificationClick={() => setMissionsOpen(true)}
         onDailyClick={() => setDailyOpen(true)}
+        onAchievementsClick={() => setAchievementsOpen(true)}
+        onLeaderboardClick={() => setLeaderboardOpen(true)}
       />
       <Toast text={toastText} />
       <PackEarnedBanner key={packBannerKey} visible={packBannerVisible} />
@@ -597,11 +589,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onClose={() => {
           setProfileOpen(false)
           setVisitorProfile(null)
-          setAchievementsOpen(false) // see the closers.profile comment above - same reasoning
-          setLeaderboardOpen(false)
         }}
-        onOpenAchievements={() => setAchievementsOpen(true)}
-        onOpenLeaderboard={() => setLeaderboardOpen(true)}
       />
       <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
       <LeaderboardSheet open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />

@@ -6,7 +6,17 @@ import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import { audio } from '../game/audio/AudioManager'
 import { useCountUp } from './useCountUp'
 import { registerLandmark } from './combatFx/landmarks'
-import { SettingsIcon, ProfileIcon, MissionsBellIcon, DailyGiftIcon, GoldIcon, FleetDpsIcon, RelicIcon } from './icons'
+import {
+  SettingsIcon,
+  ProfileIcon,
+  MissionsBellIcon,
+  DailyGiftIcon,
+  AchievementsIcon,
+  LeaderboardIcon,
+  GoldIcon,
+  FleetDpsIcon,
+  RelicIcon,
+} from './icons'
 
 interface TopBarProps {
   session: GameSession
@@ -14,9 +24,19 @@ interface TopBarProps {
   onProfileClick: () => void
   onNotificationClick: () => void
   onDailyClick: () => void
+  onAchievementsClick: () => void
+  onLeaderboardClick: () => void
 }
 
-export function TopBar({ session: s, onSettingsClick, onProfileClick, onNotificationClick, onDailyClick }: TopBarProps) {
+export function TopBar({
+  session: s,
+  onSettingsClick,
+  onProfileClick,
+  onNotificationClick,
+  onDailyClick,
+  onAchievementsClick,
+  onLeaderboardClick,
+}: TopBarProps) {
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero) || s.canPrestige()
 
   let anyMissionClaimable = false
@@ -86,6 +106,26 @@ export function TopBar({ session: s, onSettingsClick, onProfileClick, onNotifica
           >
             <DailyGiftIcon />
             {dailyClaimable && <span className="dot dot-daily" />}
+          </button>
+          <button
+            className="topbar-icon-btn"
+            onClick={() => {
+              audio.click()
+              onAchievementsClick()
+            }}
+            aria-label="Achievements"
+          >
+            <AchievementsIcon />
+          </button>
+          <button
+            className="topbar-icon-btn"
+            onClick={() => {
+              audio.click()
+              onLeaderboardClick()
+            }}
+            aria-label="Leaderboard"
+          >
+            <LeaderboardIcon />
           </button>
         </div>
       </div>
