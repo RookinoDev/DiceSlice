@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
-import { claimPurchases, craftCard, getCollection, getDust, getProfile, getSave, grantDailyPackFromSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, refineInstances, setShowcase, upsertProfile } from './db.mjs'
+import { claimPurchases, craftCard, getCollection, getDust, getLeaderboard, getProfile, getSave, grantDailyPackFromSave, grantPacksFromSave, listUnopenedPacks, openPack, putSave, refineInstances, setShowcase, upsertProfile } from './db.mjs'
 
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/stellar-breaker\.pages\.dev$/,
@@ -238,7 +238,7 @@ export function startServer(botToken, port) {
     }
 
     // Public read-only profile (no auth: it exposes only display identity + progression
-    // stats, never the raw save). Powers visitor profile views / future leaderboards.
+    // stats, never the raw save). Powers visitor profile views and the leaderboard below.
     if (req.method === 'GET' && req.url?.startsWith('/api/profile?')) {
       try {
         const id = Number(new URL(req.url, 'http://x').searchParams.get('id'))
@@ -255,6 +255,23 @@ export function startServer(botToken, port) {
       } catch (e) {
         console.error('[server] profile error:', e)
         sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Public leaderboard (no auth, same reasoning as /api/profile above - display-only
+    // aggregate stats, never the raw save). An unrecognized sortBy - or any getLeaderboard
+    // failure - degrades to an empty list rather than a 400, so a stale/mistyped client build
+    // renders "no entries" instead of an error state for what is a purely cosmetic feature.
+    if (req.method === 'GET' && req.url?.startsWith('/api/leaderboard?')) {
+      try {
+        const params = new URL(req.url, 'http://x').searchParams
+        const sortBy = params.get('sortBy') || 'deepestStage'
+        const limit = params.get('limit')
+        sendJson(res, 200, { entries: getLeaderboard(sortBy, limit), sortBy })
+      } catch (e) {
+        console.error('[server] leaderboard error:', e)
+        sendJson(res, 200, { entries: [], sortBy: null })
       }
       return
     }

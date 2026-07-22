@@ -146,6 +146,37 @@ export function getProfile(telegramUserId) {
   return row ?? null
 }
 
+// Sort keys a leaderboard request may ask for, mapped to a SQL expression pulled straight out
+// of the existing saves.save_json blob via SQLite's json_extract - no schema migration, since
+// profiles/saves are already both keyed by telegram_user_id. The caller's sortBy string is
+// looked up here, NEVER interpolated directly into SQL (an unknown key yields undefined, and
+// getLeaderboard returns [] rather than building a query at all - see below). Deliberately
+// excludes relics/stardust: both are BigNumberData (mantissa+exponent), and comparing raw
+// mantissas would sort wrong (mantissa=1,exponent=10 is bigger than mantissa=99,exponent=1) -
+// only plain-integer stats are safe to ORDER BY directly like this.
+const LEADERBOARD_SORT_COLUMNS = {
+  deepestStage: `COALESCE(json_extract(s.save_json, '$.stats.deepestStage'), json_extract(s.save_json, '$.highestStage'), 0)`,
+  bossesDefeated: `COALESCE(json_extract(s.save_json, '$.stats.bossesDefeated'), 0)`,
+  prestigeCount: `COALESCE(json_extract(s.save_json, '$.stats.prestigeCount'), 0)`,
+  deepestBossCleared: `COALESCE(json_extract(s.save_json, '$.stats.deepestBossCleared'), 0)`,
+}
+
+/** Top-`limit` public leaderboard ranked by one plain-integer stat. Users who never synced a
+ *  save are excluded via the INNER JOIN (nothing to rank them by). Returns [] for an unknown
+ *  sortBy - never throws, never touches SQL for it. */
+export function getLeaderboard(sortBy, limit = 50) {
+  const column = LEADERBOARD_SORT_COLUMNS[sortBy]
+  if (!column) return []
+  const cappedLimit = Math.max(1, Math.min(Number(limit) || 50, 100))
+  return db
+    .prepare(
+      `SELECT p.telegram_user_id AS telegramUserId, p.first_name AS firstName, p.username, p.photo_url AS photoUrl, ${column} AS value
+       FROM profiles p JOIN saves s ON s.telegram_user_id = p.telegram_user_id
+       ORDER BY value DESC LIMIT ?`,
+    )
+    .all(cappedLimit)
+}
+
 /** Upsert the user's cloud save (last write wins - the client decides which save is better). */
 export function putSave(telegramUserId, saveJson) {
   db.prepare(`

@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 // Point db.mjs at a throwaway file before it opens its connection (module-load time).
 process.env.SQLITE_PATH = join(mkdtempSync(join(tmpdir(), 'sb-db-test-')), 'test.db')
-const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, grantPacksFromSave, grantDailyPackFromSave, listUnopenedPacks, openPack, getCollection, getDust, refineInstances, craftCard, setShowcase } = await import('./db.mjs')
+const { recordPurchase, claimPurchases, putSave, getSave, upsertProfile, getProfile, getLeaderboard, grantPacksFromSave, grantDailyPackFromSave, listUnopenedPacks, openPack, getCollection, getDust, refineInstances, craftCard, setShowcase } = await import('./db.mjs')
 
 test('getSave returns null for a user who never synced', () => {
   assert.equal(getSave(111), null)
@@ -48,6 +48,59 @@ test('upsertProfile keeps first_synced_at across identity updates and joins the 
   assert.equal(second.photo_url, 'https://t.me/p.jpg')
   assert.equal(second.first_synced_at, first.first_synced_at)
   assert.equal(JSON.parse(second.save_json).stats.deepestStage, 90)
+})
+
+test('getLeaderboard ranks by the requested stat, descending, across users', () => {
+  const seed = (id, name, save) => {
+    upsertProfile(id, { firstName: name, username: null, photoUrl: null })
+    putSave(id, JSON.stringify(save))
+  }
+  seed(2001, 'Ann', { version: 1, stats: { deepestStage: 40, bossesDefeated: 5 } })
+  seed(2002, 'Bo', { version: 1, stats: { deepestStage: 120, bossesDefeated: 2 } })
+  seed(2003, 'Cy', { version: 1, stats: { deepestStage: 80, bossesDefeated: 30 } })
+
+  const byStage = getLeaderboard('deepestStage', 10).filter((r) => r.telegramUserId >= 2001 && r.telegramUserId <= 2003)
+  assert.deepEqual(
+    byStage.map((r) => r.telegramUserId),
+    [2002, 2003, 2001],
+  )
+  assert.equal(byStage[0].firstName, 'Bo')
+  assert.equal(byStage[0].value, 120)
+
+  // A DIFFERENT sort key produces a different winner from the same seeded rows.
+  const byBosses = getLeaderboard('bossesDefeated', 10).filter((r) => r.telegramUserId >= 2001 && r.telegramUserId <= 2003)
+  assert.deepEqual(
+    byBosses.map((r) => r.telegramUserId),
+    [2003, 2001, 2002],
+  )
+})
+
+test('getLeaderboard falls back to highestStage for a save with no stats block (legacy save)', () => {
+  upsertProfile(2010, { firstName: 'Legacy', username: null, photoUrl: null })
+  putSave(2010, JSON.stringify({ version: 1, highestStage: 77 }))
+  const row = getLeaderboard('deepestStage', 100).find((r) => r.telegramUserId === 2010)
+  assert.equal(row.value, 77)
+})
+
+test('getLeaderboard excludes a profile with no synced save', () => {
+  upsertProfile(2020, { firstName: 'NeverSynced', username: null, photoUrl: null })
+  const rows = getLeaderboard('deepestStage', 100)
+  assert.equal(rows.some((r) => r.telegramUserId === 2020), false)
+})
+
+test('getLeaderboard rejects an unknown sortBy without touching SQL', () => {
+  assert.deepEqual(getLeaderboard('; DROP TABLE saves;--', 10), [])
+  assert.deepEqual(getLeaderboard('relics', 10), []) // BigNumber field, deliberately not sortable
+  // The saves table must still be intact for every later test in this file.
+  assert.equal(getSave(2010) !== null, true)
+})
+
+test('getLeaderboard clamps limit into a sane range', () => {
+  upsertProfile(2030, { firstName: 'Clamp', username: null, photoUrl: null })
+  putSave(2030, JSON.stringify({ version: 1, stats: { deepestStage: 1 } }))
+  assert.equal(getLeaderboard('deepestStage', 1000).length <= 100, true)
+  assert.equal(getLeaderboard('deepestStage', -5).length >= 1, true)
+  assert.equal(getLeaderboard('deepestStage', 0).length >= 1, true)
 })
 
 test('pack grants track distinct boss-stage clears from save syncs, idempotently', () => {

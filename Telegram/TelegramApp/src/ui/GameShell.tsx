@@ -33,6 +33,7 @@ import { DailyRewardSheet } from './sheets/DailyRewardSheet'
 import { SettingsSheet } from './sheets/SettingsSheet'
 import { ProfileSheet } from './sheets/ProfileSheet'
 import { AchievementsSheet } from './sheets/AchievementsSheet'
+import { LeaderboardSheet } from './sheets/LeaderboardSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
 import { ObjectViewer } from './cards/ObjectViewer'
@@ -70,6 +71,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // Both open ONLY from a button inside ProfileSheet (see the openSheet nesting below) - never
   // true while profileOpen is false.
   const [achievementsOpen, setAchievementsOpen] = useState(false)
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   // A visited player's profile, opened via a "u_<id>" deep-link start param.
   const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
@@ -402,7 +404,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           : profileOpen
             ? achievementsOpen
               ? 'achievements'
-              : 'profile'
+              : leaderboardOpen
+                ? 'leaderboard'
+                : 'profile'
             : offlineOpen
               ? 'offline'
               : shipUnlock
@@ -432,8 +436,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         // chain (it only checks achievementsOpen INSIDE the profileOpen branch), so the
         // hardware back button would stop targeting it entirely.
         setAchievementsOpen(false)
+        setLeaderboardOpen(false)
       },
       achievements: () => setAchievementsOpen(false),
+      leaderboard: () => setLeaderboardOpen(false),
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
       cardDetail: () => setSelectedCard(null),
@@ -592,10 +598,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           setProfileOpen(false)
           setVisitorProfile(null)
           setAchievementsOpen(false) // see the closers.profile comment above - same reasoning
+          setLeaderboardOpen(false)
         }}
         onOpenAchievements={() => setAchievementsOpen(true)}
+        onOpenLeaderboard={() => setLeaderboardOpen(true)}
       />
       <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
+      <LeaderboardSheet open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
       <CardDetailSheet

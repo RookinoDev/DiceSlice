@@ -26,6 +26,7 @@ interface ProfileSheetProps {
   onShowcaseChange: (next: ShowcaseEntry[]) => void
   onInspectCard: (card: CardDefinition) => void
   onOpenAchievements: () => void
+  onOpenLeaderboard: () => void
 }
 
 interface ProfileView {
@@ -77,7 +78,7 @@ function sinceText(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
-export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, ownedCards, showcase, onShowcaseChange, onInspectCard, onOpenAchievements }: ProfileSheetProps) {
+export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, ownedCards, showcase, onShowcaseChange, onInspectCard, onOpenAchievements, onOpenLeaderboard }: ProfileSheetProps) {
   const v = visitor ? fromPublic(visitor) : fromSession(session)
 
   const stats: Array<{ label: string; value: string; accent?: 'gold' | 'cyan' | 'magenta' }> = [
@@ -140,6 +141,16 @@ export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, owne
               }}
             >
               ACHIEVEMENTS
+            </button>
+            <button
+              className="sheet-button-secondary"
+              onClick={() => {
+                audio.click()
+                hapticAction()
+                onOpenLeaderboard()
+              }}
+            >
+              LEADERBOARD
             </button>
           </div>
           <button className="profile-share-btn" onClick={share}>

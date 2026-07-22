@@ -2138,6 +2138,102 @@
   color: var(--palette-text-dim);
 }
 
+/* -- Leaderboard sheet -- */
+.leaderboard-sort-row {
+  flex-shrink: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 2px 0 12px;
+  scrollbar-width: none;
+}
+.leaderboard-sort-row::-webkit-scrollbar {
+  display: none;
+}
+.leaderboard-sort-chip {
+  flex-shrink: 0;
+  padding: 5px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--palette-text-dim);
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.leaderboard-sort-chip--active {
+  background: rgba(67, 221, 238, 0.16);
+  border-color: var(--palette-cyan);
+  color: var(--palette-cyan);
+}
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 13px;
+  border-radius: 14px;
+  background: var(--palette-sheet-row);
+}
+.leaderboard-row--me {
+  background: color-mix(in srgb, var(--palette-gold) 16%, var(--palette-sheet-row));
+  border: 1px solid color-mix(in srgb, var(--palette-gold) 45%, transparent);
+}
+.leaderboard-rank {
+  flex-shrink: 0;
+  width: 22px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--palette-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.leaderboard-avatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.leaderboard-avatar-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--palette-gold);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+}
+.leaderboard-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--palette-text-primary);
+}
+.leaderboard-value {
+  flex-shrink: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--palette-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
 /* -- Daily reward sheet -- */
 .daily-grid {
   display: flex;
