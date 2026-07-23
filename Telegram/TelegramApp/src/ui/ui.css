@@ -2234,6 +2234,83 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* -- Shop sheet -- */
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.shop-error {
+  padding: 9px 13px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  background: color-mix(in srgb, #ff5a5a 16%, var(--palette-sheet-row));
+  color: #ffb3b3;
+  font-size: 12.5px;
+}
+.shop-category-header {
+  margin: 14px 0 6px;
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--palette-text-dim);
+}
+.shop-category-header:first-child {
+  margin-top: 0;
+}
+.shop-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 14px;
+  background: var(--palette-sheet-row);
+  margin-bottom: 6px;
+}
+.shop-row--owned {
+  opacity: 0.55;
+}
+.shop-row-body {
+  flex: 1;
+  min-width: 0;
+}
+.shop-row-title {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--palette-text-primary);
+}
+.shop-row-desc {
+  margin-top: 1px;
+  font-size: 11.5px;
+  color: var(--palette-text-secondary);
+}
+.shop-row-buy {
+  flex-shrink: 0;
+  min-width: 56px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: none;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--palette-text-dimmer);
+}
+.shop-row-buy--active {
+  background: linear-gradient(180deg, var(--palette-gold-light), var(--palette-gold-deep));
+  color: #2a1c04;
+}
+.shop-row-buy--active:active {
+  transform: scale(0.93);
+}
+.shop-row-buy:disabled {
+  cursor: default;
+}
+
 /* -- Daily reward sheet -- */
 .daily-grid {
   display: flex;

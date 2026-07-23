@@ -34,6 +34,7 @@ import { SettingsSheet } from './sheets/SettingsSheet'
 import { ProfileSheet } from './sheets/ProfileSheet'
 import { AchievementsSheet } from './sheets/AchievementsSheet'
 import { LeaderboardSheet } from './sheets/LeaderboardSheet'
+import { ShopSheet } from './sheets/ShopSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
 import { ObjectViewer } from './cards/ObjectViewer'
@@ -52,16 +53,28 @@ interface GameShellProps {
   /** Force an immediate cloud-save push instead of waiting for the periodic timer - used right
    *  after a boss kill so the server-side pack grant isn't stuck behind a minute-long wait. */
   syncNow: (keepalive?: boolean) => Promise<void>
+  /** Claims any Stars purchases the server has recorded but this device hasn't credited yet -
+   *  the Shop sheet calls this right after openInvoice() resolves 'paid'. */
+  refreshPurchases: () => Promise<void>
 }
 
 // Human-readable label for a purchase grant's toast announcement, keyed by the same
 // item id used in TelegramBot/index.mjs's replyWithInvoice and
 // src/game/monetization/purchases.ts's GRANT_EFFECTS.
 const GRANT_LABELS: Record<string, string> = {
+  starter_pack: '+2,000 Stardust + 1 Stellar Pack',
   stardust_pack_500: '+500 Stardust',
+  stardust_pack_1500: '+1,500 Stardust',
+  stardust_pack_5000: '+5,000 Stardust',
+  buy_pack_meteor: '+1 Meteor Pack',
+  buy_pack_stellar: '+1 Stellar Pack',
+  buy_pack_deepsky: '+1 Deep Sky Pack',
+  buy_pack_singularity: '+1 Singularity Pack',
+  offline_cap_boost: 'Offline cap raised to 24h',
+  vip_pass_30d: 'VIP active: +25% Stardust for 30 days',
 }
 
-export function GameShell({ session, offline, claimedGrants, cloudRestores, syncNow }: GameShellProps) {
+export function GameShell({ session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases }: GameShellProps) {
   const [tab, setTab] = useState<NavTab>('combat')
   const [prestigeConfirmOpen, setPrestigeConfirmOpen] = useState(false)
   const [missionsOpen, setMissionsOpen] = useState(false)
@@ -71,6 +84,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // Both open directly from TopBar buttons, independent of profileOpen.
   const [achievementsOpen, setAchievementsOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
+  const [shopOpen, setShopOpen] = useState(false)
   // A visited player's profile, opened via a "u_<id>" deep-link start param.
   const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
@@ -402,21 +416,23 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           ? 'achievements'
           : leaderboardOpen
             ? 'leaderboard'
-            : settingsOpen
-              ? 'settings'
-              : profileOpen
-                ? 'profile'
-                : offlineOpen
-                  ? 'offline'
-                  : shipUnlock
-                    ? 'shipUnlock'
-                    : selectedCard
-                      ? objectViewerOpen
-                        ? 'objectViewer'
-                        : 'cardDetail'
-                      : packSheetOpen
-                        ? 'packOpen'
-                        : null
+            : shopOpen
+              ? 'shop'
+              : settingsOpen
+                ? 'settings'
+                : profileOpen
+                  ? 'profile'
+                  : offlineOpen
+                    ? 'offline'
+                    : shipUnlock
+                      ? 'shipUnlock'
+                      : selectedCard
+                        ? objectViewerOpen
+                          ? 'objectViewer'
+                          : 'cardDetail'
+                        : packSheetOpen
+                          ? 'packOpen'
+                          : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
@@ -430,6 +446,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       },
       achievements: () => setAchievementsOpen(false),
       leaderboard: () => setLeaderboardOpen(false),
+      shop: () => setShopOpen(false),
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
       cardDetail: () => setSelectedCard(null),
@@ -524,6 +541,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onDailyClick={() => setDailyOpen(true)}
         onAchievementsClick={() => setAchievementsOpen(true)}
         onLeaderboardClick={() => setLeaderboardOpen(true)}
+        onShopClick={() => setShopOpen(true)}
       />
       <Toast text={toastText} />
       <PackEarnedBanner key={packBannerKey} visible={packBannerVisible} />
@@ -593,6 +611,13 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       />
       <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
       <LeaderboardSheet open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />
+      <ShopSheet
+        open={shopOpen}
+        onClose={() => setShopOpen(false)}
+        apiBaseUrl={import.meta.env.VITE_API_URL}
+        refreshPurchases={refreshPurchases}
+        refreshCards={refreshCards}
+      />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
       <CardDetailSheet

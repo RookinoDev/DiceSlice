@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import { validateInitData } from './validateInitData.mjs'
+import { getShopItem, SHOP_ITEMS } from './shop.mjs'
 import {
   claimPurchases,
   craftCard,
@@ -10,6 +11,7 @@ import {
   getSave,
   grantDailyPackFromSave,
   grantPacksFromSave,
+  hasPurchased,
   listUnopenedPacks,
   openPack,
   putSave,
@@ -95,7 +97,8 @@ function publicProfilePayload(row) {
   }
 }
 
-export function startServer(botToken, port) {
+export function startServer(bot, port) {
+  const botToken = bot.token
   const server = createServer(async (req, res) => {
     withCors(req, res)
 
@@ -117,6 +120,53 @@ export function startServer(botToken, port) {
         sendJson(res, 200, { ok: true })
       } catch (e) {
         console.error('[server] notification-prefs error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // In-app Shop (see TelegramApp/src/ui/sheets/ShopSheet.tsx). Catalog is server-authoritative
+    // (see shop.mjs) - the client only ever renders what this returns. `purchased` lists this
+    // user's already-bought one-time item ids, so the UI can grey them out without a second
+    // round-trip per item.
+    if (req.method === 'POST' && req.url === '/api/shop/items') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        const purchased = SHOP_ITEMS.filter((item) => item.oneTime && hasPurchased(userId, item.id)).map((item) => item.id)
+        sendJson(res, 200, { items: SHOP_ITEMS, purchased })
+      } catch (e) {
+        console.error('[server] shop/items error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Mints a Telegram Stars invoice link for Telegram.WebApp.openInvoice() to open in-app -
+    // the same payment flow the old "/shop" chat command used (replyWithInvoice), just
+    // triggered from inside the Mini App instead of a bot command. Payment completion still
+    // arrives via the bot's message:successful_payment handler in index.mjs unchanged.
+    if (req.method === 'POST' && req.url === '/api/shop/invoice') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        const item = getShopItem(String(body.itemId ?? ''))
+        if (!item) {
+          sendJson(res, 400, { error: 'unknown item' })
+          return
+        }
+        if (item.oneTime && hasPurchased(userId, item.id)) {
+          sendJson(res, 409, { error: 'already purchased' })
+          return
+        }
+        // Stars payments use currency "XTR" and an empty provider_token - Telegram settles
+        // them natively, no payment provider involved.
+        const url = await bot.api.createInvoiceLink(item.title, item.description, item.id, '', 'XTR', [{ label: item.title, amount: item.priceStars }])
+        sendJson(res, 200, { url })
+      } catch (e) {
+        console.error('[server] shop/invoice error:', e)
         sendJson(res, 400, { error: 'bad request' })
       }
       return

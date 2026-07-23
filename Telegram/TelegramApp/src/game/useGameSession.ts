@@ -52,10 +52,11 @@ function loadAndBegin(cfg: BalanceConfig): Boot {
       const stage = session.stage.currentStage
       const income = offlineIncomePerSecond(session.ships.fleetDps(), session.stage.hpFor(stage), session.stage.goldFor(stage))
       // Phoenix Cinders (see #13) - artifact levels are already restored by applySave above.
-      const gold = offlineEarningsFromConfig(last, now, income, cfg).mul(session.artifacts.offlineRewardMultiplier())
+      const bonusHours = session.boosts.offlineCapBonusHours
+      const gold = offlineEarningsFromConfig(last, now, income, cfg, bonusHours).mul(session.artifacts.offlineRewardMultiplier())
       if (gold.gt(BigNumber.Zero)) {
         session.wallet.add(gold)
-        offline = { seconds: Math.min(now - last, cfg.offlineCapHours * 3600), gold }
+        offline = { seconds: Math.min(now - last, (cfg.offlineCapHours + bonusHours) * 3600), gold }
       }
     }
   }
@@ -105,6 +106,22 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     const state = captureSave(activeSessionRef.current)
     writeSave(state)
     if (cloudReadyRef.current) await pushCloudSave(import.meta.env.VITE_API_URL, state, keepalive)
+  }
+
+  /** Claims any Stars purchases the server has recorded but this device hasn't credited yet.
+   *  Runs on mount and on regaining foreground (see the effect below); the Shop sheet also
+   *  calls this directly right after openInvoice() resolves 'paid', so a purchase made without
+   *  ever backgrounding the tab still lands immediately instead of waiting on a future visit. */
+  const refreshPurchases = async (): Promise<void> => {
+    const grants = await claimPendingPurchases(import.meta.env.VITE_API_URL)
+    if (grants.length > 0) {
+      // Always credit the live session - `session` in this closure may be a stale
+      // pre-restore one if a cloud restore raced this claim.
+      applyGrants(activeSessionRef.current, grants)
+      claimedGrantsRef.current = [...claimedGrantsRef.current, ...grants]
+      setClaimedGrants((prev) => [...prev, ...grants])
+      syncNow() // paid progress: persist immediately, don't wait for the autosave tick
+    }
   }
 
   useEffect(() => {
@@ -159,23 +176,12 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
   }, [cfg])
 
   useEffect(() => {
-    const checkPurchases = async () => {
-      const grants = await claimPendingPurchases(import.meta.env.VITE_API_URL)
-      if (grants.length > 0) {
-        // Always credit the live session - `session` in this closure may be a stale
-        // pre-restore one if a cloud restore raced this claim.
-        applyGrants(activeSessionRef.current, grants)
-        claimedGrantsRef.current = [...claimedGrantsRef.current, ...grants]
-        setClaimedGrants((prev) => [...prev, ...grants])
-        syncNow() // paid progress: persist immediately, don't wait for the autosave tick
-      }
-    }
-    checkPurchases()
+    refreshPurchases()
 
     // Re-check when the Mini App regains foreground - a purchase may have completed
     // in the bot chat while this tab was backgrounded.
     const onVisibilityChange = () => {
-      if (!document.hidden) checkPurchases()
+      if (!document.hidden) refreshPurchases()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -262,5 +268,5 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     () => versionRef.current,
   )
 
-  return { session, offline, claimedGrants, cloudRestores, syncNow }
+  return { session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases }
 }

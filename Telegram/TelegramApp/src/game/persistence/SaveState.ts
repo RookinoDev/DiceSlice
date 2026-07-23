@@ -27,4 +27,11 @@ export interface SaveState {
 
   /** Lifetime profile counters. Optional: absent on pre-profile saves (still version 1). */
   stats?: LifetimeStats
+
+  /** Permanent hours added to BalanceConfig.offlineCapHours by the one-time offline cap shop
+   *  purchase. Optional: absent on saves from before that item existed (defaults to 0). */
+  offlineCapBonusHours?: number
+
+  /** Unix seconds the VIP pass's passive Stardust bonus expires, 0/absent if never bought. */
+  vipExpiresUnixSeconds?: number
 }

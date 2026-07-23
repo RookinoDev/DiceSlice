@@ -37,6 +37,7 @@ interface TelegramWebApp {
   HapticFeedback?: HapticFeedback
   BackButton?: BackButton
   onEvent(event: string, handler: () => void): void
+  openInvoice(url: string, callback: (status: 'paid' | 'cancelled' | 'failed' | 'pending') => void): void
 }
 
 declare global {
@@ -115,6 +116,18 @@ export function getStartParam(): string | null {
 /** Opens Telegram's native share sheet with prefilled text + link. No-ops outside Telegram. */
 export function shareViaTelegram(url: string, text: string): void {
   cachedWebApp?.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`)
+}
+
+/** Opens Telegram's native Stars payment sheet for an invoice link (see shopApi.ts's
+ *  createShopInvoice). Resolves 'failed' outside Telegram, where there's no WebApp to open it. */
+export function openInvoice(url: string): Promise<'paid' | 'cancelled' | 'failed' | 'pending'> {
+  return new Promise((resolve) => {
+    if (!cachedWebApp) {
+      resolve('failed')
+      return
+    }
+    cachedWebApp.openInvoice(url, resolve)
+  })
 }
 
 /** Light haptic tap - use for frequent, low-weight actions (regular taps). */

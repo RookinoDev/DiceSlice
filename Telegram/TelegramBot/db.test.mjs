@@ -28,6 +28,7 @@ const {
   setNotificationsEnabled,
   getUsersDueForReengagement,
   markNotified,
+  hasPurchased,
 } = await import('./db.mjs')
 
 test('getSave returns null for a user who never synced', () => {
@@ -217,6 +218,42 @@ test('claimPurchases grants each recorded purchase exactly once', () => {
   const first = claimPurchases(666)
   assert.deepEqual(first, [{ item: 'stardust_pack_500' }, { item: 'stardust_pack_500' }])
   assert.deepEqual(claimPurchases(666), [])
+})
+
+test('claiming a "buy_pack_<type>" purchase mints a real pack, not just a claim record', () => {
+  recordPurchase(667, 'buy_pack_stellar')
+  assert.equal(listUnopenedPacks(667).length, 0) // not minted until claimed
+  const grants = claimPurchases(667)
+  assert.deepEqual(grants, [{ item: 'buy_pack_stellar' }])
+  const packs = listUnopenedPacks(667)
+  assert.equal(packs.length, 1)
+  assert.equal(packs[0].type, 'stellar')
+  assert.deepEqual(claimPurchases(667), []) // re-claiming never double-mints
+  assert.equal(listUnopenedPacks(667).length, 1)
+})
+
+test('claiming "starter_pack" mints its Stellar Pack half alongside the Stardust half', () => {
+  recordPurchase(680, 'starter_pack')
+  const grants = claimPurchases(680)
+  assert.deepEqual(grants, [{ item: 'starter_pack' }])
+  const packs = listUnopenedPacks(680)
+  assert.equal(packs.length, 1)
+  assert.equal(packs[0].type, 'stellar')
+})
+
+test('an unknown "buy_pack_<type>" is returned to the caller but mints nothing', () => {
+  recordPurchase(668, 'buy_pack_nonexistent')
+  const grants = claimPurchases(668)
+  assert.deepEqual(grants, [{ item: 'buy_pack_nonexistent' }])
+  assert.equal(listUnopenedPacks(668).length, 0)
+})
+
+test('hasPurchased reflects a purchase whether or not it has been claimed', () => {
+  assert.equal(hasPurchased(669, 'starter_pack'), false)
+  recordPurchase(669, 'starter_pack')
+  assert.equal(hasPurchased(669, 'starter_pack'), true)
+  claimPurchases(669)
+  assert.equal(hasPurchased(669, 'starter_pack'), true)
 })
 
 test('minted cards carry a variant and getCollection exposes it', () => {

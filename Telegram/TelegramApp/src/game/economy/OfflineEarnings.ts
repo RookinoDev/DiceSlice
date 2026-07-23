@@ -13,8 +13,10 @@ export function offlineEarningsFromConfig(
   nowUnix: number,
   incomePerSecond: BigNumber,
   cfg: BalanceConfig,
+  /** Extra hours from the one-time offline cap shop purchase (see MonetizationBoosts). */
+  bonusHours = 0,
 ): BigNumber {
-  const cap = cfg.offlineCapHours * 3600
+  const cap = (cfg.offlineCapHours + bonusHours) * 3600
   const secs = offlineCappedSeconds(lastUnix, nowUnix, cap)
   return incomePerSecond.mul(new BigNumber(secs * cfg.offlineRate))
 }

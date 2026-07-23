@@ -77,6 +77,16 @@ export function LeaderboardIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
   )
 }
 
+export function ShopIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 9l1.2-4.5A1 1 0 017.16 4h9.68a1 1 0 01.96.75L20 9" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M4 9h16l-.8 10.2a1 1 0 01-1 .8H5.8a1 1 0 01-1-.8L4 9z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9 12.5a3 3 0 006 0" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function CloseIcon({ color = '#8B93AC', size = 12 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 13 13">

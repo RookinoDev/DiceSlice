@@ -13,6 +13,7 @@ import {
   DailyGiftIcon,
   AchievementsIcon,
   LeaderboardIcon,
+  ShopIcon,
   GoldIcon,
   FleetDpsIcon,
   RelicIcon,
@@ -26,6 +27,7 @@ interface TopBarProps {
   onDailyClick: () => void
   onAchievementsClick: () => void
   onLeaderboardClick: () => void
+  onShopClick: () => void
 }
 
 export function TopBar({
@@ -36,6 +38,7 @@ export function TopBar({
   onDailyClick,
   onAchievementsClick,
   onLeaderboardClick,
+  onShopClick,
 }: TopBarProps) {
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero) || s.canPrestige()
 
@@ -126,6 +129,16 @@ export function TopBar({
             aria-label="Leaderboard"
           >
             <LeaderboardIcon />
+          </button>
+          <button
+            className="topbar-icon-btn"
+            onClick={() => {
+              audio.click()
+              onShopClick()
+            }}
+            aria-label="Shop"
+          >
+            <ShopIcon />
           </button>
         </div>
       </div>

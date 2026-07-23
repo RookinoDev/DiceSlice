@@ -8,9 +8,18 @@ function App() {
     initTelegram()
   }, [])
 
-  const { session, offline, claimedGrants, cloudRestores, syncNow } = useGameSession()
+  const { session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases } = useGameSession()
 
-  return <GameShell session={session} offline={offline} claimedGrants={claimedGrants} cloudRestores={cloudRestores} syncNow={syncNow} />
+  return (
+    <GameShell
+      session={session}
+      offline={offline}
+      claimedGrants={claimedGrants}
+      cloudRestores={cloudRestores}
+      syncNow={syncNow}
+      refreshPurchases={refreshPurchases}
+    />
+  )
 }
 
 export default App

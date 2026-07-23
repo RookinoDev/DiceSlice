@@ -9,8 +9,34 @@ export interface PurchaseGrant {
 }
 
 // Item ids must match the invoice_payload passed to replyWithInvoice in TelegramBot/index.mjs.
+// "buy_pack_<type>" items have no client-side effect - db.mjs's claimPurchases already minted
+// the pack server-side (packs live entirely there, unlike currency). They're listed here as
+// no-ops purely so applyGrants below doesn't log them as "unknown grant item"; the Cards tab
+// picks the new pack up via its own existing refetch (see ShopSheet's refreshCards call).
+const noopGrant = () => {}
+
 const GRANT_EFFECTS: Record<string, (session: GameSession) => void> = {
+  // The Starter Pack's Stellar Pack half is minted server-side by db.mjs's claimPurchases -
+  // this only needs to apply the Stardust half, same split as every other bundle would use.
+  starter_pack: (session) => session.wallet.add(new BigNumber(2000)),
   stardust_pack_500: (session) => session.wallet.add(new BigNumber(500)),
+  stardust_pack_1500: (session) => session.wallet.add(new BigNumber(1500)),
+  stardust_pack_5000: (session) => session.wallet.add(new BigNumber(5000)),
+  buy_pack_meteor: noopGrant,
+  buy_pack_stellar: noopGrant,
+  buy_pack_deepsky: noopGrant,
+  buy_pack_singularity: noopGrant,
+  offline_cap_boost: (session) => {
+    session.boosts.offlineCapBonusHours += 16
+  },
+  // Extends from the current expiry (never wastes remaining days on an early repurchase), not
+  // from "now" - matches the description shown in the shop (see TelegramBot/shop.mjs).
+  vip_pass_30d: (session) => {
+    const nowSeconds = Math.floor(Date.now() / 1000)
+    const THIRTY_DAYS_SECONDS = 30 * 24 * 60 * 60
+    const base = Math.max(nowSeconds, session.boosts.vipExpiresUnixSeconds)
+    session.boosts.vipExpiresUnixSeconds = base + THIRTY_DAYS_SECONDS
+  },
 }
 
 export async function claimPendingPurchases(apiBaseUrl: string): Promise<PurchaseGrant[]> {

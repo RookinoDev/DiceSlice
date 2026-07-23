@@ -8,6 +8,7 @@ import { buildDefaultMissions } from '../config/MissionDefinition'
 import { buildPrototypeSkills, SkillType } from '../config/SkillDefinition'
 import { CurrencyService } from '../economy/CurrencyService'
 import { DailyRewardService } from '../monetization/DailyRewardService'
+import { MonetizationBoosts } from '../monetization/MonetizationBoosts'
 import { dailyGrantsPack, dailyGrantsRelic, dailyGoldFor, dayInCycle } from '../economy/DailyRewardTable'
 import type { PackType } from '../cards/cardsApi'
 import { ArtifactService, type ArtifactUnlockContext } from './ArtifactService'
@@ -51,6 +52,7 @@ export class GameSession {
   readonly artifacts: ArtifactService
   readonly missions: MissionService
   readonly daily = new DailyRewardService()
+  readonly boosts = new MonetizationBoosts()
 
   /** Lifetime profile counters (survive prestige; persisted via SaveState.stats). */
   readonly stats: LifetimeStats = newLifetimeStats(Math.floor(Date.now() / 1000))
@@ -269,7 +271,11 @@ export class GameSession {
   }
 
   private handleKill(planet: Planet, overkill: BigNumber): void {
-    const gold = this.stage.goldFor(planet.stage).mul(this.artifacts.goldMultiplier()).mul(this.skills.goldMultiplier())
+    const gold = this.stage
+      .goldFor(planet.stage)
+      .mul(this.artifacts.goldMultiplier())
+      .mul(this.skills.goldMultiplier())
+      .mul(this.boosts.vipGoldMultiplier())
     this.wallet.add(gold)
     this.onReward.emit({ planet, gold, overkill })
   }

@@ -98,6 +98,6 @@ bot.start({
   onStart: (info) => console.log(`Polling started as @${info.username}. Mini App URL: ${webAppUrl}`),
 }).catch((err) => console.error('bot.start() rejected:', err))
 
-startServer(token, process.env.PORT || 3000)
+startServer(bot, process.env.PORT || 3000)
 
 process.on('unhandledRejection', (err) => console.error('Unhandled rejection:', err))

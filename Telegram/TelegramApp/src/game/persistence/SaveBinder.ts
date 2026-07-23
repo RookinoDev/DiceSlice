@@ -25,6 +25,8 @@ export function captureSave(s: GameSession): SaveState {
     lastDailyClaimUnixSeconds: Number.isFinite(s.daily.lastClaimDay) ? s.daily.lastClaimDay * DailyRewardService.SECONDS_PER_DAY : 0,
     dailyStreak: s.daily.streak,
     stats: { ...s.stats, deepestStage: Math.max(s.stats.deepestStage, s.stage.highestStage) },
+    offlineCapBonusHours: s.boosts.offlineCapBonusHours,
+    vipExpiresUnixSeconds: s.boosts.vipExpiresUnixSeconds,
   }
 }
 
@@ -36,6 +38,8 @@ export function applySave(s: GameSession, st: SaveState): void {
   s.ships.restoreLevels(st.shipLevels)
   s.artifacts.restoreLevels(st.artifactLevels)
   s.missions.restoreProgress(st.missionProgress, st.missionClaimed)
+  s.boosts.offlineCapBonusHours = st.offlineCapBonusHours ?? 0
+  s.boosts.vipExpiresUnixSeconds = st.vipExpiresUnixSeconds ?? 0
   if (st.lastDailyClaimUnixSeconds > 0) {
     s.daily.restore(Math.floor(st.lastDailyClaimUnixSeconds / DailyRewardService.SECONDS_PER_DAY), st.dailyStreak)
   }

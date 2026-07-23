@@ -260,7 +260,7 @@ export function getSave(telegramUserId) {
 }
 
 // --- Card packs ---
-import { CARD_POOL, craftCost, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER } from './cards.mjs'
+import { CARD_POOL, craftCost, PACK_TYPES, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER } from './cards.mjs'
 
 const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
 
@@ -535,9 +535,37 @@ export function recordPurchase(telegramUserId, item) {
   db.prepare('INSERT INTO purchases (telegram_user_id, item, created_at) VALUES (?, ?, ?)').run(telegramUserId, item, Date.now())
 }
 
+/** Whether `telegramUserId` has ever bought `item` - claimed or not. Backs one-time shop items
+ *  (Starter Pack, offline cap boost): a pending-but-unclaimed purchase still counts, so a second
+ *  invoice can never be issued while the first is in flight. */
+export function hasPurchased(telegramUserId, item) {
+  return db.prepare('SELECT 1 AS x FROM purchases WHERE telegram_user_id = ? AND item = ? LIMIT 1').get(telegramUserId, item) !== undefined
+}
+
+// Shop items of the form "buy_pack_<type>" (see TelegramBot/shop.mjs) grant a card pack
+// directly instead of a client-side currency effect - packs live entirely server-side (the
+// `packs` table), so claimPurchases below mints the row itself rather than leaving it for the
+// client's GRANT_EFFECTS to interpret (it has nothing to apply). The <type> suffix must be a
+// real PACK_TYPES key (cards.mjs) - an id that doesn't match one is just returned to the client
+// unmolested as an unknown grant, never silently dropped.
+const BUY_PACK_PREFIX = 'buy_pack_'
+// The Starter Pack's card-pack half - its Stardust half is a normal client-side GRANT_EFFECTS
+// entry (purchases.ts), same split as every other bundle would use.
+const STARTER_PACK_ITEM = 'starter_pack'
+const STARTER_PACK_TYPE = 'stellar'
+
+/** Which PACK_TYPES key (if any) a claimed purchase item mints a pack for. */
+function packTypeForPurchaseItem(item) {
+  if (item === STARTER_PACK_ITEM) return STARTER_PACK_TYPE
+  if (item.startsWith(BUY_PACK_PREFIX)) return item.slice(BUY_PACK_PREFIX.length)
+  return null
+}
+
 /**
  * Atomically returns unclaimed purchases for a user and marks them claimed, so a retried
- * or concurrent request can never grant the same purchase twice.
+ * or concurrent request can never grant the same purchase twice. Any item that mints a pack
+ * (see packTypeForPurchaseItem above) also gets its pack row inserted in the same transaction,
+ * so a purchase can never be marked claimed without its pack actually existing (or vice versa).
  */
 export function claimPurchases(telegramUserId) {
   const now = Date.now()
@@ -547,6 +575,11 @@ export function claimPurchases(telegramUserId) {
     if (rows.length > 0) {
       const ids = rows.map((r) => r.id)
       db.prepare(`UPDATE purchases SET claimed_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`).run(now, ...ids)
+      const insertPack = db.prepare('INSERT INTO packs (telegram_user_id, type, created_at, quality) VALUES (?, ?, ?, 0)')
+      for (const row of rows) {
+        const type = packTypeForPurchaseItem(row.item)
+        if (type && PACK_TYPES[type]) insertPack.run(telegramUserId, type, now)
+      }
     }
     db.exec('COMMIT')
     return rows.map((r) => ({ item: r.item }))
