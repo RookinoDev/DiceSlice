@@ -291,3 +291,25 @@ export function ArtifactBeaconIcon({ size = 24 }: IconProps) {
     </svg>
   )
 }
+
+// -- Shop glyphs (Offline Cap Extender, VIP Pass) --
+export function HourglassIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M6 3h12v3.2c0 1.6-1.8 3-3.4 4.8h-5.2C7.8 9.2 6 7.8 6 6.2V3z" fill="#43DDEE" />
+      <path d="M6 21h12v-3.2c0-1.6-1.8-3-3.4-4.8h-5.2C7.8 14.8 6 16.2 6 17.8V21z" fill="#8FE9F5" />
+      <rect x="5" y="2" width="14" height="2" rx="1" fill="#43DDEE" />
+      <rect x="5" y="20" width="14" height="2" rx="1" fill="#43DDEE" />
+    </svg>
+  )
+}
+
+export function CrownIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M4 18l-1.6-9.4L8 12l4-7 4 7 5.6-3.4L20 18z" fill="#FFB238" />
+      <rect x="4" y="18" width="16" height="3" rx="1" fill="#E8930F" />
+      <circle cx="12" cy="5.2" r="1.6" fill="#FFD873" />
+    </svg>
+  )
+}
