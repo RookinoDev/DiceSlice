@@ -61,8 +61,9 @@ export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPre
             <button
               key={t.tab}
               className="bottomnav-tab"
-              // Landmark so the boss-kill "+pack" fly-to animation knows where the CARDS tab is.
-              ref={t.tab === 'cards' ? (el) => registerLandmark('nav-cards', el) : undefined}
+              // Landmark per tab - the boss-kill "+pack" fly-to animation needs CARDS specifically,
+              // and the tutorial overlay (TutorialSteps.ts) spotlights whichever tab it's teaching.
+              ref={(el) => registerLandmark(`nav-${t.tab}`, el)}
               onClick={() => {
                 audio.click()
                 onSelect(t.tab)

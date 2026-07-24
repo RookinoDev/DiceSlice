@@ -403,6 +403,112 @@
   white-space: nowrap;
 }
 
+/* -- Tutorial spotlight overlay (see useTutorial.ts / TutorialOverlay.tsx) -- */
+.tutorial-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  /* Never blocks input - the spotlighted element (and everything else) stays fully tappable;
+     only the callout's own button/link re-enable pointer-events below. */
+  pointer-events: none;
+}
+.tutorial-cutout {
+  position: fixed;
+  border-radius: 20px;
+  /* The classic spotlight trick: an absurdly large shadow radius darkens the whole viewport
+     except this box, with no SVG mask needed. */
+  box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78);
+  border: 2px solid var(--palette-gold-light);
+  animation: tutorial-cutout-pulse 1.8s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes tutorial-cutout-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78), 0 0 0 rgba(255, 178, 56, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78), 0 0 16px rgba(255, 178, 56, 0.7);
+  }
+}
+.tutorial-callout {
+  position: fixed;
+  pointer-events: auto;
+  background: var(--palette-sheet-row);
+  border: 1.5px solid rgba(255, 178, 56, 0.5);
+  border-radius: 16px;
+  padding: 14px 16px;
+  animation: sb-pop-in 0.3s ease-out;
+}
+/* Informational steps with no spotlight target (e.g. the boss intro) - a plain centered card
+   over the same darkened scrim, no cutout ring. */
+.tutorial-card {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: auto;
+  background: var(--palette-sheet-row);
+  border: 1.5px solid rgba(255, 178, 56, 0.5);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78);
+  animation: sb-pop-in 0.3s ease-out;
+}
+.tutorial-callout-title,
+.tutorial-card .tutorial-callout-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--palette-gold-label);
+  margin-bottom: 4px;
+}
+.tutorial-callout-body {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--palette-text-primary);
+}
+.tutorial-callout-got-it {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--palette-gold-light), var(--palette-gold-deep));
+  color: #2a1c04;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+}
+.tutorial-callout-got-it:active {
+  transform: scale(0.97);
+}
+.tutorial-skip-link {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 4px;
+  border: none;
+  background: none;
+  color: var(--palette-text-dim);
+  font-size: 11.5px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-cutout {
+    animation: none;
+  }
+  .tutorial-callout,
+  .tutorial-card {
+    animation: none;
+  }
+}
+
 /* -- Content area -- */
 .game-shell-content {
   position: relative;
@@ -2562,6 +2668,21 @@
 }
 .settings-toggle.on .settings-toggle-knob {
   left: 21px;
+}
+.settings-replay-button {
+  padding: 7px 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11.5px;
+  letter-spacing: 0.3px;
+  color: var(--palette-text-primary);
+  cursor: pointer;
+}
+.settings-replay-button:active {
+  transform: scale(0.95);
 }
 .settings-reset-button {
   width: 100%;

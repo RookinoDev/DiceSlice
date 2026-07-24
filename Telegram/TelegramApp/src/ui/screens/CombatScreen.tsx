@@ -546,7 +546,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       </div>
 
       <div className="combat-skills">
-        {vm.skills.map((sk) => {
+        {vm.skills.map((sk, skillIndex) => {
           const Icon = SKILL_ICONS[sk.type] ?? SkillOverdriveIcon
           // #4 fix: secondsLeft/totalSeconds double as BOTH "buff time remaining" (while active)
           // and "time until usable again" (while on cooldown) - see MainPresenter.ts's ternary.
@@ -560,6 +560,8 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
             <div key={sk.type} className="skill-slot-wrap">
               <button
                 className={`skill-slot ${sk.ready ? 'ready' : ''} ${sk.active ? 'skill-slot--active' : ''}`}
+                // Tutorial spotlight target for the first skill to unlock (see TutorialSteps.ts).
+                ref={skillIndex === 0 ? (el) => registerLandmark('skill-0', el) : undefined}
                 disabled={!sk.ready}
                 onClick={() => {
                   if (s.activateSkill(sk.type)) {
@@ -614,6 +616,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
         <div className="combat-tap-footer">
           <button
             className={`combat-tap-upgrade ${vm.canUpgradeTap ? 'affordable' : ''}`}
+            ref={(el) => registerLandmark('tap-upgrade', el)}
             onClick={() => {
               if (s.upgradeTapDamage()) {
                 // Rapid Upgrade Escalation (#36) - quick successive upgrades ramp the flourish:

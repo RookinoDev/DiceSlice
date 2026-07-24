@@ -10,6 +10,7 @@ interface SettingsSheetProps {
   open: boolean
   onClose: () => void
   apiBaseUrl: string | undefined
+  onReplayTutorial: () => void
 }
 
 const APP_VERSION = '0.1.0'
@@ -22,7 +23,7 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
-export function SettingsSheet({ open, onClose, apiBaseUrl }: SettingsSheetProps) {
+export function SettingsSheet({ open, onClose, apiBaseUrl, onReplayTutorial }: SettingsSheetProps) {
   const [musicOn, setMusicOn] = useState(!audio.musicMuted)
   const [sfxOn, setSfxOn] = useState(!audio.muted)
   const [notificationsOn, setNotificationsOn] = useState(prefs.notificationsEnabled)
@@ -65,6 +66,13 @@ export function SettingsSheet({ open, onClose, apiBaseUrl }: SettingsSheetProps)
             syncNotificationPrefs(apiBaseUrl, !notificationsOn)
           }}
         />
+      </div>
+
+      <div className="settings-row">
+        <span>Tutorial</span>
+        <button className="settings-replay-button" onClick={onReplayTutorial}>
+          REPLAY
+        </button>
       </div>
 
       <button className="settings-reset-button" onClick={() => setResetArmed(true)}>

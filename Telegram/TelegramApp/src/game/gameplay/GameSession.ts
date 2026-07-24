@@ -53,6 +53,8 @@ export class GameSession {
   readonly missions: MissionService
   readonly daily = new DailyRewardService()
   readonly boosts = new MonetizationBoosts()
+  /** Ids of first-time-player tutorial steps already shown (see useTutorial.ts + SaveState.tutorialSeen). */
+  readonly tutorialSeen = new Set<string>()
 
   /** Lifetime profile counters (survive prestige; persisted via SaveState.stats). */
   readonly stats: LifetimeStats = newLifetimeStats(Math.floor(Date.now() / 1000))

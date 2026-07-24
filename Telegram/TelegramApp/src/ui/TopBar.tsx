@@ -101,6 +101,7 @@ export function TopBar({
           </button>
           <button
             className="topbar-icon-btn"
+            ref={(el) => registerLandmark('topbar-daily', el)}
             onClick={() => {
               audio.click()
               onDailyClick()

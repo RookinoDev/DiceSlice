@@ -27,6 +27,7 @@ export function captureSave(s: GameSession): SaveState {
     stats: { ...s.stats, deepestStage: Math.max(s.stats.deepestStage, s.stage.highestStage) },
     offlineCapBonusHours: s.boosts.offlineCapBonusHours,
     vipExpiresUnixSeconds: s.boosts.vipExpiresUnixSeconds,
+    tutorialSeen: Array.from(s.tutorialSeen),
   }
 }
 
@@ -40,6 +41,8 @@ export function applySave(s: GameSession, st: SaveState): void {
   s.missions.restoreProgress(st.missionProgress, st.missionClaimed)
   s.boosts.offlineCapBonusHours = st.offlineCapBonusHours ?? 0
   s.boosts.vipExpiresUnixSeconds = st.vipExpiresUnixSeconds ?? 0
+  s.tutorialSeen.clear()
+  for (const id of st.tutorialSeen ?? []) s.tutorialSeen.add(id)
   if (st.lastDailyClaimUnixSeconds > 0) {
     s.daily.restore(Math.floor(st.lastDailyClaimUnixSeconds / DailyRewardService.SECONDS_PER_DAY), st.dailyStreak)
   }

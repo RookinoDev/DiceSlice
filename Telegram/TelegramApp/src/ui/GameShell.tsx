@@ -22,6 +22,8 @@ import { Toast } from './Toast'
 import { PackEarnedBanner } from './PackEarnedBanner'
 import { FloatingNumbers } from './FloatingNumbers'
 import { useFloatingNumbers } from './useFloatingNumbers'
+import { useTutorial } from './useTutorial'
+import { TutorialOverlay } from './TutorialOverlay'
 import { CombatScreen } from './screens/CombatScreen'
 import { FleetScreen } from './screens/FleetScreen'
 import { ArtifactsScreen } from './screens/ArtifactsScreen'
@@ -403,6 +405,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   }
 
   const vm = buildMainViewModel(session)
+  const tutorial = useTutorial(session, vm, tab, pendingPacks)
 
   // Route Telegram's native BackButton to close whichever sheet/toast is open, instead of
   // letting it fall through to the platform's default (which would close the Mini App).
@@ -591,7 +594,12 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       <PrestigeConfirmSheet session={session} open={prestigeConfirmOpen} onClose={() => setPrestigeConfirmOpen(false)} onPrestiged={handlePrestiged} onToast={showToast} />
       <MissionsSheet session={session} open={missionsOpen} onClose={() => setMissionsOpen(false)} onClaimed={() => showToast('MISSION COMPLETE')} />
       <DailyRewardSheet session={session} open={dailyOpen} onClose={() => setDailyOpen(false)} onClaimed={handleDailyClaimed} />
-      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />
+      <SettingsSheet
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        apiBaseUrl={import.meta.env.VITE_API_URL}
+        onReplayTutorial={tutorial.replay}
+      />
       <ProfileSheet
         session={session}
         open={profileOpen}
@@ -639,6 +647,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       />
       <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
       <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={handleClosePackSheet} />
+      <TutorialOverlay step={tutorial.step} isFirstStep={tutorial.isFirstStep} onDismiss={tutorial.dismiss} onSkip={tutorial.skip} />
     </div>
   )
 }

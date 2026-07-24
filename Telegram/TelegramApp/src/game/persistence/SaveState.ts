@@ -34,4 +34,10 @@ export interface SaveState {
 
   /** Unix seconds the VIP pass's passive Stardust bonus expires, 0/absent if never bought. */
   vipExpiresUnixSeconds?: number
+
+  /** Ids of first-time-player tutorial steps already shown/dismissed (see useTutorial.ts).
+   *  Absent entirely distinguishes "never initialized" (a save from before this feature, or a
+   *  genuinely brand-new one) from "initialized but empty" ([]) - useTutorial tells those apart
+   *  to retroactively skip the whole sequence for players who already have progress. */
+  tutorialSeen?: string[]
 }
