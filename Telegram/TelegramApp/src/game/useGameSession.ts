@@ -108,6 +108,23 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     if (cloudReadyRef.current) await pushCloudSave(import.meta.env.VITE_API_URL, state, keepalive)
   }
 
+  /** Settings > "Reset Save". Writing a fresh save to storage/cloud isn't enough on its own -
+   *  this session is still live and ticking, and the pagehide/hidden-tab handlers below flush
+   *  activeSessionRef.current back to both stores on the very reload this triggers, silently
+   *  restoring the old progress and racing whatever this function just wrote. Resetting the
+   *  live session in place (via the same applySave used for every other load) closes that gap:
+   *  by the time anything flushes again, there's no stale progress left to flush. */
+  const resetSave = async (): Promise<void> => {
+    const fresh = captureSave(createGameSession(cfg))
+    applySave(activeSessionRef.current, fresh)
+    // applySave only calls daily.restore() when lastDailyClaimUnixSeconds > 0 (correct for a
+    // normal boot, where skipping means "leave the fresh service's own defaults alone" - but
+    // here the live service may already hold a real streak that needs clearing explicitly).
+    activeSessionRef.current.daily.restore(Number.NEGATIVE_INFINITY, 0)
+    writeSave(fresh)
+    if (cloudReadyRef.current) await pushCloudSave(import.meta.env.VITE_API_URL, fresh)
+  }
+
   /** Claims any Stars purchases the server has recorded but this device hasn't credited yet.
    *  Runs on mount and on regaining foreground (see the effect below); the Shop sheet also
    *  calls this directly right after openInvoice() resolves 'paid', so a purchase made without
@@ -268,5 +285,5 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     () => versionRef.current,
   )
 
-  return { session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases }
+  return { session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases, resetSave }
 }

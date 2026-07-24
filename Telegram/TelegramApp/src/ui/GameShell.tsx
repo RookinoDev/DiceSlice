@@ -58,6 +58,9 @@ interface GameShellProps {
   /** Claims any Stars purchases the server has recorded but this device hasn't credited yet -
    *  the Shop sheet calls this right after openInvoice() resolves 'paid'. */
   refreshPurchases: () => Promise<void>
+  /** Settings > "Reset Save" - resets the live session in place and writes the fresh state to
+   *  both stores, so the unload flush that reload() triggers can't restore stale progress. */
+  resetSave: () => Promise<void>
 }
 
 // Human-readable label for a purchase grant's toast announcement, keyed by the same
@@ -76,7 +79,7 @@ const GRANT_LABELS: Record<string, string> = {
   vip_pass_30d: 'VIP active: +25% Stardust for 30 days',
 }
 
-export function GameShell({ session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases }: GameShellProps) {
+export function GameShell({ session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases, resetSave }: GameShellProps) {
   const [tab, setTab] = useState<NavTab>('combat')
   const [prestigeConfirmOpen, setPrestigeConfirmOpen] = useState(false)
   const [missionsOpen, setMissionsOpen] = useState(false)
@@ -599,6 +602,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onClose={() => setSettingsOpen(false)}
         apiBaseUrl={import.meta.env.VITE_API_URL}
         onReplayTutorial={tutorial.replay}
+        resetSave={resetSave}
       />
       <ProfileSheet
         session={session}

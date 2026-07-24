@@ -2,7 +2,6 @@
 import { useState } from 'react'
 import { prefs } from '../../game/prefs'
 import { audio } from '../../game/audio/AudioManager'
-import { deleteSave } from '../../game/persistence/localStorageSave'
 import { syncNotificationPrefs } from '../../game/notificationApi'
 import { Sheet } from '../Sheet'
 
@@ -11,6 +10,9 @@ interface SettingsSheetProps {
   onClose: () => void
   apiBaseUrl: string | undefined
   onReplayTutorial: () => void
+  /** Resets the live session (both stores) - see useGameSession.ts's resetSave for why the
+   *  reset has to happen on the live session itself, not just by clearing localStorage. */
+  resetSave: () => Promise<void>
 }
 
 const APP_VERSION = '0.1.0'
@@ -23,15 +25,22 @@ function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   )
 }
 
-export function SettingsSheet({ open, onClose, apiBaseUrl, onReplayTutorial }: SettingsSheetProps) {
+export function SettingsSheet({ open, onClose, apiBaseUrl, onReplayTutorial, resetSave }: SettingsSheetProps) {
   const [musicOn, setMusicOn] = useState(!audio.musicMuted)
   const [sfxOn, setSfxOn] = useState(!audio.muted)
   const [notificationsOn, setNotificationsOn] = useState(prefs.notificationsEnabled)
   const [resetArmed, setResetArmed] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const handleClose = () => {
     setResetArmed(false)
     onClose()
+  }
+
+  const handleErase = async () => {
+    setResetting(true)
+    await resetSave()
+    location.reload()
   }
 
   return (
@@ -83,17 +92,11 @@ export function SettingsSheet({ open, onClose, apiBaseUrl, onReplayTutorial }: S
         <div className="settings-confirm-box">
           <div className="settings-confirm-text">This permanently erases your progress. This cannot be undone.</div>
           <div className="settings-confirm-actions">
-            <button className="settings-cancel-button" onClick={() => setResetArmed(false)}>
+            <button className="settings-cancel-button" onClick={() => setResetArmed(false)} disabled={resetting}>
               CANCEL
             </button>
-            <button
-              className="settings-erase-button"
-              onClick={() => {
-                deleteSave()
-                location.reload()
-              }}
-            >
-              ERASE
+            <button className="settings-erase-button" onClick={handleErase} disabled={resetting}>
+              {resetting ? 'ERASING…' : 'ERASE'}
             </button>
           </div>
         </div>

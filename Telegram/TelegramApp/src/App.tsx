@@ -8,7 +8,7 @@ function App() {
     initTelegram()
   }, [])
 
-  const { session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases } = useGameSession()
+  const { session, offline, claimedGrants, cloudRestores, syncNow, refreshPurchases, resetSave } = useGameSession()
 
   return (
     <GameShell
@@ -18,6 +18,7 @@ function App() {
       cloudRestores={cloudRestores}
       syncNow={syncNow}
       refreshPurchases={refreshPurchases}
+      resetSave={resetSave}
     />
   )
 }
