@@ -57,9 +57,10 @@ export async function pushCloudSave(apiBaseUrl: string | undefined, save: SaveSt
 
 /**
  * Which of two saves represents more progress? Relics first (they persist across
- * prestige, so they are the best lifetime proxy), then deepest stage of the current
- * run, then the newer timestamp. All ties keep `local`, so a same-device boot never
- * swaps the running session for an identical cloud copy.
+ * prestige, so they are the best lifetime proxy), then talent level (also prestige-
+ * persistent and monotonic, like Relics), then deepest stage of the current run, then
+ * the newer timestamp. All ties keep `local`, so a same-device boot never swaps the
+ * running session for an identical cloud copy.
  */
 export function pickBetterSave(local: SaveState | null, cloud: SaveState | null): SaveState | null {
   if (!local) return cloud
@@ -69,6 +70,10 @@ export function pickBetterSave(local: SaveState | null, cloud: SaveState | null)
   const cloudRelics = toBig(cloud.relics)
   if (cloudRelics.gt(localRelics)) return cloud
   if (localRelics.gt(cloudRelics)) return local
+
+  const localTalentLevel = local.talentLevel ?? 1
+  const cloudTalentLevel = cloud.talentLevel ?? 1
+  if (cloudTalentLevel !== localTalentLevel) return cloudTalentLevel > localTalentLevel ? cloud : local
 
   if (cloud.highestStage !== local.highestStage) return cloud.highestStage > local.highestStage ? cloud : local
   return cloud.lastSaveUnixSeconds > local.lastSaveUnixSeconds ? cloud : local
@@ -83,6 +88,12 @@ export function sanitizeSave(raw: unknown): SaveState | null {
   if (!isFiniteNumber(s.tapLevel) || !isFiniteNumber(s.currentStage) || !isFiniteNumber(s.highestStage)) return null
   if (!isFiniteNumber(s.lastSaveUnixSeconds)) return null
   if (!Array.isArray(s.shipLevels) || !Array.isArray(s.artifactLevels)) return null
+  // Talent fields are optional (pre-feature saves omit them entirely - see SaveState.ts's own
+  // comment) but must be well-typed when present, since pickBetterSave reads talentLevel above.
+  if (s.talentLevel !== undefined && !isFiniteNumber(s.talentLevel)) return null
+  if (s.talentXp !== undefined && !isFiniteNumber(s.talentXp)) return null
+  if (s.talentPoints !== undefined && !isFiniteNumber(s.talentPoints)) return null
+  if (s.talentNodeLevels !== undefined && !Array.isArray(s.talentNodeLevels)) return null
   return raw as SaveState
 }
 

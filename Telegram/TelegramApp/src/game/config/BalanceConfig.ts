@@ -97,6 +97,16 @@ export interface BalanceConfig {
   overdriveTapBase: number
   midasGoldPerLvl: number
   midasGoldBase: number
+
+  // Talent tree: XP is a plain number (linear per-stage), not a BigNumber - see TalentXp.ts.
+  // xp(stage) = base + stage*perStage; xpToNextLevel(level) = curveBase * level^curvePower.
+  talentXpBase: number
+  talentXpPerStage: number
+  /** Extra XP a boss clear grants ON TOP of the normal per-kill XP it already earns via
+   *  onPlanetKilled (bosses fire both events - see GameSession's constructor). */
+  talentBossXpBonusMultiplier: number
+  talentXpCurveBase: number
+  talentXpCurvePower: number
 }
 
 export const defaultBalanceConfig: BalanceConfig = {
@@ -188,4 +198,11 @@ export const defaultBalanceConfig: BalanceConfig = {
   overdriveTapBase: 40,
   midasGoldPerLvl: 5,
   midasGoldBase: 10,
+
+  // Talent tree - first pass, easy to retune later (plain BalanceConfig numbers, no migration).
+  talentXpBase: 3,
+  talentXpPerStage: 1.5,
+  talentBossXpBonusMultiplier: 4,
+  talentXpCurveBase: 40,
+  talentXpCurvePower: 1.5,
 }

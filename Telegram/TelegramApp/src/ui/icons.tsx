@@ -313,3 +313,72 @@ export function CrownIcon({ size = 24 }: IconProps) {
     </svg>
   )
 }
+
+// -- Talent tree --
+export function NavTalentsIcon({ color, size = 20 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 21V9M12 9l-5 4M12 9l5 4M12 9V3" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="3" r="2" fill={color} />
+      <circle cx="7" cy="13" r="2" fill={color} />
+      <circle cx="17" cy="13" r="2" fill={color} />
+    </svg>
+  )
+}
+
+/** LV badge star - takes a `color` prop (unlike the fixed-color Artifact* icons below) since it
+ *  tints to match whichever accent the badge is drawn in. */
+export function LevelStarIcon({ color = '#FFD873', size = 14 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M12 2l2.5 7.2L22 12l-7.5 2.8L12 22l-2.5-7.2L2 12l7.5-2.8z" fill={color} />
+    </svg>
+  )
+}
+
+export function TalentAssaultIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="8" stroke="#FF6B6B" strokeWidth="1.8" />
+      <path d="M12 2v5M12 17v5M2 12h5M17 12h5" stroke="#FF6B6B" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="2.4" fill="#FF6B6B" />
+    </svg>
+  )
+}
+
+export function TalentFleetIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M12 2l5 13-5-3-5 3z" fill="#43DDEE" />
+      <path d="M5 15l3 7-4-2-2 2z" fill="#8FE9F5" opacity="0.8" />
+      <path d="M19 15l-3 7 4-2 2 2z" fill="#8FE9F5" opacity="0.8" />
+    </svg>
+  )
+}
+
+export function TalentWealthIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="9" cy="15" r="6" fill="#FFD873" />
+      <circle cx="9" cy="15" r="6" stroke="#E8930F" strokeWidth="1.4" />
+      <circle cx="15" cy="8" r="6" fill="#FFE9B0" stroke="#E8930F" strokeWidth="1.4" />
+    </svg>
+  )
+}
+
+export function TalentAscendantIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 20l6-9 4 5 6-11" stroke="#7CFFB2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="20" cy="5" r="2" fill="#7CFFB2" />
+    </svg>
+  )
+}
+
+export function TalentCapstoneIcon({ size = 28 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M12 2l3 7 7 1-5.2 5 1.4 7L12 18.5 5.8 22l1.4-7L2 10l7-1z" fill="#F0E6FF" stroke="#B07CFF" strokeWidth="1" />
+    </svg>
+  )
+}

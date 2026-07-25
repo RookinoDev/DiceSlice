@@ -2,9 +2,9 @@
 import type { ReactElement } from 'react'
 import { audio } from '../game/audio/AudioManager'
 import { registerLandmark } from './combatFx/landmarks'
-import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavPrestigeIcon, NavCardsIcon } from './icons'
+import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavPrestigeIcon, NavCardsIcon, NavTalentsIcon } from './icons'
 
-export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'prestige' | 'cards'
+export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'prestige' | 'cards' | 'talents'
 
 const DIM = '#5C6480'
 const ACTIVE_COLORS: Record<NavTab, string> = {
@@ -13,6 +13,7 @@ const ACTIVE_COLORS: Record<NavTab, string> = {
   artifacts: '#F49CFF',
   prestige: '#E24FFF',
   cards: '#FFD873',
+  talents: '#7CFFB2',
 }
 
 const ICONS: Record<NavTab, (props: { color: string }) => ReactElement> = {
@@ -21,7 +22,11 @@ const ICONS: Record<NavTab, (props: { color: string }) => ReactElement> = {
   artifacts: NavArtifactsIcon,
   prestige: NavPrestigeIcon,
   cards: NavCardsIcon,
+  talents: NavTalentsIcon,
 }
+
+/** dot color/animation per tab (see ui.css's .dot-* rules) - only tabs that ever set `dot` need an entry. */
+const DOT_CLASS: Partial<Record<NavTab, string>> = { cards: 'dot-cards', prestige: 'dot-prestige', talents: 'dot-talents' }
 
 interface TabSpec {
   tab: NavTab
@@ -39,13 +44,16 @@ interface BottomNavProps {
   prestigeReady: boolean
   showCards: boolean
   cardsReady: boolean
+  showTalents: boolean
+  talentsReady: boolean
 }
 
-export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPrestige, prestigeReady, showCards, cardsReady }: BottomNavProps) {
+export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPrestige, prestigeReady, showCards, cardsReady, showTalents, talentsReady }: BottomNavProps) {
   const tabs: TabSpec[] = [
     { tab: 'combat', label: 'Combat', visible: true },
     { tab: 'fleet', label: 'Fleet', visible: showFleet },
     { tab: 'artifacts', label: 'Artifacts', visible: showArtifacts },
+    { tab: 'talents', label: 'Talents', visible: showTalents, dot: talentsReady },
     { tab: 'cards', label: 'Cards', visible: showCards, dot: cardsReady },
     { tab: 'prestige', label: 'Prestige', visible: showPrestige, dot: prestigeReady },
   ]
@@ -71,7 +79,7 @@ export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPre
             >
               <span className={`bottomnav-icon ${t.tab === 'cards' && t.dot ? 'bottomnav-icon--pulse' : ''}`}>
                 <Icon color={color} />
-                {t.dot && <span className={`dot ${t.tab === 'cards' ? 'dot-cards' : 'dot-prestige'}`} />}
+                {t.dot && <span className={`dot ${DOT_CLASS[t.tab] ?? 'dot-prestige'}`} />}
               </span>
               <span className="bottomnav-label" style={{ color }}>
                 {t.label.toUpperCase()}

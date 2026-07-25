@@ -66,6 +66,8 @@ export interface MainViewModel {
   showArtifacts: boolean
   /** near/at the unlock stage, or relics exist */
   showPrestige: boolean
+  /** player has reached level 2 (ever earned a Talent Point) */
+  showTalents: boolean
 }
 
 /** Maps a GameSession to a MainViewModel, mirroring MainPresenter.Build() from Unity. */
@@ -120,6 +122,8 @@ export function buildMainViewModel(s: GameSession): MainViewModel {
   const canPrestige = s.canPrestige()
   const showPrestige = canPrestige || hasRelics || s.stage.highestStage >= s.prestigeUnlockStage - 2
 
+  const showTalents = s.talents.level >= 2
+
   return {
     stageLabel: p ? `Sector ${p.stage}` : '—',
     isBoss: p ? p.isBoss : false,
@@ -152,5 +156,6 @@ export function buildMainViewModel(s: GameSession): MainViewModel {
     showFleet,
     showArtifacts,
     showPrestige,
+    showTalents,
   }
 }

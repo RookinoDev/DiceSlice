@@ -28,6 +28,10 @@ export function captureSave(s: GameSession): SaveState {
     offlineCapBonusHours: s.boosts.offlineCapBonusHours,
     vipExpiresUnixSeconds: s.boosts.vipExpiresUnixSeconds,
     tutorialSeen: Array.from(s.tutorialSeen),
+    talentLevel: s.talents.level,
+    talentXp: s.talents.xp,
+    talentPoints: s.talents.unspentPoints,
+    talentNodeLevels: captureTalentLevels(s),
   }
 }
 
@@ -43,6 +47,8 @@ export function applySave(s: GameSession, st: SaveState): void {
   s.boosts.vipExpiresUnixSeconds = st.vipExpiresUnixSeconds ?? 0
   s.tutorialSeen.clear()
   for (const id of st.tutorialSeen ?? []) s.tutorialSeen.add(id)
+  s.talents.restoreLevels(st.talentNodeLevels)
+  s.talents.restoreProgress(st.talentLevel ?? 1, st.talentXp ?? 0, st.talentPoints ?? 0)
   if (st.lastDailyClaimUnixSeconds > 0) {
     s.daily.restore(Math.floor(st.lastDailyClaimUnixSeconds / DailyRewardService.SECONDS_PER_DAY), st.dailyStreak)
   }
@@ -78,4 +84,8 @@ function captureShipLevels(s: GameSession): number[] {
 
 function captureArtifactLevels(s: GameSession): number[] {
   return Array.from({ length: s.artifacts.count }, (_, i) => s.artifacts.levelOf(i))
+}
+
+function captureTalentLevels(s: GameSession): number[] {
+  return Array.from({ length: s.talents.count }, (_, i) => s.talents.levelOf(i))
 }

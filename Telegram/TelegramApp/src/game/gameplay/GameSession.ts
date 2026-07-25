@@ -19,6 +19,9 @@ import { PrestigeService } from './PrestigeService'
 import { ShipService } from './ShipService'
 import { SkillService } from './SkillService'
 import { StageManager } from './StageManager'
+import { TalentService } from './TalentService'
+import { buildDefaultTalents } from '../config/TalentDefinition'
+import { xpForPlanetKill } from '../economy/TalentXp'
 import { TapController } from './TapController'
 import { TapDamageUpgrade } from './TapDamageUpgrade'
 import { newLifetimeStats, type LifetimeStats } from './LifetimeStats'
@@ -50,6 +53,7 @@ export class GameSession {
   readonly skills: SkillService
   readonly prestige: PrestigeService
   readonly artifacts: ArtifactService
+  readonly talents: TalentService
   readonly missions: MissionService
   readonly daily = new DailyRewardService()
   readonly boosts = new MonetizationBoosts()
@@ -83,14 +87,15 @@ export class GameSession {
     this.skills = new SkillService(buildPrototypeSkills(cfg), () => this.tapUpgrade.level)
     this.prestige = new PrestigeService(cfg)
     this.artifacts = new ArtifactService(buildDefaultArtifacts(cfg), this.prestige.relics)
+    this.talents = new TalentService(buildDefaultTalents(), cfg)
     this.missions = new MissionService(buildDefaultMissions(), this.wallet)
 
-    // Taps are multiplied by the active tap-damage skill buff x permanent tap artifact,
-    // with a chance to crit (Voidglass Lens - 0 until unlocked and owned).
+    // Taps are multiplied by the active tap-damage skill buff x permanent tap artifact x
+    // talent tree, with a chance to crit (Voidglass Lens - 0 until unlocked and owned).
     this.taps = new TapController(
       this.enemy,
       this.tapUpgrade,
-      () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()),
+      () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()).mul(this.talents.tapDamageMultiplier()),
       () => this.artifacts.tapCritChance(),
     )
 
@@ -102,6 +107,12 @@ export class GameSession {
     this.ships.onShipChanged.on(() => this.missions.notifyShipUpgraded())
     this.prestige.onPrestiged.on(() => this.missions.notifyPrestiged())
     this.stage.onBossFailed.on((stage) => this.handleBossFailed(stage))
+
+    // Talent tree XP: every kill (including bosses, which fire onPlanetKilled too - same as
+    // gold) grants base XP off the kill's stage; a boss clear ADDITIONALLY grants a bonus on
+    // top via its own dedicated event, rather than branching on planet.isBoss here.
+    this.enemy.onPlanetKilled.on((e) => this.talents.grantXp(xpForPlanetKill(e.planet.stage, cfg)))
+    this.stage.onBossCleared.on((clearedStage) => this.talents.grantXp(xpForPlanetKill(clearedStage, cfg) * cfg.talentBossXpBonusMultiplier))
 
     // Lifetime profile counters - observe-only, never feed back into gameplay.
     this.enemy.onPlanetKilled.on(() => this.stats.planetsDestroyed++)
@@ -141,7 +152,7 @@ export class GameSession {
       this.onSkillDamage.emit(droneDmg)
     }
 
-    return this.ships.tick(deltaSeconds, this.enemy, this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()), this.artifacts.shipCritChance())
+    return this.ships.tick(deltaSeconds, this.enemy, this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()).mul(this.talents.dpsMultiplier()), this.artifacts.shipCritChance())
   }
 
   upgradeTapDamage(): boolean {
@@ -163,6 +174,11 @@ export class GameSession {
   /** Buy/upgrade a permanent artifact with Relics. False if unaffordable or still locked. */
   buyArtifact(i: number): boolean {
     return this.artifacts.buyOrUpgrade(i, this.artifactUnlockContext)
+  }
+
+  /** Spend 1 Talent Point on node i. False if locked, maxed, or no points left. */
+  buyTalentNode(i: number): boolean {
+    return this.talents.buyNode(i)
   }
 
   /** Gold value of a single kill at the player's current stage - the shared unit missions and
@@ -276,6 +292,7 @@ export class GameSession {
     const gold = this.stage
       .goldFor(planet.stage)
       .mul(this.artifacts.goldMultiplier())
+      .mul(this.talents.goldMultiplier())
       .mul(this.skills.goldMultiplier())
       .mul(this.boosts.vipGoldMultiplier())
     this.wallet.add(gold)

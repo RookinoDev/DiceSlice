@@ -110,4 +110,12 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Check Daily Reward, Missions, and the Shop up top for free bonuses along the way!',
     trigger: (ctx) => ctx.session.stats.bossesDefeated >= 1,
   },
+  {
+    id: 'talents',
+    landmark: 'nav-talents',
+    title: 'Talent Tree',
+    body: 'Leveling up grants Talent Points - spend them on permanent bonuses in the Talent Tree!',
+    trigger: (ctx) => ctx.session.talents.level >= 2,
+    autoAdvanceOn: (ctx) => ctx.tab === 'talents',
+  },
 ]

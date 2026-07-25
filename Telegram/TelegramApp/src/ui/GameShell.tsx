@@ -20,6 +20,7 @@ import { TopBar } from './TopBar'
 import { BottomNav, type NavTab } from './BottomNav'
 import { Toast } from './Toast'
 import { PackEarnedBanner } from './PackEarnedBanner'
+import { LevelUpBanner } from './LevelUpBanner'
 import { FloatingNumbers } from './FloatingNumbers'
 import { useFloatingNumbers } from './useFloatingNumbers'
 import { useTutorial } from './useTutorial'
@@ -28,6 +29,7 @@ import { CombatScreen } from './screens/CombatScreen'
 import { FleetScreen } from './screens/FleetScreen'
 import { ArtifactsScreen } from './screens/ArtifactsScreen'
 import { PrestigeScreen } from './screens/PrestigeScreen'
+import { TalentsScreen } from './screens/TalentsScreen'
 import { CardsScreen } from './screens/CardsScreen'
 import { PrestigeConfirmSheet } from './sheets/PrestigeConfirmSheet'
 import { MissionsSheet } from './sheets/MissionsSheet'
@@ -127,6 +129,18 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     setPackBannerVisible(true)
     clearTimeout(packBannerTimeout.current)
     packBannerTimeout.current = setTimeout(() => setPackBannerVisible(false), 1800)
+  }
+  // Talent tree level-up banner - same key-bump-remount shape as the pack banner above.
+  const [levelUpBannerKey, setLevelUpBannerKey] = useState(0)
+  const [levelUpBannerVisible, setLevelUpBannerVisible] = useState(false)
+  const [levelUpLevel, setLevelUpLevel] = useState(1)
+  const levelUpBannerTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const showLevelUpBanner = (level: number) => {
+    setLevelUpLevel(level)
+    setLevelUpBannerKey((k) => k + 1)
+    setLevelUpBannerVisible(true)
+    clearTimeout(levelUpBannerTimeout.current)
+    levelUpBannerTimeout.current = setTimeout(() => setLevelUpBannerVisible(false), 1800)
   }
   const { ref: shellRef, triggerShake } = useScreenShake<HTMLDivElement>()
   const { containerRef: rewardParticlesRef, spawn: spawnRewardParticle } = useParticles()
@@ -352,6 +366,12 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           triggerShake('big')
         }
       }),
+      session.talents.onLevelUp.on((level) => {
+        showLevelUpBanner(level)
+        audio.prestige()
+        hapticSuccess()
+        triggerShake('small')
+      }),
     ]
     return () => offs.forEach((off) => off())
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -548,9 +568,14 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onAchievementsClick={() => setAchievementsOpen(true)}
         onLeaderboardClick={() => setLeaderboardOpen(true)}
         onShopClick={() => setShopOpen(true)}
+        onTalentsClick={() => setTab('talents')}
       />
       <Toast text={toastText} />
-      <PackEarnedBanner key={packBannerKey} visible={packBannerVisible} />
+      {/* Distinct key namespaces ("pack-"/"levelup-") - these are two independent key-bump
+          counters that both start at 0, and React requires unique keys among ALL adjacent
+          siblings at this level regardless of component type, not just within one .map(). */}
+      <PackEarnedBanner key={`pack-${packBannerKey}`} visible={packBannerVisible} />
+      <LevelUpBanner key={`levelup-${levelUpBannerKey}`} visible={levelUpBannerVisible} level={levelUpLevel} />
       {supernova && (
         <div key={supernova.key} className="supernova-overlay">
           <div className="supernova-flash" />
@@ -569,6 +594,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         )}
         {tab === 'fleet' && vm.showFleet && <FleetScreen session={session} onToast={showToast} />}
         {tab === 'artifacts' && vm.showArtifacts && <ArtifactsScreen session={session} onToast={showToast} />}
+        {tab === 'talents' && vm.showTalents && <TalentsScreen session={session} onToast={showToast} />}
         {tab === 'prestige' && vm.showPrestige && <PrestigeScreen session={session} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} />}
         {tab === 'cards' && showCards && (
           <CardsScreen
@@ -591,6 +617,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         prestigeReady={vm.canPrestige}
         showCards={showCards}
         cardsReady={pendingPacks.length > 0}
+        showTalents={vm.showTalents}
+        talentsReady={session.talents.unspentPoints > 0}
       />
       <ParticleLayer containerRef={rewardParticlesRef} className="fx-particle-layer--shell" />
 

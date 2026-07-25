@@ -40,4 +40,11 @@ export interface SaveState {
    *  genuinely brand-new one) from "initialized but empty" ([]) - useTutorial tells those apart
    *  to retroactively skip the whole sequence for players who already have progress. */
   tutorialSeen?: string[]
+
+  /** Talent tree (see gameplay/TalentService.ts). Persists through Prestige, same as Relics/
+   *  artifactLevels - absent on saves from before this feature (defaults to a fresh level 1). */
+  talentLevel?: number
+  talentXp?: number
+  talentPoints?: number
+  talentNodeLevels?: number[]
 }

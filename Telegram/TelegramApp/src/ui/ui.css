@@ -316,6 +316,20 @@
     dot-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
     sb-pulse-dot 1.6s ease-in-out infinite;
 }
+/* Talent Points available - same pop-in-then-breathe idiom as .dot-cards, green like the
+   Talents tab's own accent color instead of red/magenta (a point waiting isn't urgent). */
+.dot-talents {
+  position: absolute;
+  top: 0;
+  right: -10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--palette-success);
+  animation:
+    dot-pop-in 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) backwards,
+    sb-pulse-dot 1.6s ease-in-out infinite;
+}
 /* User-requested: the CARDS icon itself grows/shrinks while a pack is waiting to be opened,
    not just the dot. */
 .bottomnav-icon--pulse {
@@ -1820,6 +1834,256 @@
 }
 .artifact-row.is-locked {
   opacity: 0.6;
+}
+
+/* -- Level badge (TopBar + TalentsScreen header) -- */
+.level-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.level-badge--large {
+  align-items: center;
+  gap: 6px;
+}
+.level-badge-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(124, 255, 178, 0.1);
+  border: 1px solid rgba(124, 255, 178, 0.28);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  color: #7cffb2;
+  white-space: nowrap;
+}
+.level-badge--large .level-badge-chip {
+  font-size: 16px;
+  padding: 8px 16px;
+}
+.level-xp-track {
+  display: block;
+  width: 100%;
+  min-width: 44px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.level-badge--large .level-xp-track {
+  width: 140px;
+  height: 6px;
+}
+.level-xp-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #3adc84, #7cffb2);
+  transition: width 0.4s ease-out;
+}
+
+/* -- Level-up banner - copy of .pack-earned-banner's drop-down shape, talent-green tint -- */
+.levelup-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 95;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 14px 20px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  background: linear-gradient(180deg, rgba(58, 220, 132, 0.96), rgba(58, 220, 132, 0.22));
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  animation: pack-banner-drop 1.8s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+.levelup-banner-text {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  color: #052d16;
+}
+.levelup-banner-sub {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: #0a3d1f;
+  opacity: 0.85;
+}
+.levelup-banner-icon {
+  color: #052d16;
+  font-size: 14px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .levelup-banner {
+    animation: none;
+  }
+}
+
+/* -- Talents screen -- */
+.talents-screen {
+  display: flex;
+  flex-direction: column;
+}
+.talent-tree-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 4px 16px;
+}
+.talent-points-available {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12.5px;
+  letter-spacing: 0.3px;
+  color: var(--palette-gold-label);
+}
+
+.talent-capstone-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  margin-bottom: 18px;
+  border-radius: 20px;
+  background: radial-gradient(circle at 50% 0%, rgba(176, 124, 255, 0.18), var(--palette-panel) 75%);
+  border: 1px solid rgba(176, 124, 255, 0.3);
+}
+.talent-capstone-card.is-locked {
+  opacity: 0.75;
+}
+.talent-capstone-req {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--palette-text-dim);
+  text-align: center;
+  max-width: 220px;
+}
+
+.talent-tree-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  padding-bottom: 20px;
+}
+.talent-branch-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+.talent-branch-label {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-align: center;
+  margin-bottom: 10px;
+  min-height: 22px;
+}
+.talent-node-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.talent-connector {
+  width: 2px;
+  height: 14px;
+  background: rgba(255, 255, 255, 0.1);
+}
+.talent-connector.is-lit {
+  /* Sibling of .talent-node, not a descendant - can't inherit its inline --talent-color, so this
+     is a fixed accent rather than per-branch tinted. */
+  background: var(--palette-success);
+}
+
+.talent-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 4px;
+  border-radius: 14px;
+  background: var(--palette-panel);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  text-align: center;
+}
+.talent-node:active {
+  transform: scale(0.95);
+}
+.talent-node.is-owned {
+  border-color: color-mix(in srgb, var(--talent-color, var(--palette-success)) 45%, transparent);
+}
+.talent-node.is-maxed {
+  background: color-mix(in srgb, var(--talent-color, var(--palette-success)) 16%, var(--palette-panel));
+}
+.talent-node.is-locked {
+  opacity: 0.55;
+}
+.talent-node--capstone {
+  width: auto;
+  min-width: 160px;
+  padding: 12px 18px;
+  background: none;
+  border: none;
+}
+.talent-node-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--talent-color, var(--palette-text-dim)) 16%, transparent);
+}
+.talent-node--capstone .talent-node-icon {
+  width: 48px;
+  height: 48px;
+}
+.talent-node-level {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10px;
+  color: var(--palette-text-dimmer);
+  margin-top: 2px;
+}
+.talent-node.is-owned .talent-node-level {
+  color: var(--talent-color, var(--palette-success));
+}
+.talent-node-name {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 8.5px;
+  line-height: 1.15;
+  color: var(--palette-text-secondary);
+}
+.talent-node--capstone .talent-node-name {
+  font-size: 13px;
+  color: var(--palette-text-primary);
+}
+.talent-node-bonus {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 9.5px;
+  color: var(--palette-success);
 }
 
 /* -- Prestige screen -- */

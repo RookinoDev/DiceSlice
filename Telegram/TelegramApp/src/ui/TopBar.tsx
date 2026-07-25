@@ -5,6 +5,7 @@ import type { GameSession } from '../game/gameplay/GameSession'
 import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import { audio } from '../game/audio/AudioManager'
 import { useCountUp } from './useCountUp'
+import { LevelBadge } from './LevelBadge'
 import { registerLandmark } from './combatFx/landmarks'
 import {
   SettingsIcon,
@@ -28,6 +29,7 @@ interface TopBarProps {
   onAchievementsClick: () => void
   onLeaderboardClick: () => void
   onShopClick: () => void
+  onTalentsClick: () => void
 }
 
 export function TopBar({
@@ -39,6 +41,7 @@ export function TopBar({
   onAchievementsClick,
   onLeaderboardClick,
   onShopClick,
+  onTalentsClick,
 }: TopBarProps) {
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero) || s.canPrestige()
 
@@ -65,6 +68,14 @@ export function TopBar({
     <div className="topbar-wrap">
       <div className="topbar-row">
         <div className="topbar-icon-group">
+          <LevelBadge
+            level={s.talents.level}
+            xpFraction={s.talents.xpFraction()}
+            onClick={() => {
+              audio.click()
+              onTalentsClick()
+            }}
+          />
           <button
             className="topbar-icon-btn"
             onClick={() => {
