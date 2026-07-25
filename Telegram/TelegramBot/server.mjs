@@ -31,6 +31,29 @@ const ALLOWED_ORIGIN_PATTERNS = [
 /** Request bodies larger than this are rejected outright (saves are ~2KB in practice). */
 const MAX_BODY_BYTES = 64 * 1024
 
+// One-time shop items (Starter Pack, offline cap boost) must only ever be invoiced once, but
+// hasPurchased() only reflects a COMPLETED payment (recorded in message:successful_payment,
+// index.mjs) - nothing blocked a second invoice for the same item while the first was still
+// awaiting payment (open the Shop twice fast enough, or two tabs, and both invoices are payable,
+// double-charging and double-granting - see /api/shop/invoice below). This in-memory reservation
+// closes that window without touching the payment-recording path; entries self-expire via TTL, so
+// nothing needs to clear one out once the real purchase lands (hasPurchased short-circuits first).
+// ponytail: single-process lock (this service runs numReplicas:1) - move to a DB row if this ever
+// needs to survive a restart or scale to multiple instances.
+const PENDING_INVOICE_TTL_MS = 15 * 60 * 1000
+const pendingOneTimeInvoices = new Map() // `${userId}:${itemId}` -> expiry timestamp
+
+function hasPendingInvoice(userId, itemId) {
+  const key = `${userId}:${itemId}`
+  const expiry = pendingOneTimeInvoices.get(key)
+  if (expiry === undefined) return false
+  if (Date.now() > expiry) {
+    pendingOneTimeInvoices.delete(key)
+    return false
+  }
+  return true
+}
+
 function isAllowedOrigin(origin) {
   return !!origin && ALLOWED_ORIGIN_PATTERNS.some((pattern) => pattern.test(origin))
 }

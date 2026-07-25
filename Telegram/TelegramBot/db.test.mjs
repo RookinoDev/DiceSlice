@@ -370,6 +370,26 @@ test('resetPlayerCollection wipes a user\'s cards, packs, pity progress, and sho
   assert.equal(grantPacksFromSave(4000, { version: 1, highestStage: 10, stats: { deepestBossCleared: 5, deepestStage: 10 } }), 1)
 })
 
+test('refineInstances rejects a request that mixes number and string forms of the same id', () => {
+  // A malformed/adversarial [5, "5"] must not fetch the same row twice: new Set() doesn't
+  // coerce types (so the plain duplicate-id check misses it), but SQLite's numeric affinity
+  // means both bind the same row - without a type guard this would double-pay dust for one
+  // destroyed card while silently deleting only one row (the second DELETE is a no-op).
+  grantManyPacks(4100)
+  const owned = getCollection(4100)
+  const byCard = new Map()
+  for (const row of owned) {
+    if (!byCard.has(row.card_id)) byCard.set(row.card_id, [])
+    byCard.get(row.card_id).push(row)
+  }
+  const dupeGroup = [...byCard.values()].find((rows) => rows.length >= 2)
+  assert.ok(dupeGroup, 'expected at least one duplicate after flooding the legendary pool')
+
+  const id = dupeGroup[0].id
+  assert.equal(refineInstances(4100, [id, String(id)]), null)
+  assert.equal(getCollection(4100).length, owned.length) // nothing was deleted by the rejected call
+})
+
 test('recordReferral is first-touch-wins and getReferralCount aggregates per referrer', () => {
   assert.equal(recordReferral(3001, 3000), true) // 3000 referred 3001
   assert.equal(recordReferral(3001, 9999), false) // already referred - first touch wins

@@ -412,9 +412,14 @@ export function openPack(telegramUserId, packId) {
     const ownedIds = new Set(db.prepare('SELECT DISTINCT card_id FROM card_instances WHERE telegram_user_id = ?').all(telegramUserId).map((r) => r.card_id))
     const { cards, pity } = rollPack(pack.type, { sinceEpic: progress.since_epic, sinceLegendary: progress.since_legendary }, ownedIds, pack.quality ?? 0)
 
+    // ownedIds is mutated as we go (not just read) - a pack can legitimately roll two copies of
+    // the same never-owned card (see cards.mjs's NEW_CARD_REROLLS comment), and without updating
+    // it mid-loop both copies would report isNew:true instead of only the first.
     const minted = cards.map(({ cardId, rarity, variant }) => {
       const serial = mintInstance(telegramUserId, cardId, variant, `pack:${pack.type}`, now)
-      return { cardId, rarity, variant, holo: variant === 'holo', serial, isNew: !ownedIds.has(cardId) }
+      const isNew = !ownedIds.has(cardId)
+      ownedIds.add(cardId)
+      return { cardId, rarity, variant, holo: variant === 'holo', serial, isNew }
     })
 
     db.prepare('UPDATE packs SET opened_at = ? WHERE id = ?').run(now, pack.id)
@@ -469,6 +474,10 @@ export function resetPlayerCollection(telegramUserId) {
  */
 export function refineInstances(telegramUserId, instanceIds) {
   if (!Array.isArray(instanceIds) || instanceIds.length === 0 || instanceIds.length > 200) return null
+  // Every id must be a genuine number: SQLite applies numeric affinity to a bound TEXT value, so
+  // e.g. [5, "5"] would fetch the SAME row twice (double-paying its dust) while `new Set` below
+  // sees them as distinct (no type coercion) and lets the "duplicate id" rejection miss it.
+  if (!instanceIds.every((id) => Number.isInteger(id))) return null
   db.exec('BEGIN IMMEDIATE')
   try {
     const rows = instanceIds.map((id) => db.prepare('SELECT id, card_id, variant FROM card_instances WHERE id = ? AND telegram_user_id = ?').get(id, telegramUserId))

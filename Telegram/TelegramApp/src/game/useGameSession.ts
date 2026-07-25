@@ -89,6 +89,13 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
 
   const cloudReadyRef = useRef(false)
   const reconcileInFlightRef = useRef(false)
+  // Set for the rest of this session once resetSave() runs. The initial cloud reconcile below
+  // can still be in flight (cold server start, retry backoff) when a reset happens - without
+  // this, its eventual response reflects the PRE-reset cloud copy, and pickBetterSave sees a
+  // freshly-reset save (0 relics, stage 1) as "worse" than that stale progress and restores it
+  // right on top of the reset. Once set, reconcile() always treats local (the reset) as the
+  // winner and pushes it up instead of ever pulling the old cloud copy back down.
+  const resetInProgressRef = useRef(false)
   const [cloudRestores, setCloudRestores] = useState(0)
 
   const listenersRef = useRef(new Set<() => void>())
@@ -118,6 +125,11 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
    *  The card collection/packs/dust live only on the bot server (never in SaveState), so they
    *  need their own wipe call alongside the client-side reset - see db.mjs's resetPlayerCollection. */
   const resetSave = async (): Promise<void> => {
+    // Must be set before anything else: closes the race where the initial cloud reconcile
+    // (still in flight - cold server start, retry backoff) resolves after this point with the
+    // PRE-reset cloud copy and would otherwise restore it right on top of the reset (see
+    // resetInProgressRef's own comment above).
+    resetInProgressRef.current = true
     const fresh = captureSave(createGameSession(cfg))
     applySave(activeSessionRef.current, fresh)
     // applySave only calls daily.restore() when lastDailyClaimUnixSeconds > 0 (correct for a
@@ -125,10 +137,12 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     // here the live service may already hold a real streak that needs clearing explicitly).
     activeSessionRef.current.daily.restore(Number.NEGATIVE_INFINITY, 0)
     writeSave(fresh)
-    await Promise.all([
-      cloudReadyRef.current ? pushCloudSave(import.meta.env.VITE_API_URL, fresh) : Promise.resolve(),
-      resetCollection(import.meta.env.VITE_API_URL),
-    ])
+    // Unconditional (not gated on cloudReadyRef like syncNow/periodic pushes are): those gate
+    // to protect a fresh install from overwriting an unseen cloud save, but a reset is an
+    // explicit request to overwrite the cloud save too - skipping the push here would leave the
+    // stale pre-reset copy sitting server-side forever (nothing else ever re-pushes on its own).
+    const [pushed] = await Promise.all([pushCloudSave(import.meta.env.VITE_API_URL, fresh), resetCollection(import.meta.env.VITE_API_URL)])
+    if (pushed) cloudReadyRef.current = true
   }
 
   /** Claims any Stars purchases the server has recorded but this device hasn't credited yet.
@@ -169,7 +183,7 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
         cloudReadyRef.current = true
 
         const local = captureSave(activeSessionRef.current)
-        const winner = pickBetterSave(local, res.save)
+        const winner = resetInProgressRef.current ? local : pickBetterSave(local, res.save)
         if (res.save && winner === res.save) {
           // Cloud has more progress: reboot from it through the normal load path so
           // offline earnings since its timestamp are granted like any other launch.

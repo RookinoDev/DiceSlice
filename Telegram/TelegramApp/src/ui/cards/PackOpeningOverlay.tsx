@@ -63,6 +63,13 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
   // queue while the burst is still animating), which would otherwise flicker the burst's
   // tier color/scale to whatever pack is now first in line.
   const tornPackType = useRef<PackType | null>(null)
+  // The pack id whose tear is still the one on screen. The Telegram BackButton can close this
+  // sheet (open -> false -> true) while completeTear()'s server round-trip for a DIFFERENT pack
+  // is still in flight; without this, that stale response's continuation would setPhase() over
+  // whatever the player has since torn instead, showing pack A's cards under pack B's burst.
+  // onOpened() still always fires below regardless - the pack is genuinely opened server-side
+  // either way, only the on-screen phase transition needs to be suppressed when stale.
+  const activeTearId = useRef<number | null>(null)
 
   const currentPack = pendingPacks[0] ?? null
 
@@ -73,6 +80,7 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
       setTearing(false)
       setTearProgress(0)
       busy.current = false
+      activeTearId.current = null
     }
     return () => cancelAnimationFrame(tearRaf.current)
   }, [open])
@@ -133,6 +141,7 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
   const completeTear = async (packId: number) => {
     cancelAnimationFrame(tearRaf.current)
     busy.current = true
+    activeTearId.current = packId
     tornPackType.current = currentPack?.type ?? null
     setPhase({ kind: 'burst' })
     audio.packTear()
@@ -140,14 +149,23 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
     hapticAction()
     setShaking(true)
     const r = await openPackRequest(apiBaseUrl, packId)
-    busy.current = false
-    setTearing(false)
-    setTearProgress(0)
+    // Only touch on-screen state if this is still the tear being displayed - see activeTearId's
+    // own comment above for why a stale response can arrive after the sheet was closed/reopened.
+    const stillActive = activeTearId.current === packId
+    if (stillActive) {
+      busy.current = false
+      setTearing(false)
+      setTearProgress(0)
+    }
     if (r) {
-      onOpened(packId, r)
-      // Let the burst flash breathe for a beat even on a fast server.
-      setTimeout(() => setPhase({ kind: 'dealing', result: r }), 300)
-    } else {
+      onOpened(packId, r) // pack is genuinely opened server-side either way - always credit it
+      if (stillActive) {
+        // Let the burst flash breathe for a beat even on a fast server.
+        setTimeout(() => {
+          if (activeTearId.current === packId) setPhase({ kind: 'dealing', result: r })
+        }, 300)
+      }
+    } else if (stillActive) {
       setPhase({ kind: 'pack' })
     }
   }
