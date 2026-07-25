@@ -439,6 +439,29 @@ export function getDust(telegramUserId) {
 }
 
 /**
+ * Settings > "Reset Save". The card collection, packs, dust, and pity counters all live only
+ * here - useGameSession.ts's resetSave() resets the client save (currency, stage, ships,
+ * artifacts) but has no way to touch this, so it calls this over the wire too. Deletes rather
+ * than zeroing pack_progress/daily_pack_progress: the next real grant re-creates them via their
+ * own INSERT OR IGNORE, same as a genuinely new player. Also clears the profile showcase - it
+ * references (cardId, variant) pairs the player no longer owns.
+ */
+export function resetPlayerCollection(telegramUserId) {
+  db.exec('BEGIN IMMEDIATE')
+  try {
+    db.prepare('DELETE FROM card_instances WHERE telegram_user_id = ?').run(telegramUserId)
+    db.prepare('DELETE FROM packs WHERE telegram_user_id = ?').run(telegramUserId)
+    db.prepare('DELETE FROM pack_progress WHERE telegram_user_id = ?').run(telegramUserId)
+    db.prepare('DELETE FROM daily_pack_progress WHERE telegram_user_id = ?').run(telegramUserId)
+    db.prepare('UPDATE profiles SET showcase = NULL WHERE telegram_user_id = ?').run(telegramUserId)
+    db.exec('COMMIT')
+  } catch (e) {
+    db.exec('ROLLBACK')
+    throw e
+  }
+}
+
+/**
  * Refines (destroys) owned duplicate instances into dust. Duplicates only: an instance is
  * refinable only while the user owns MORE THAN ONE instance of that base card, and the last
  * remaining copy can never be refined - refining can't punch a hole in the collection.

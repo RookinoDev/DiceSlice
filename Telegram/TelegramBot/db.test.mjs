@@ -29,6 +29,7 @@ const {
   getUsersDueForReengagement,
   markNotified,
   hasPurchased,
+  resetPlayerCollection,
 } = await import('./db.mjs')
 
 test('getSave returns null for a user who never synced', () => {
@@ -338,6 +339,35 @@ test('showcase stores only owned (card, variant) pairs and round-trips via profi
 
   assert.equal(setShowcase(1100, [{ cardId: 'earth', variant: 'polychrome' }]), false) // not owned
   assert.equal(setShowcase(1100, Array(9).fill(mine[0])), false) // over the cap
+})
+
+test('resetPlayerCollection wipes a user\'s cards, packs, pity progress, and showcase without touching other users', () => {
+  // Build up real state: two packs (one opened into owned cards, one left unopened) and a showcase.
+  grantPacksFromSave(4000, { version: 1, highestStage: 10, stats: { deepestBossCleared: 10, deepestStage: 10 } })
+  for (const pack of listUnopenedPacks(4000)) openPack(4000, pack.id)
+  grantPacksFromSave(4000, { version: 1, highestStage: 10, stats: { deepestBossCleared: 15, deepestStage: 10 } }) // leaves one unopened
+  grantDailyPackFromSave(4000, { version: 1, dailyStreak: 10 })
+  const owned = getCollection(4000)
+  assert.ok(owned.length > 0)
+  setShowcase(4000, [{ cardId: owned[0].card_id, variant: owned[0].variant }])
+  assert.ok(listUnopenedPacks(4000).length > 0)
+  assert.ok(JSON.parse(getProfile(4000).showcase).length > 0)
+
+  // A second user's data must survive untouched.
+  grantPacksFromSave(4001, { version: 1, highestStage: 10, stats: { deepestBossCleared: 5, deepestStage: 10 } })
+  const otherPacksBefore = listUnopenedPacks(4001).length
+
+  resetPlayerCollection(4000)
+
+  assert.deepEqual(getCollection(4000), [])
+  assert.deepEqual(listUnopenedPacks(4000), [])
+  assert.equal(getDust(4000), 0)
+  assert.equal(getProfile(4000).showcase, null)
+  assert.equal(listUnopenedPacks(4001).length, otherPacksBefore) // other user untouched
+
+  // pack_progress is deleted, not zeroed - a fresh grant re-creates it via INSERT OR IGNORE,
+  // same as a genuinely new player (rather than e.g. staying capped by a stale bosses_granted).
+  assert.equal(grantPacksFromSave(4000, { version: 1, highestStage: 10, stats: { deepestBossCleared: 5, deepestStage: 10 } }), 1)
 })
 
 test('recordReferral is first-touch-wins and getReferralCount aggregates per referrer', () => {

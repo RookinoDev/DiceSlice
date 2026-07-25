@@ -11,6 +11,7 @@ import { applySave, captureSave } from './persistence/SaveBinder'
 import { loadSave, nowUnixSeconds, writeSave } from './persistence/localStorageSave'
 import { fetchCloudSave, pickBetterSave, pushCloudSave } from './persistence/cloudSave'
 import { applyGrants, claimPendingPurchases, type PurchaseGrant } from './monetization/purchases'
+import { resetCollection } from './cards/cardsApi'
 
 const AUTOSAVE_SECONDS = 15
 /** Safety-net periodic cloud push while playing (on top of the immediate per-event syncNow()
@@ -113,7 +114,9 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
    *  activeSessionRef.current back to both stores on the very reload this triggers, silently
    *  restoring the old progress and racing whatever this function just wrote. Resetting the
    *  live session in place (via the same applySave used for every other load) closes that gap:
-   *  by the time anything flushes again, there's no stale progress left to flush. */
+   *  by the time anything flushes again, there's no stale progress left to flush.
+   *  The card collection/packs/dust live only on the bot server (never in SaveState), so they
+   *  need their own wipe call alongside the client-side reset - see db.mjs's resetPlayerCollection. */
   const resetSave = async (): Promise<void> => {
     const fresh = captureSave(createGameSession(cfg))
     applySave(activeSessionRef.current, fresh)
@@ -122,7 +125,10 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     // here the live service may already hold a real streak that needs clearing explicitly).
     activeSessionRef.current.daily.restore(Number.NEGATIVE_INFINITY, 0)
     writeSave(fresh)
-    if (cloudReadyRef.current) await pushCloudSave(import.meta.env.VITE_API_URL, fresh)
+    await Promise.all([
+      cloudReadyRef.current ? pushCloudSave(import.meta.env.VITE_API_URL, fresh) : Promise.resolve(),
+      resetCollection(import.meta.env.VITE_API_URL),
+    ])
   }
 
   /** Claims any Stars purchases the server has recorded but this device hasn't credited yet.

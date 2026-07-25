@@ -113,6 +113,12 @@ export async function saveShowcase(apiBaseUrl: string | undefined, cards: Array<
   return res?.ok === true
 }
 
+/** Settings > "Reset Save". Wipes the card collection/packs/dust that live only server-side. */
+export async function resetCollection(apiBaseUrl: string | undefined): Promise<boolean> {
+  const res = await postJson<{ ok: boolean }>(apiBaseUrl, '/api/reset', {})
+  return res?.ok === true
+}
+
 export const PACK_LABEL: Record<PackType, string> = {
   meteor: 'METEOR PACK',
   stellar: 'STELLAR PACK',

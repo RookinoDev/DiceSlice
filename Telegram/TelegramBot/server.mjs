@@ -16,6 +16,7 @@ import {
   openPack,
   putSave,
   refineInstances,
+  resetPlayerCollection,
   setNotificationsEnabled,
   setShowcase,
   upsertProfile,
@@ -316,6 +317,22 @@ export function startServer(bot, port) {
         sendJson(res, 200, { ok: true })
       } catch (e) {
         console.error('[server] showcase error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Settings > "Reset Save" - wipes the card collection/packs/dust that live only server-side.
+    // Currency/stage/ships/artifacts reset client-side (see useGameSession.ts's resetSave).
+    if (req.method === 'POST' && req.url === '/api/reset') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        resetPlayerCollection(userId)
+        sendJson(res, 200, { ok: true })
+      } catch (e) {
+        console.error('[server] reset error:', e)
         sendJson(res, 400, { error: 'bad request' })
       }
       return
