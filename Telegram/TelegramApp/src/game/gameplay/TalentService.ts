@@ -8,6 +8,11 @@ import type { BalanceConfig } from '../config/BalanceConfig'
 import { CAPSTONE_EFFECTS, TalentEffect, talentBonusAt, isTalentNodeUnlocked, type TalentDefinition } from '../config/TalentDefinition'
 import { xpToNextLevel } from '../economy/TalentXp'
 
+/** Talents' own contribution to crit chance, capped before GameSession sums it with Artifacts'
+ *  (and, once sockets exist, Gems') separately-capped contributions - same reasoning as
+ *  ArtifactService's own CRIT_CHANCE_CAP, just a smaller share of the shared ceiling. */
+const TALENT_CRIT_CHANCE_CAP = 0.3
+
 export class TalentService {
   private readonly defs: TalentDefinition[]
   private readonly cfg: BalanceConfig
@@ -84,12 +89,14 @@ export class TalentService {
     return true
   }
 
-  /** Restore node levels from a save (extra/short entries ignored) - same defensive clamping as
-   *  ArtifactService.restoreLevels. */
+  /** Restore node levels from a save. A length mismatch means the tree itself was redesigned
+   *  since this save was written (e.g. 25 nodes -> 79) - unlike Artifacts' simple clamp, applying
+   *  old values index-by-index here would silently misapply them onto UNRELATED new nodes (same
+   *  index, different id/effect entirely), not just truncate extras. Safer to start that player's
+   *  talent progress fresh in the new tree than to quietly wire old points into the wrong nodes. */
   restoreLevels(levels: number[] | undefined | null): void {
-    if (!levels) return
-    const n = Math.min(levels.length, this.levels.length)
-    for (let i = 0; i < n; i++) this.levels[i] = levels[i] < 0 ? 0 : levels[i]
+    if (!levels || levels.length !== this.levels.length) return
+    for (let i = 0; i < levels.length; i++) this.levels[i] = levels[i] < 0 ? 0 : levels[i]
   }
   /** Restore level/xp/points together (interdependent - set atomically). */
   restoreProgress(level: number, xp: number, points: number): void {
@@ -128,6 +135,26 @@ export class TalentService {
   }
   offlineRewardMultiplier(): BigNumber {
     return this.multiplier(TalentEffect.OfflineReward)
+  }
+  /** Multiplies the Relics gained on a Stellar Ascension - see PrestigeService.prestige(). */
+  relicGainMultiplier(): BigNumber {
+    return this.multiplier(TalentEffect.RelicGain)
+  }
+  /** Crit chance is a plain probability, not a stacking multiplier - summed (not compounded)
+   *  across every owned node tagged with `effect`, same shape as ArtifactService.critChanceFor. */
+  private critChanceFor(effect: TalentEffect): number {
+    let chance = 0
+    for (let i = 0; i < this.defs.length; i++) {
+      if (this.defs[i].effect !== effect || this.levels[i] <= 0) continue
+      chance += talentBonusAt(this.defs[i], this.levels[i])
+    }
+    return Math.min(TALENT_CRIT_CHANCE_CAP, chance)
+  }
+  tapCritChance(): number {
+    return this.critChanceFor(TalentEffect.TapCritChance)
+  }
+  shipCritChance(): number {
+    return this.critChanceFor(TalentEffect.ShipCritChance)
   }
   /** Plain number, not BigNumber - multiplies straight into xpForPlanetKill's result. */
   xpGainMultiplier(): number {

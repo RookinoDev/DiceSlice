@@ -26,6 +26,11 @@ import { TapController } from './TapController'
 import { TapDamageUpgrade } from './TapDamageUpgrade'
 import { newLifetimeStats, type LifetimeStats } from './LifetimeStats'
 
+/** Crit chance ceiling once Artifacts' and Talents' own separately-capped contributions are
+ *  summed together (each source already caps itself lower - see ArtifactService/TalentService -
+ *  this is just the final backstop so no combination of sources reaches a guaranteed crit). */
+const TOTAL_CRIT_CAP = 0.85
+
 export interface DailyPreview {
   /** 1..30 in the cycle */
   day: number
@@ -91,12 +96,13 @@ export class GameSession {
     this.missions = new MissionService(buildDefaultMissions(), this.wallet)
 
     // Taps are multiplied by the active tap-damage skill buff x permanent tap artifact x
-    // talent tree, with a chance to crit (Voidglass Lens - 0 until unlocked and owned).
+    // talent tree, with a chance to crit (Voidglass Lens - 0 until unlocked and owned - plus
+    // the Precision cluster's own talent nodes, summed and capped together).
     this.taps = new TapController(
       this.enemy,
       this.tapUpgrade,
       () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()).mul(this.talents.tapDamageMultiplier()),
-      () => this.artifacts.tapCritChance(),
+      () => Math.min(TOTAL_CRIT_CAP, this.artifacts.tapCritChance() + this.talents.tapCritChance()),
     )
 
     this.enemy.onPlanetKilled.on((e) => this.handleKill(e.planet, e.overkill))
@@ -141,18 +147,26 @@ export class GameSession {
     this.stage.tick(deltaSeconds)
     this.skills.tick(deltaSeconds)
 
-    // Drone Swarm: auto-taps/sec while active -> continuous tap damage.
+    // Drone Swarm: auto-taps/sec while active -> continuous tap damage. Was missing the talent
+    // tree's tap-damage multiplier here specifically (present on the real tap path above) -
+    // a pre-existing gap, fixed while this line was already being touched for the tree redesign.
     const taps = this.skills.droneTapsPerSecond()
     if (taps > 0 && this.enemy.current) {
       const droneDmg = this.tapUpgrade.currentDamage
         .mul(this.skills.tapDamageMultiplier())
         .mul(this.artifacts.tapDamageMultiplier())
+        .mul(this.talents.tapDamageMultiplier())
         .mul(new BigNumber(taps * deltaSeconds))
       this.enemy.applyDamage(droneDmg)
       this.onSkillDamage.emit(droneDmg)
     }
 
-    return this.ships.tick(deltaSeconds, this.enemy, this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()).mul(this.talents.dpsMultiplier()), this.artifacts.shipCritChance())
+    return this.ships.tick(
+      deltaSeconds,
+      this.enemy,
+      this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()).mul(this.talents.dpsMultiplier()),
+      Math.min(TOTAL_CRIT_CAP, this.artifacts.shipCritChance() + this.talents.shipCritChance()),
+    )
   }
 
   upgradeTapDamage(): boolean {
@@ -231,13 +245,13 @@ export class GameSession {
     return this.stage.highestStage >= this.cfg.prestigeUnlockStage
   }
   previewRelics(): BigNumber {
-    return this.prestige.relicsForStage(this.stage.highestStage)
+    return this.prestige.relicsForStage(this.stage.highestStage, this.talents.relicGainMultiplier())
   }
 
   /** Reset the run for Relics. Returns Relics gained (0 if not unlocked). */
   doPrestige(): BigNumber {
     if (!this.canPrestige()) return BigNumber.Zero
-    const gained = this.prestige.prestige(this.stage.highestStage, this.wallet, this.tapUpgrade, this.ships, this.stage)
+    const gained = this.prestige.prestige(this.stage.highestStage, this.wallet, this.tapUpgrade, this.ships, this.stage, this.talents.relicGainMultiplier())
     this.stage.begin() // re-enter stage 1 -> spawns a fresh planet
     return gained
   }

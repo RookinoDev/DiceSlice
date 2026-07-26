@@ -23,19 +23,20 @@ export class PrestigeService {
     this.cfg = cfg
   }
 
-  relicsForStage(highestStage: number): BigNumber {
+  relicsForStage(highestStage: number, relicMultiplier: BigNumber = BigNumber.One): BigNumber {
     const s = Math.max(0, highestStage - this.cfg.relicStartStage)
     if (s <= 0) return BigNumber.Zero
     const r = this.cfg.relicScale * Math.pow(s, this.cfg.relicPower)
-    return new BigNumber(Math.floor(r))
+    return new BigNumber(Math.floor(r)).mul(relicMultiplier)
   }
 
   /**
-   * Perform a prestige: award Relics from the highest stage, then reset the run
-   * (Stardust, tap level, ship levels, stage). Returns Relics gained.
+   * Perform a prestige: award Relics from the highest stage (optionally boosted by the
+   * Continuum talent cluster's RelicGain nodes), then reset the run (Stardust, tap level, ship
+   * levels, stage). Returns Relics gained.
    */
-  prestige(highestStage: number, stardust: CurrencyService, tap: TapDamageUpgrade, ships: ShipService, stage: StageManager): BigNumber {
-    const gained = this.relicsForStage(highestStage)
+  prestige(highestStage: number, stardust: CurrencyService, tap: TapDamageUpgrade, ships: ShipService, stage: StageManager, relicMultiplier: BigNumber = BigNumber.One): BigNumber {
+    const gained = this.relicsForStage(highestStage, relicMultiplier)
     this.relics.add(gained)
 
     stardust.set(BigNumber.Zero)

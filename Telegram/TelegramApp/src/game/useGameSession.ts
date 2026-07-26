@@ -54,7 +54,10 @@ function loadAndBegin(cfg: BalanceConfig): Boot {
       const income = offlineIncomePerSecond(session.ships.fleetDps(), session.stage.hpFor(stage), session.stage.goldFor(stage))
       // Phoenix Cinders (see #13) - artifact levels are already restored by applySave above.
       const bonusHours = session.boosts.offlineCapBonusHours
-      const gold = offlineEarningsFromConfig(last, now, income, cfg, bonusHours).mul(session.artifacts.offlineRewardMultiplier())
+      // talents.offlineRewardMultiplier() existed but was never actually applied here - a
+      // pre-existing gap (Continuum's OfflineReward nodes were purchasable but silently
+      // did nothing), fixed while this line was already being touched for the tree redesign.
+      const gold = offlineEarningsFromConfig(last, now, income, cfg, bonusHours).mul(session.artifacts.offlineRewardMultiplier()).mul(session.talents.offlineRewardMultiplier())
       if (gold.gt(BigNumber.Zero)) {
         session.wallet.add(gold)
         offline = { seconds: Math.min(now - last, (cfg.offlineCapHours + bonusHours) * 3600), gold }
