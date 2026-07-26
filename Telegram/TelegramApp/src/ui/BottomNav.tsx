@@ -40,6 +40,8 @@ interface BottomNavProps {
   current: NavTab
   onSelect: (tab: NavTab) => void
   onShopClick: () => void
+  /** Daily Reward now lives inside the Shop - surfaced here so the bottom bar still cues it. */
+  dailyClaimable: boolean
   showFleet: boolean
   showArtifacts: boolean
   showPrestige: boolean
@@ -54,6 +56,7 @@ export function BottomNav({
   current,
   onSelect,
   onShopClick,
+  dailyClaimable,
   showFleet,
   showArtifacts,
   showPrestige,
@@ -110,8 +113,9 @@ export function BottomNav({
           onShopClick()
         }}
       >
-        <span className="bottomnav-icon">
+        <span className={`bottomnav-icon ${dailyClaimable ? 'bottomnav-icon--pulse' : ''}`}>
           <ShopIcon color={SHOP_COLOR} />
+          {dailyClaimable && <span className="dot dot-daily" />}
         </span>
         <span className="bottomnav-label" style={{ color: SHOP_COLOR }}>
           SHOP

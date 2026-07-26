@@ -23,6 +23,10 @@ interface ShopSheetProps {
    *  purchase mints its pack server-side with nothing for refreshPurchases to apply, so the
    *  Cards tab needs its own nudge to notice it without waiting on the next visibility change. */
   refreshCards: () => void
+  /** Daily Reward lives inside the Shop (not its own top-bar button) so a free claim always
+   *  means a look at the catalog too - see DailyRewardSheet, opened as a sheet on top of this one. */
+  dailyClaimable: boolean
+  onOpenDaily: () => void
 }
 
 // Starter Pack renders separately as a featured hero card up top - not in this grouped list.
@@ -66,7 +70,7 @@ function glowColorForItem(item: ShopItem): string {
   return '#FFB238'
 }
 
-export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refreshCards }: ShopSheetProps) {
+export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refreshCards, dailyClaimable, onOpenDaily }: ShopSheetProps) {
   const [items, setItems] = useState<ShopItem[]>([])
   const [purchased, setPurchased] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
@@ -165,6 +169,24 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
 
   return (
     <Sheet open={open} onClose={onClose} title="SHOP">
+      <button
+        className={`shop-daily-banner ${dailyClaimable ? 'shop-daily-banner--claimable' : ''}`}
+        onClick={() => {
+          audio.click()
+          hapticAction()
+          onOpenDaily()
+        }}
+      >
+        <div className="shop-daily-icon-well">
+          <DailyGiftIcon color="#FFD873" size={26} />
+        </div>
+        <div className="shop-daily-body">
+          <div className="shop-daily-title">DAILY REWARD</div>
+          <div className="shop-daily-desc">{dailyClaimable ? 'Your free reward is ready to claim!' : "Claimed for today - come back tomorrow."}</div>
+        </div>
+        <div className={`shop-daily-cta ${dailyClaimable ? 'shop-daily-cta--active' : ''}`}>{dailyClaimable ? 'CLAIM' : 'VIEW'}</div>
+      </button>
+
       {loading ? (
         <div className="cards-empty">Loading…</div>
       ) : items.length === 0 ? (

@@ -97,9 +97,9 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   },
   {
     id: 'extras',
-    landmark: 'topbar-daily',
+    landmark: 'nav-shop',
     title: "Don't Miss Out",
-    body: 'Check Daily Reward and Missions up top, and the Shop down in the bottom bar, for free bonuses along the way!',
+    body: 'Check Missions up top, and open the Shop down here for your free Daily Reward and other bonuses!',
     trigger: (ctx) => ctx.session.stats.bossesDefeated >= 1,
   },
   {

@@ -281,14 +281,16 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // after an offline stretch (see .game-shell--returning in ui.css). Real numbers untouched.
   const [returningBoost, setReturningBoost] = useState(false)
 
-  // Show the offline-rewards sheet once at launch, else the daily-reward sheet if claimable.
+  // Show the offline-rewards sheet once at launch, else the Shop (with its Daily Reward banner
+  // up top) if the daily claim is ready - the free reward is the hook that gets them into the
+  // Shop, not a standalone popup that would let them skip it entirely.
   useEffect(() => {
     if (offline) {
       setOfflineOpen(true)
       setReturningBoost(true)
       const t = setTimeout(() => setReturningBoost(false), 10000)
       return () => clearTimeout(t)
-    } else if (session.daily.canClaim(nowUnixSeconds())) setDailyOpen(true)
+    } else if (session.daily.canClaim(nowUnixSeconds())) setShopOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -435,29 +437,29 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     ? 'prestigeConfirm'
     : missionsOpen
       ? 'missions'
-      : dailyOpen
-        ? 'daily'
-        : achievementsOpen
-          ? 'achievements'
-          : leaderboardOpen
-            ? 'leaderboard'
-            : shopOpen
-              ? 'shop'
-              : settingsOpen
-                ? 'settings'
-                : profileOpen
-                  ? 'profile'
-                  : offlineOpen
-                    ? 'offline'
-                    : shipUnlock
-                      ? 'shipUnlock'
-                      : selectedCard
-                        ? objectViewerOpen
-                          ? 'objectViewer'
-                          : 'cardDetail'
-                        : packSheetOpen
-                          ? 'packOpen'
-                          : null
+      : achievementsOpen
+        ? 'achievements'
+        : leaderboardOpen
+          ? 'leaderboard'
+          : shopOpen
+            ? dailyOpen
+              ? 'daily'
+              : 'shop'
+            : settingsOpen
+              ? 'settings'
+              : profileOpen
+                ? 'profile'
+                : offlineOpen
+                  ? 'offline'
+                  : shipUnlock
+                    ? 'shipUnlock'
+                    : selectedCard
+                      ? objectViewerOpen
+                        ? 'objectViewer'
+                        : 'cardDetail'
+                      : packSheetOpen
+                        ? 'packOpen'
+                        : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
@@ -471,7 +473,15 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       },
       achievements: () => setAchievementsOpen(false),
       leaderboard: () => setLeaderboardOpen(false),
-      shop: () => setShopOpen(false),
+      shop: () => {
+        setShopOpen(false)
+        // Belt-and-suspenders: this only runs via the hardware BackButton, but ShopSheet's own
+        // X/backdrop calls its `onClose` prop directly, bypassing this map - closing Shop through
+        // EITHER path must also close Daily Reward nested on top of it, or dailyOpen is left true
+        // with shopOpen already false: orphaned on screen and invisible to this same openSheet
+        // chain (see the achievements/profile precedent this mirrors).
+        setDailyOpen(false)
+      },
       offline: () => setOfflineOpen(false),
       shipUnlock: () => setShipUnlock(null),
       cardDetail: () => setSelectedCard(null),
@@ -549,6 +559,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // live and the player is actually looking at it, so attention stays on the encounter.
   const bossTakeover = vm.bossActive && tab === 'combat'
 
+  // Daily Reward now lives inside the Shop (see the ShopSheet render below) - this flag drives
+  // both the Shop bottom-nav dot and the banner inside the sheet itself.
+  const dailyClaimable = session.daily.canClaim(nowUnixSeconds())
+
   // Progressive disclosure, matching Fleet/Artifacts/Prestige: hidden until there's something
   // to look at (an owned card or a pack waiting), not from the very first launch.
   // Always visible: hiding a whole feature behind a network fetch meant one slow/failed
@@ -563,7 +577,6 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onSettingsClick={() => setSettingsOpen(true)}
         onProfileClick={() => setProfileOpen(true)}
         onNotificationClick={() => setMissionsOpen(true)}
-        onDailyClick={() => setDailyOpen(true)}
         onAchievementsClick={() => setAchievementsOpen(true)}
         onLeaderboardClick={() => setLeaderboardOpen(true)}
         onTalentsClick={() => setTab('talents')}
@@ -611,6 +624,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         current={tab}
         onSelect={setTab}
         onShopClick={() => setShopOpen(true)}
+        dailyClaimable={dailyClaimable}
         showFleet={vm.showFleet}
         showArtifacts={vm.showArtifacts}
         showPrestige={vm.showPrestige}
@@ -624,7 +638,6 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
 
       <PrestigeConfirmSheet session={session} open={prestigeConfirmOpen} onClose={() => setPrestigeConfirmOpen(false)} onPrestiged={handlePrestiged} onToast={showToast} />
       <MissionsSheet session={session} open={missionsOpen} onClose={() => setMissionsOpen(false)} onClaimed={() => showToast('MISSION COMPLETE')} />
-      <DailyRewardSheet session={session} open={dailyOpen} onClose={() => setDailyOpen(false)} onClaimed={handleDailyClaimed} />
       <SettingsSheet
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -653,11 +666,19 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       <LeaderboardSheet open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />
       <ShopSheet
         open={shopOpen}
-        onClose={() => setShopOpen(false)}
+        onClose={() => {
+          setShopOpen(false)
+          setDailyOpen(false) // see the closers.shop comment above - same reasoning
+        }}
         apiBaseUrl={import.meta.env.VITE_API_URL}
         refreshPurchases={refreshPurchases}
         refreshCards={refreshCards}
+        dailyClaimable={dailyClaimable}
+        onOpenDaily={() => setDailyOpen(true)}
       />
+      {/* Rendered after ShopSheet, not before - it opens ON TOP of Shop (see the daily banner
+          inside ShopSheet), and DOM order is paint order for these same-z-index fixed sheets. */}
+      <DailyRewardSheet session={session} open={dailyOpen} onClose={() => setDailyOpen(false)} onClaimed={handleDailyClaimed} />
       <OfflineRewardsSheet offline={offline} open={offlineOpen} onClose={() => setOfflineOpen(false)} onCollected={(gold) => showToast(`+${gold.toShortString()} Stardust collected`)} />
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
       <CardDetailSheet
