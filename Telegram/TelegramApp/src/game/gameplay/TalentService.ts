@@ -39,11 +39,6 @@ export class TalentService {
   xpToNextLevel(): number {
     return xpToNextLevel(this._level, this.cfg)
   }
-  /** 0..1, for the XP bar. */
-  xpFraction(): number {
-    const need = this.xpToNextLevel()
-    return need > 0 ? Math.min(1, this._xp / need) : 0
-  }
 
   /** Grants XP for a kill (raw, un-scaled - the Ascendant branch's self-buff is applied here,
    *  not by callers), looping level-ups so one large grant can cross several levels correctly. */

@@ -2,16 +2,18 @@
 import type { ReactElement } from 'react'
 import { audio } from '../game/audio/AudioManager'
 import { registerLandmark } from './combatFx/landmarks'
-import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavPrestigeIcon, NavCardsIcon, NavTalentsIcon } from './icons'
+import { NavCombatIcon, NavFleetIcon, NavArtifactsIcon, NavCardsIcon, NavTalentsIcon, ShopIcon } from './icons'
 
-export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'prestige' | 'cards' | 'talents'
+// 'artifacts' now covers both Artifacts and Prestige - see ArtifactsPrestigeScreen.tsx - so this
+// bar doesn't run out of room with Shop added below.
+export type NavTab = 'combat' | 'fleet' | 'artifacts' | 'cards' | 'talents'
 
 const DIM = '#5C6480'
+const SHOP_COLOR = '#FFB238'
 const ACTIVE_COLORS: Record<NavTab, string> = {
   combat: '#FFB238',
   fleet: '#43DDEE',
   artifacts: '#F49CFF',
-  prestige: '#E24FFF',
   cards: '#FFD873',
   talents: '#7CFFB2',
 }
@@ -20,13 +22,12 @@ const ICONS: Record<NavTab, (props: { color: string }) => ReactElement> = {
   combat: NavCombatIcon,
   fleet: NavFleetIcon,
   artifacts: NavArtifactsIcon,
-  prestige: NavPrestigeIcon,
   cards: NavCardsIcon,
   talents: NavTalentsIcon,
 }
 
 /** dot color/animation per tab (see ui.css's .dot-* rules) - only tabs that ever set `dot` need an entry. */
-const DOT_CLASS: Partial<Record<NavTab, string>> = { cards: 'dot-cards', prestige: 'dot-prestige', talents: 'dot-talents' }
+const DOT_CLASS: Partial<Record<NavTab, string>> = { cards: 'dot-cards', artifacts: 'dot-prestige', talents: 'dot-talents' }
 
 interface TabSpec {
   tab: NavTab
@@ -38,6 +39,7 @@ interface TabSpec {
 interface BottomNavProps {
   current: NavTab
   onSelect: (tab: NavTab) => void
+  onShopClick: () => void
   showFleet: boolean
   showArtifacts: boolean
   showPrestige: boolean
@@ -48,14 +50,25 @@ interface BottomNavProps {
   talentsReady: boolean
 }
 
-export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPrestige, prestigeReady, showCards, cardsReady, showTalents, talentsReady }: BottomNavProps) {
+export function BottomNav({
+  current,
+  onSelect,
+  onShopClick,
+  showFleet,
+  showArtifacts,
+  showPrestige,
+  prestigeReady,
+  showCards,
+  cardsReady,
+  showTalents,
+  talentsReady,
+}: BottomNavProps) {
   const tabs: TabSpec[] = [
     { tab: 'combat', label: 'Combat', visible: true },
     { tab: 'fleet', label: 'Fleet', visible: showFleet },
-    { tab: 'artifacts', label: 'Artifacts', visible: showArtifacts },
+    { tab: 'artifacts', label: 'Artifacts', visible: showArtifacts || showPrestige, dot: prestigeReady },
     { tab: 'talents', label: 'Talents', visible: showTalents, dot: talentsReady },
     { tab: 'cards', label: 'Cards', visible: showCards, dot: cardsReady },
-    { tab: 'prestige', label: 'Prestige', visible: showPrestige, dot: prestigeReady },
   ]
 
   return (
@@ -87,6 +100,23 @@ export function BottomNav({ current, onSelect, showFleet, showArtifacts, showPre
             </button>
           )
         })}
+      {/* Always its own bright accent (not dim/active like the tabs above) - this opens the Shop
+          sheet directly rather than switching `current`, so it's never the "selected" tab. */}
+      <button
+        className="bottomnav-tab"
+        ref={(el) => registerLandmark('nav-shop', el)}
+        onClick={() => {
+          audio.click()
+          onShopClick()
+        }}
+      >
+        <span className="bottomnav-icon">
+          <ShopIcon color={SHOP_COLOR} />
+        </span>
+        <span className="bottomnav-label" style={{ color: SHOP_COLOR }}>
+          SHOP
+        </span>
+      </button>
     </div>
   )
 }

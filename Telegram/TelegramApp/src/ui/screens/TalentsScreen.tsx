@@ -34,7 +34,7 @@ export function TalentsScreen({ session: s, onToast }: TalentsScreenProps) {
       </div>
 
       <div className="talent-tree-summary">
-        <LevelBadge level={t.level} xpFraction={t.xpFraction()} size="large" />
+        <LevelBadge level={t.level} xp={t.xp} xpToNextLevel={t.xpToNextLevel()} size="large" />
         <div className="talent-points-available">
           {t.unspentPoints} POINT{t.unspentPoints === 1 ? '' : 'S'} AVAILABLE
         </div>

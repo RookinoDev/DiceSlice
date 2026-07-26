@@ -328,14 +328,6 @@ export function NavTalentsIcon({ color, size = 20 }: IconProps) {
 
 /** LV badge star - takes a `color` prop (unlike the fixed-color Artifact* icons below) since it
  *  tints to match whichever accent the badge is drawn in. */
-export function LevelStarIcon({ color = '#FFD873', size = 14 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24">
-      <path d="M12 2l2.5 7.2L22 12l-7.5 2.8L12 22l-2.5-7.2L2 12l7.5-2.8z" fill={color} />
-    </svg>
-  )
-}
-
 export function TalentAssaultIcon({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

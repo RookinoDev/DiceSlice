@@ -27,8 +27,7 @@ import { useTutorial } from './useTutorial'
 import { TutorialOverlay } from './TutorialOverlay'
 import { CombatScreen } from './screens/CombatScreen'
 import { FleetScreen } from './screens/FleetScreen'
-import { ArtifactsScreen } from './screens/ArtifactsScreen'
-import { PrestigeScreen } from './screens/PrestigeScreen'
+import { ArtifactsPrestigeScreen } from './screens/ArtifactsPrestigeScreen'
 import { TalentsScreen } from './screens/TalentsScreen'
 import { CardsScreen } from './screens/CardsScreen'
 import { PrestigeConfirmSheet } from './sheets/PrestigeConfirmSheet'
@@ -567,7 +566,6 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onDailyClick={() => setDailyOpen(true)}
         onAchievementsClick={() => setAchievementsOpen(true)}
         onLeaderboardClick={() => setLeaderboardOpen(true)}
-        onShopClick={() => setShopOpen(true)}
         onTalentsClick={() => setTab('talents')}
       />
       <Toast text={toastText} />
@@ -593,9 +591,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           </>
         )}
         {tab === 'fleet' && vm.showFleet && <FleetScreen session={session} onToast={showToast} />}
-        {tab === 'artifacts' && vm.showArtifacts && <ArtifactsScreen session={session} onToast={showToast} />}
+        {tab === 'artifacts' && (vm.showArtifacts || vm.showPrestige) && (
+          <ArtifactsPrestigeScreen session={session} onToast={showToast} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} prestigeReady={vm.canPrestige} />
+        )}
         {tab === 'talents' && vm.showTalents && <TalentsScreen session={session} onToast={showToast} />}
-        {tab === 'prestige' && vm.showPrestige && <PrestigeScreen session={session} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} />}
         {tab === 'cards' && showCards && (
           <CardsScreen
             ownedCards={ownedCards}
@@ -611,6 +610,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       <BottomNav
         current={tab}
         onSelect={setTab}
+        onShopClick={() => setShopOpen(true)}
         showFleet={vm.showFleet}
         showArtifacts={vm.showArtifacts}
         showPrestige={vm.showPrestige}

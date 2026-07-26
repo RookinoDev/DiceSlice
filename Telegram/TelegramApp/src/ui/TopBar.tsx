@@ -14,7 +14,6 @@ import {
   DailyGiftIcon,
   AchievementsIcon,
   LeaderboardIcon,
-  ShopIcon,
   GoldIcon,
   FleetDpsIcon,
   RelicIcon,
@@ -28,7 +27,6 @@ interface TopBarProps {
   onDailyClick: () => void
   onAchievementsClick: () => void
   onLeaderboardClick: () => void
-  onShopClick: () => void
   onTalentsClick: () => void
 }
 
@@ -40,7 +38,6 @@ export function TopBar({
   onDailyClick,
   onAchievementsClick,
   onLeaderboardClick,
-  onShopClick,
   onTalentsClick,
 }: TopBarProps) {
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero) || s.canPrestige()
@@ -68,14 +65,6 @@ export function TopBar({
     <div className="topbar-wrap">
       <div className="topbar-row">
         <div className="topbar-icon-group">
-          <LevelBadge
-            level={s.talents.level}
-            xpFraction={s.talents.xpFraction()}
-            onClick={() => {
-              audio.click()
-              onTalentsClick()
-            }}
-          />
           <button
             className="topbar-icon-btn"
             onClick={() => {
@@ -96,6 +85,15 @@ export function TopBar({
           >
             <ProfileIcon />
           </button>
+          <LevelBadge
+            level={s.talents.level}
+            xp={s.talents.xp}
+            xpToNextLevel={s.talents.xpToNextLevel()}
+            onClick={() => {
+              audio.click()
+              onTalentsClick()
+            }}
+          />
         </div>
 
         <div className="topbar-icon-group">
@@ -141,16 +139,6 @@ export function TopBar({
             aria-label="Leaderboard"
           >
             <LeaderboardIcon />
-          </button>
-          <button
-            className="topbar-icon-btn"
-            onClick={() => {
-              audio.click()
-              onShopClick()
-            }}
-            aria-label="Shop"
-          >
-            <ShopIcon />
           </button>
         </div>
       </div>
