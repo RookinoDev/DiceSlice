@@ -411,18 +411,18 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
     >
       <div className="combat-combo-backdrop" />
       {bossIntroName && (
-        <div key={bossIntroKey} className="boss-intro">
+        <div key={`boss-intro-${bossIntroKey}`} className="boss-intro">
           <div className="boss-intro-label">⚠ BOSS ENCOUNTER ⚠</div>
           <div className="boss-intro-name">{bossIntroName}</div>
         </div>
       )}
       {sectorStamp !== null && (
-        <div key={sectorStamp} className="sector-stamp">
+        <div key={`sector-stamp-${sectorStamp}`} className="sector-stamp">
           SECTOR {sectorStamp}
         </div>
       )}
       {overdrivePhase === 'countdown' && (
-        <div key={overdriveCountdown} className={`overdrive-countdown ${overdriveCountdown === 'OVERDRIVE' ? 'overdrive-countdown--go' : ''}`}>
+        <div key={`overdrive-countdown-${overdriveCountdown}`} className={`overdrive-countdown ${overdriveCountdown === 'OVERDRIVE' ? 'overdrive-countdown--go' : ''}`}>
           {overdriveCountdown}
         </div>
       )}
@@ -438,7 +438,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
               {/* key on the urgent pill: each final-5 second remounts it so the digit-pop
                   animation replays per second, escalating with the heartbeat/tick. */}
               <div
-                key={bossUrgent ? vm.bossSecondsLeft : 'calm'}
+                key={`boss-timer-${bossUrgent ? vm.bossSecondsLeft : 'calm'}`}
                 className={`combat-boss-timer-pill ${bossUrgent ? 'combat-boss-timer-pill--urgent' : ''}`}
                 style={{ '--boss-pct': `${bossTimePct}%` } as CSSProperties}
               >
@@ -456,7 +456,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       {!vm.bossActive && <div className="combat-target-name">{displayTarget.name}</div>}
 
       {/* #1 fix: HP bar now sits right under the planet's name, not below the planet art. */}
-      <div key={hpBarShake} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
+      <div key={`hp-shake-${hpBarShake}`} className={`combat-hp-bar ${hpBarShake > 0 ? 'combat-hp-bar--shake' : ''}`}>
         <div className="combat-hp-track">
           <div
             ref={(el) => {
@@ -478,7 +478,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
 
       <div className={`combat-planet-wrap ${unstable ? 'combat-planet-wrap--unstable' : ''}`}>
         {tapStreak >= 5 && (
-          <div key={tapStreak} className={`combo-chip ${comboFading ? 'combo-chip--fading' : ''} ${inRhythm ? 'combo-chip--rhythm' : ''}`}>
+          <div key={`combo-${tapStreak}`} className={`combo-chip ${comboFading ? 'combo-chip--fading' : ''} ${inRhythm ? 'combo-chip--rhythm' : ''}`}>
             ×{tapStreak} COMBO
           </div>
         )}
@@ -607,7 +607,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
       </Sheet>
 
       {recordText && (
-        <div key={recordText} className="record-hit-banner">
+        <div key={`record-${recordText}`} className="record-hit-banner">
           {recordText}
         </div>
       )}
@@ -637,7 +637,7 @@ export function CombatScreen({ session: s, onToast, onSkillActivated }: CombatSc
           >
             <div className="combat-tap-info">
               <div
-                key={upgradePulse}
+                key={`upgrade-pulse-${upgradePulse}`}
                 className={`combat-tap-icon-chip ${upgradePulse > 0 ? 'combat-tap-icon-chip--pulse' : ''} ${upgradeStreak.current >= 3 ? 'combat-tap-icon-chip--pulse-strong' : ''}`}
               >
                 <SkillOverdriveIcon color={vm.canUpgradeTap ? tapIconTierColor(vm.tapLevel) : '#5C6480'} size={18} />
