@@ -14,9 +14,10 @@ import { CLUSTER_LABEL, CLUSTER_COLOR } from './talentTreeMeta'
 interface TalentsScreenProps {
   session: GameSession
   onToast: (text: string) => void
+  onOpenSocket?: (nodeId: string) => void
 }
 
-export function TalentsScreen({ session: s, onToast }: TalentsScreenProps) {
+export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScreenProps) {
   const t = s.talents
   const defs = Array.from({ length: t.count }, (_, i) => t.def(i))
   const nexusIndex = defs.findIndex((d) => d.branch === 'nexus')
@@ -40,7 +41,7 @@ export function TalentsScreen({ session: s, onToast }: TalentsScreenProps) {
 
       {nexusIndex >= 0 && (
         <div className={`talent-capstone-card ${nexusUnlocked ? '' : 'is-locked'}`}>
-          <TalentNode session={s} index={nexusIndex} onToast={onToast} />
+          <TalentNode session={s} index={nexusIndex} onToast={onToast} onOpenSocket={onOpenSocket} />
           {!nexusUnlocked && <div className="talent-capstone-req">{talentUnlockLabel(defs, nexusIndex)}</div>}
         </div>
       )}
@@ -51,7 +52,7 @@ export function TalentsScreen({ session: s, onToast }: TalentsScreenProps) {
             <div className="talent-cluster-label" style={{ color: CLUSTER_COLOR[cluster] }}>
               {CLUSTER_LABEL[cluster]}
             </div>
-            <TalentClusterPanel session={s} nodeIndices={clusterIndices(cluster)} onToast={onToast} />
+            <TalentClusterPanel session={s} nodeIndices={clusterIndices(cluster)} onToast={onToast} onOpenSocket={onOpenSocket} />
           </div>
         ))}
       </div>

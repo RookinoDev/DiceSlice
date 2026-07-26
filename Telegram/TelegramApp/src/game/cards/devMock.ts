@@ -2,13 +2,15 @@
 // API). Referenced behind `import.meta.env.DEV` checks in cardsApi.ts, so production builds
 // eliminate this module entirely at compile time - unlike a hand-edited stub, it can never
 // ship by accident (the lesson from the Phase 2 TEMP-TEST-STUB incident).
-import type { OpenPackResult, OwnedCard, PendingPack } from './cardsApi'
+import type { CollectionResult, GemSocketAssignment, OpenPackResult, OwnedCard, PendingPack } from './cardsApi'
 import { FULL_CATALOG } from './generatedCards'
 import { VARIANT_ORDER } from './variants'
 import { nameHash } from './rosterCardRules.mjs'
 
-/** ~2,600 owned instances across ~2,000 base cards - enough to prove the virtualized grid. */
-export function mockCollection(): { cards: OwnedCard[]; dust: number } {
+/** ~2,600 owned instances across ~2,000 base cards - enough to prove the virtualized grid. A
+ *  couple of gem sockets are pre-filled so the Talent Tree's socket UI has something to show
+ *  in dev preview without needing to buy a gem node first. */
+export function mockCollection(): CollectionResult {
   const cards: OwnedCard[] = []
   let instanceId = 1
   for (let i = 0; i < FULL_CATALOG.length; i += 3) {
@@ -25,7 +27,11 @@ export function mockCollection(): { cards: OwnedCard[]; dust: number } {
       })
     }
   }
-  return { cards, dust: 1234 }
+  const gemSockets: GemSocketAssignment[] = [
+    { nodeId: 'assault-gem-1', cardId: 'earth', variant: 'standard' },
+    { nodeId: 'armada-gem-1', cardId: 'jupiter', variant: 'standard' },
+  ]
+  return { cards, dust: 1234, gemSockets }
 }
 
 export function mockPacks(): PendingPack[] {

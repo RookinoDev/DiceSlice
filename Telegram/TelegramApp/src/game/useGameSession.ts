@@ -57,7 +57,10 @@ function loadAndBegin(cfg: BalanceConfig): Boot {
       // talents.offlineRewardMultiplier() existed but was never actually applied here - a
       // pre-existing gap (Continuum's OfflineReward nodes were purchasable but silently
       // did nothing), fixed while this line was already being touched for the tree redesign.
-      const gold = offlineEarningsFromConfig(last, now, income, cfg, bonusHours).mul(session.artifacts.offlineRewardMultiplier()).mul(session.talents.offlineRewardMultiplier())
+      const gold = offlineEarningsFromConfig(last, now, income, cfg, bonusHours)
+        .mul(session.artifacts.offlineRewardMultiplier())
+        .mul(session.talents.offlineRewardMultiplier())
+        .mul(session.gems.offlineRewardMultiplier())
       if (gold.gt(BigNumber.Zero)) {
         session.wallet.add(gold)
         offline = { seconds: Math.min(now - last, (cfg.offlineCapHours + bonusHours) * 3600), gold }

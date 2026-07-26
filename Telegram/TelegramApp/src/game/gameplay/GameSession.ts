@@ -13,6 +13,7 @@ import { dailyGrantsPack, dailyGrantsRelic, dailyGoldFor, dayInCycle } from '../
 import type { PackType } from '../cards/cardsApi'
 import { ArtifactService, type ArtifactUnlockContext } from './ArtifactService'
 import { EnemyController } from './EnemyController'
+import { GemSocketService } from './GemSocketService'
 import { MissionService } from './MissionService'
 import type { Planet } from './Planet'
 import { PrestigeService } from './PrestigeService'
@@ -59,6 +60,10 @@ export class GameSession {
   readonly prestige: PrestigeService
   readonly artifacts: ArtifactService
   readonly talents: TalentService
+  /** Which owned card (if any) sits in each unlocked Gem Socket talent node - see
+   *  GemSocketService's own comment. Starts empty; hydrated from /api/collection's
+   *  gemSockets field by GameShell's refreshCards(), same as ownedCards itself. */
+  readonly gems = new GemSocketService()
   readonly missions: MissionService
   readonly daily = new DailyRewardService()
   readonly boosts = new MonetizationBoosts()
@@ -96,13 +101,14 @@ export class GameSession {
     this.missions = new MissionService(buildDefaultMissions(), this.wallet)
 
     // Taps are multiplied by the active tap-damage skill buff x permanent tap artifact x
-    // talent tree, with a chance to crit (Voidglass Lens - 0 until unlocked and owned - plus
-    // the Precision cluster's own talent nodes, summed and capped together).
+    // talent tree x socketed Gems, with a chance to crit (Voidglass Lens - 0 until unlocked and
+    // owned - plus the Precision cluster's own talent nodes and any Pulsar-bucket Gems, summed
+    // and capped together).
     this.taps = new TapController(
       this.enemy,
       this.tapUpgrade,
-      () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()).mul(this.talents.tapDamageMultiplier()),
-      () => Math.min(TOTAL_CRIT_CAP, this.artifacts.tapCritChance() + this.talents.tapCritChance()),
+      () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()).mul(this.talents.tapDamageMultiplier()).mul(this.gems.tapDamageMultiplier()),
+      () => Math.min(TOTAL_CRIT_CAP, this.artifacts.tapCritChance() + this.talents.tapCritChance() + this.gems.tapCritChance()),
     )
 
     this.enemy.onPlanetKilled.on((e) => this.handleKill(e.planet, e.overkill))
@@ -117,8 +123,8 @@ export class GameSession {
     // Talent tree XP: every kill (including bosses, which fire onPlanetKilled too - same as
     // gold) grants base XP off the kill's stage; a boss clear ADDITIONALLY grants a bonus on
     // top via its own dedicated event, rather than branching on planet.isBoss here.
-    this.enemy.onPlanetKilled.on((e) => this.talents.grantXp(xpForPlanetKill(e.planet.stage, cfg)))
-    this.stage.onBossCleared.on((clearedStage) => this.talents.grantXp(xpForPlanetKill(clearedStage, cfg) * cfg.talentBossXpBonusMultiplier))
+    this.enemy.onPlanetKilled.on((e) => this.talents.grantXp(xpForPlanetKill(e.planet.stage, cfg) * this.gems.xpGainMultiplier()))
+    this.stage.onBossCleared.on((clearedStage) => this.talents.grantXp(xpForPlanetKill(clearedStage, cfg) * cfg.talentBossXpBonusMultiplier * this.gems.xpGainMultiplier()))
 
     // Lifetime profile counters - observe-only, never feed back into gameplay.
     this.enemy.onPlanetKilled.on(() => this.stats.planetsDestroyed++)
@@ -156,6 +162,7 @@ export class GameSession {
         .mul(this.skills.tapDamageMultiplier())
         .mul(this.artifacts.tapDamageMultiplier())
         .mul(this.talents.tapDamageMultiplier())
+        .mul(this.gems.tapDamageMultiplier())
         .mul(new BigNumber(taps * deltaSeconds))
       this.enemy.applyDamage(droneDmg)
       this.onSkillDamage.emit(droneDmg)
@@ -164,8 +171,8 @@ export class GameSession {
     return this.ships.tick(
       deltaSeconds,
       this.enemy,
-      this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()).mul(this.talents.dpsMultiplier()),
-      Math.min(TOTAL_CRIT_CAP, this.artifacts.shipCritChance() + this.talents.shipCritChance()),
+      this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()).mul(this.talents.dpsMultiplier()).mul(this.gems.dpsMultiplier()),
+      Math.min(TOTAL_CRIT_CAP, this.artifacts.shipCritChance() + this.talents.shipCritChance() + this.gems.shipCritChance()),
     )
   }
 
@@ -245,13 +252,20 @@ export class GameSession {
     return this.stage.highestStage >= this.cfg.prestigeUnlockStage
   }
   previewRelics(): BigNumber {
-    return this.prestige.relicsForStage(this.stage.highestStage, this.talents.relicGainMultiplier())
+    return this.prestige.relicsForStage(this.stage.highestStage, this.talents.relicGainMultiplier().mul(this.gems.relicGainMultiplier()))
   }
 
   /** Reset the run for Relics. Returns Relics gained (0 if not unlocked). */
   doPrestige(): BigNumber {
     if (!this.canPrestige()) return BigNumber.Zero
-    const gained = this.prestige.prestige(this.stage.highestStage, this.wallet, this.tapUpgrade, this.ships, this.stage, this.talents.relicGainMultiplier())
+    const gained = this.prestige.prestige(
+      this.stage.highestStage,
+      this.wallet,
+      this.tapUpgrade,
+      this.ships,
+      this.stage,
+      this.talents.relicGainMultiplier().mul(this.gems.relicGainMultiplier()),
+    )
     this.stage.begin() // re-enter stage 1 -> spawns a fresh planet
     return gained
   }
@@ -307,6 +321,7 @@ export class GameSession {
       .goldFor(planet.stage)
       .mul(this.artifacts.goldMultiplier())
       .mul(this.talents.goldMultiplier())
+      .mul(this.gems.goldMultiplier())
       .mul(this.skills.goldMultiplier())
       .mul(this.boosts.vipGoldMultiplier())
     this.wallet.add(gold)

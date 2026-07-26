@@ -6,6 +6,7 @@ import {
   craftCard,
   getCollection,
   getDust,
+  getGemSockets,
   getLeaderboard,
   getProfile,
   getSave,
@@ -17,6 +18,7 @@ import {
   putSave,
   refineInstances,
   resetPlayerCollection,
+  setGemSockets,
   setNotificationsEnabled,
   setShowcase,
   upsertProfile,
@@ -282,7 +284,7 @@ export function startServer(bot, port) {
         const body = await readJsonBody(req)
         const userId = requireUser(body, res, botToken)
         if (userId === null) return
-        sendJson(res, 200, { cards: getCollection(userId), dust: getDust(userId) })
+        sendJson(res, 200, { cards: getCollection(userId), dust: getDust(userId), gemSockets: getGemSockets(userId) })
       } catch (e) {
         console.error('[server] collection error:', e)
         sendJson(res, 400, { error: 'bad request' })
@@ -340,6 +342,24 @@ export function startServer(bot, port) {
         sendJson(res, 200, { ok: true })
       } catch (e) {
         console.error('[server] showcase error:', e)
+        sendJson(res, 400, { error: 'bad request' })
+      }
+      return
+    }
+
+    // Talent tree Gem Sockets: which owned card fills each unlocked socket node.
+    if (req.method === 'POST' && req.url === '/api/gem-sockets') {
+      try {
+        const body = await readJsonBody(req)
+        const userId = requireUser(body, res, botToken)
+        if (userId === null) return
+        if (!setGemSockets(userId, body.sockets)) {
+          sendJson(res, 400, { error: 'invalid gem sockets' })
+          return
+        }
+        sendJson(res, 200, { ok: true })
+      } catch (e) {
+        console.error('[server] gem-sockets error:', e)
         sendJson(res, 400, { error: 'bad request' })
       }
       return

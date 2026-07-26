@@ -132,6 +132,9 @@ db.exec(`
 if (!hasColumn('packs', 'quality')) db.exec(`ALTER TABLE packs ADD COLUMN quality REAL NOT NULL DEFAULT 0`)
 if (!hasColumn('pack_progress', 'dust')) db.exec(`ALTER TABLE pack_progress ADD COLUMN dust INTEGER NOT NULL DEFAULT 0`)
 if (!hasColumn('profiles', 'showcase')) db.exec(`ALTER TABLE profiles ADD COLUMN showcase TEXT`)
+// Talent Tree M5: Gem Sockets. Which owned (cardId, variant) fills each unlocked Gem Socket
+// talent node - same "references card ownership, never the derived bonus" split as showcase.
+if (!hasColumn('profiles', 'gem_sockets')) db.exec(`ALTER TABLE profiles ADD COLUMN gem_sockets TEXT`)
 // Phase 2: push notifications (re-engagement reminders, see notifyIdlePlayers in index.mjs).
 // Defaults match the client's prefs.ts default (notifications on) so a profile that's never
 // explicitly synced its preference is treated the same as one that has and left it on.
@@ -448,8 +451,8 @@ export function getDust(telegramUserId) {
  * here - useGameSession.ts's resetSave() resets the client save (currency, stage, ships,
  * artifacts) but has no way to touch this, so it calls this over the wire too. Deletes rather
  * than zeroing pack_progress/daily_pack_progress: the next real grant re-creates them via their
- * own INSERT OR IGNORE, same as a genuinely new player. Also clears the profile showcase - it
- * references (cardId, variant) pairs the player no longer owns.
+ * own INSERT OR IGNORE, same as a genuinely new player. Also clears the profile showcase and
+ * gem sockets - both reference (cardId, variant) pairs the player no longer owns.
  */
 export function resetPlayerCollection(telegramUserId) {
   db.exec('BEGIN IMMEDIATE')
@@ -458,7 +461,7 @@ export function resetPlayerCollection(telegramUserId) {
     db.prepare('DELETE FROM packs WHERE telegram_user_id = ?').run(telegramUserId)
     db.prepare('DELETE FROM pack_progress WHERE telegram_user_id = ?').run(telegramUserId)
     db.prepare('DELETE FROM daily_pack_progress WHERE telegram_user_id = ?').run(telegramUserId)
-    db.prepare('UPDATE profiles SET showcase = NULL WHERE telegram_user_id = ?').run(telegramUserId)
+    db.prepare('UPDATE profiles SET showcase = NULL, gem_sockets = NULL WHERE telegram_user_id = ?').run(telegramUserId)
     db.exec('COMMIT')
   } catch (e) {
     db.exec('ROLLBACK')
@@ -561,6 +564,44 @@ export function setShowcase(telegramUserId, cards) {
     ON CONFLICT(telegram_user_id) DO UPDATE SET showcase = excluded.showcase, updated_at = excluded.updated_at
   `).run(telegramUserId, json, now, now)
   return true
+}
+
+const GEM_SOCKETS_MAX = 79 // generous ceiling - matches the talent tree's total node count
+
+/**
+ * Saves Gem Socket contents: nodeId -> owned (cardId, variant) pairs. Returns false when any
+ * entry isn't owned in that exact variant, exactly mirroring setShowcase's own validation.
+ * Doesn't separately verify the nodeId is a real/unlocked tree node - the tree's own shape is
+ * client-side data (TalentDefinition.ts), and a stale/unrecognized nodeId here just never
+ * resolves to anything the client reads back, same as an unrecognized field would.
+ */
+export function setGemSockets(telegramUserId, sockets) {
+  if (!Array.isArray(sockets) || sockets.length > GEM_SOCKETS_MAX) return false
+  const owned = db.prepare('SELECT 1 AS x FROM card_instances WHERE telegram_user_id = ? AND card_id = ? AND variant = ? LIMIT 1')
+  const seenNodeIds = new Set()
+  for (const s of sockets) {
+    if (!s || typeof s.nodeId !== 'string' || typeof s.cardId !== 'string' || !VARIANT_ORDER.includes(s.variant)) return false
+    if (seenNodeIds.has(s.nodeId)) return false // one card per node
+    seenNodeIds.add(s.nodeId)
+    if (owned.get(telegramUserId, s.cardId, s.variant) === undefined) return false
+  }
+  const json = JSON.stringify(sockets.map((s) => ({ nodeId: s.nodeId, cardId: s.cardId, variant: s.variant })))
+  const now = Date.now()
+  db.prepare(`
+    INSERT INTO profiles (telegram_user_id, gem_sockets, first_synced_at, updated_at) VALUES (?, ?, ?, ?)
+    ON CONFLICT(telegram_user_id) DO UPDATE SET gem_sockets = excluded.gem_sockets, updated_at = excluded.updated_at
+  `).run(telegramUserId, json, now, now)
+  return true
+}
+
+export function getGemSockets(telegramUserId) {
+  const row = db.prepare('SELECT gem_sockets FROM profiles WHERE telegram_user_id = ?').get(telegramUserId)
+  if (!row || !row.gem_sockets) return []
+  try {
+    return JSON.parse(row.gem_sockets)
+  } catch {
+    return []
+  }
 }
 
 export function recordPurchase(telegramUserId, item) {

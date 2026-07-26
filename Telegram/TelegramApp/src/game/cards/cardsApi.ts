@@ -38,10 +38,19 @@ export interface OwnedCard {
   mintedAtMs: number
 }
 
+/** One Gem Socket talent node's contents: which owned card+variant fills it. See
+ *  game/gameplay/GemSocketService.ts. */
+export interface GemSocketAssignment {
+  nodeId: string
+  cardId: string
+  variant: CardVariant
+}
+
 export interface CollectionResult {
   cards: OwnedCard[]
   /** Prism Dust balance (duplicate-refine currency). */
   dust: number
+  gemSockets: GemSocketAssignment[]
 }
 
 async function postJson<T>(apiBaseUrl: string | undefined, path: string, body: Record<string, unknown>): Promise<T | null> {
@@ -81,15 +90,16 @@ export async function openPackRequest(apiBaseUrl: string | undefined, packId: nu
 
 export async function fetchCollection(apiBaseUrl: string | undefined): Promise<CollectionResult> {
   if (useDevMock()) return (await import('./devMock')).mockCollection()
-  const data = await postJson<{ cards: Array<{ id: number; card_id: string; variant: CardVariant; serial: number; minted_at: number }>; dust: number }>(
-    apiBaseUrl,
-    '/api/collection',
-    {},
-  )
-  if (!data) return { cards: [], dust: 0 }
+  const data = await postJson<{
+    cards: Array<{ id: number; card_id: string; variant: CardVariant; serial: number; minted_at: number }>
+    dust: number
+    gemSockets?: GemSocketAssignment[]
+  }>(apiBaseUrl, '/api/collection', {})
+  if (!data) return { cards: [], dust: 0, gemSockets: [] }
   return {
     cards: data.cards.map((c) => ({ instanceId: c.id, cardId: c.card_id, variant: c.variant, serial: c.serial, mintedAtMs: c.minted_at })),
     dust: data.dust ?? 0,
+    gemSockets: data.gemSockets ?? [],
   }
 }
 
@@ -110,6 +120,13 @@ export async function craftCardRequest(
 /** Persist the profile showcase (ordered owned cardId+variant pairs, max 8). */
 export async function saveShowcase(apiBaseUrl: string | undefined, cards: Array<{ cardId: string; variant: CardVariant }>): Promise<boolean> {
   const res = await postJson<{ ok: boolean }>(apiBaseUrl, '/api/showcase', { cards })
+  return res?.ok === true
+}
+
+/** Persist Gem Socket contents (nodeId -> owned cardId+variant pairs). Server re-validates
+ *  ownership per entry, same as showcase. */
+export async function saveGemSockets(apiBaseUrl: string | undefined, sockets: GemSocketAssignment[]): Promise<boolean> {
+  const res = await postJson<{ ok: boolean }>(apiBaseUrl, '/api/gem-sockets', { sockets })
   return res?.ok === true
 }
 

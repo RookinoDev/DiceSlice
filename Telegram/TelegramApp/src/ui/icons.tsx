@@ -104,6 +104,23 @@ export function LockIcon({ color = '#5C6480', size = 15 }: IconProps) {
   )
 }
 
+/** A Talent Tree Gem Socket - a faceted diamond, hollow when empty and unlocked (waiting for a
+ *  card) vs. solid-filled once a card is socketed (see TalentNode.tsx). */
+export function GemIcon({ color = '#D6A8FF', size = 15, filled = false }: IconProps & { filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M7 3h10l4 6-11 12L2 9l5-6z"
+        fill={filled ? color : 'none'}
+        stroke={color}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path d="M2 9h20M7 3l2 6-4 3M17 3l-2 6 4 3M9 9l3 12 3-12" stroke={color} strokeWidth="1" strokeLinejoin="round" opacity="0.7" />
+    </svg>
+  )
+}
+
 export function CheckIcon({ color = '#3ADC84', size = 14 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">

@@ -42,6 +42,7 @@ import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
 import { ObjectViewer } from './cards/ObjectViewer'
 import { PackOpeningOverlay } from './cards/PackOpeningOverlay'
+import { SocketPickerSheet } from './cards/SocketPickerSheet'
 import { ShipUnlockToast, type ShipUnlockInfo } from './ShipUnlockToast'
 import './ui.css'
 
@@ -95,6 +96,8 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
   const [shipUnlock, setShipUnlock] = useState<ShipUnlockInfo | null>(null)
+  // Which Gem Socket talent node is being edited, or null when SocketPickerSheet is closed.
+  const [socketPickerNodeId, setSocketPickerNodeId] = useState<string | null>(null)
   const [ownedCards, setOwnedCards] = useState<OwnedCard[]>([])
   const [dust, setDust] = useState(0)
   const [myShowcase, setMyShowcase] = useState<ShowcaseEntry[]>([])
@@ -433,36 +436,39 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
 
   // Route Telegram's native BackButton to close whichever sheet/toast is open, instead of
   // letting it fall through to the platform's default (which would close the Mini App).
-  const openSheet = prestigeConfirmOpen
-    ? 'prestigeConfirm'
-    : missionsOpen
-      ? 'missions'
-      : achievementsOpen
-        ? 'achievements'
-        : leaderboardOpen
-          ? 'leaderboard'
-          : shopOpen
-            ? dailyOpen
-              ? 'daily'
-              : 'shop'
-            : settingsOpen
-              ? 'settings'
-              : profileOpen
-                ? 'profile'
-                : offlineOpen
-                  ? 'offline'
-                  : shipUnlock
-                    ? 'shipUnlock'
-                    : selectedCard
-                      ? objectViewerOpen
-                        ? 'objectViewer'
-                        : 'cardDetail'
-                      : packSheetOpen
-                        ? 'packOpen'
-                        : null
+  const openSheet = socketPickerNodeId !== null
+    ? 'socketPicker'
+    : prestigeConfirmOpen
+      ? 'prestigeConfirm'
+      : missionsOpen
+        ? 'missions'
+        : achievementsOpen
+          ? 'achievements'
+          : leaderboardOpen
+            ? 'leaderboard'
+            : shopOpen
+              ? dailyOpen
+                ? 'daily'
+                : 'shop'
+              : settingsOpen
+                ? 'settings'
+                : profileOpen
+                  ? 'profile'
+                  : offlineOpen
+                    ? 'offline'
+                    : shipUnlock
+                      ? 'shipUnlock'
+                      : selectedCard
+                        ? objectViewerOpen
+                          ? 'objectViewer'
+                          : 'cardDetail'
+                        : packSheetOpen
+                          ? 'packOpen'
+                          : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
+      socketPicker: () => setSocketPickerNodeId(null),
       prestigeConfirm: () => setPrestigeConfirmOpen(false),
       missions: () => setMissionsOpen(false),
       daily: () => setDailyOpen(false),
@@ -497,9 +503,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // the boss-kill handler below can tell whether THIS sync actually revealed a new one.
   const refreshCards = async (): Promise<PendingPack[]> => {
     const apiUrl = import.meta.env.VITE_API_URL
-    fetchCollection(apiUrl).then(({ cards, dust: dustBalance }) => {
+    fetchCollection(apiUrl).then(({ cards, dust: dustBalance, gemSockets }) => {
       setOwnedCards(cards)
       setDust(dustBalance)
+      session.gems.hydrate(gemSockets)
     })
     const packs = await fetchPendingPacks(apiUrl)
     setPendingPacks(packs)
@@ -607,7 +614,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         {tab === 'artifacts' && (vm.showArtifacts || vm.showPrestige) && (
           <ArtifactsPrestigeScreen session={session} onToast={showToast} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} prestigeReady={vm.canPrestige} />
         )}
-        {tab === 'talents' && vm.showTalents && <TalentsScreen session={session} onToast={showToast} />}
+        {tab === 'talents' && vm.showTalents && <TalentsScreen session={session} onToast={showToast} onOpenSocket={setSocketPickerNodeId} />}
         {tab === 'cards' && showCards && (
           <CardsScreen
             ownedCards={ownedCards}
@@ -661,6 +668,14 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           setProfileOpen(false)
           setVisitorProfile(null)
         }}
+      />
+      <SocketPickerSheet
+        session={session}
+        apiBaseUrl={import.meta.env.VITE_API_URL}
+        ownedCards={ownedCards}
+        nodeId={socketPickerNodeId}
+        onClose={() => setSocketPickerNodeId(null)}
+        onToast={showToast}
       />
       <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
       <LeaderboardSheet open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />

@@ -16,6 +16,7 @@ interface TalentClusterPanelProps {
   /** Global indices into session.talents' node array that belong to this cluster/panel. */
   nodeIndices: number[]
   onToast: (text: string) => void
+  onOpenSocket?: (nodeId: string) => void
 }
 
 interface Edge {
@@ -23,7 +24,7 @@ interface Edge {
   to: { i: number; def: TalentDefinition }
 }
 
-export function TalentClusterPanel({ session: s, nodeIndices, onToast }: TalentClusterPanelProps) {
+export function TalentClusterPanel({ session: s, nodeIndices, onToast, onOpenSocket }: TalentClusterPanelProps) {
   const t = s.talents
   const nodes = nodeIndices.map((i) => ({ i, def: t.def(i) }))
   if (nodes.length === 0) return null
@@ -68,7 +69,7 @@ export function TalentClusterPanel({ session: s, nodeIndices, onToast }: TalentC
           className="talent-node-slot"
           style={{ left: `${xPct(n.def.pos.col)}%`, top: yPx(n.def.pos.row), width: `${100 / numCols}%` }}
         >
-          <TalentNode session={s} index={n.i} onToast={onToast} />
+          <TalentNode session={s} index={n.i} onToast={onToast} onOpenSocket={onOpenSocket} />
         </div>
       ))}
     </div>
