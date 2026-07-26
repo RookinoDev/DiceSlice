@@ -23,12 +23,20 @@ export const BRANCH_ORDER: TalentBranch[] = ['assault', 'fleet', 'wealth', 'asce
 export const TIERS_PER_BRANCH = 6
 
 export interface TalentDefinition {
-  /** Stable id, e.g. 'assault-1'..'assault-6', 'capstone' - debug/test reference only; the
-   *  prerequisite chain itself is index-based (see isTalentNodeUnlocked). */
+  /** Stable id, e.g. 'assault-1'..'assault-6', 'capstone' - never rename (it's the prerequisite
+   *  graph's own vocabulary now, not just a debug label - see `prerequisites` below). */
   id: string
   branch: TalentBranch | 'capstone'
-  /** 1..6 (position within its branch), 0 for the capstone. */
+  /** 1..6 (position within its branch), 0 for the capstone. Display/grouping only now - the
+   *  actual unlock graph is `prerequisites`, not tier/branch adjacency (see isTalentNodeUnlocked). */
   tier: number
+  /** ALL listed ids must be owned (level>0) before this node unlocks. Empty = always unlockable.
+   *  Replaces the old positional "defs[i-1]" rule with a real id-based graph, so a future tree
+   *  can have forks/merges (2+ prerequisites) instead of only straight chains. */
+  prerequisites: string[]
+  /** Layout coordinate for the (future) SVG tree renderer - unused by today's CSS-grid rendering,
+   *  populated now so the node data doesn't need a second migration when the renderer changes. */
+  pos: { col: number; row: number }
   effect: TalentEffect
   displayName: string
   description: string
@@ -39,8 +47,24 @@ export interface TalentDefinition {
   maxLevel: number
 }
 
+const BRANCH_COL: Record<TalentBranch, number> = { assault: 0, fleet: 1, wealth: 2, ascendant: 3 }
+
 function node(branch: TalentBranch, tier: number, effect: TalentEffect, displayName: string, description: string): TalentDefinition {
-  return { id: `${branch}-${tier}`, branch, tier, effect, displayName, description, firstLevelBonus: 0.045, bonusPerLevel: 0.02, maxLevel: 5 }
+  return {
+    id: `${branch}-${tier}`,
+    branch,
+    tier,
+    // Tier 1 has no prerequisite; every later tier requires the previous tier in the SAME
+    // branch - identical unlock behavior to the old positional rule, just expressed as an id.
+    prerequisites: tier <= 1 ? [] : [`${branch}-${tier - 1}`],
+    pos: { col: BRANCH_COL[branch], row: TIERS_PER_BRANCH - tier },
+    effect,
+    displayName,
+    description,
+    firstLevelBonus: 0.045,
+    bonusPerLevel: 0.02,
+    maxLevel: 5,
+  }
 }
 
 /**
@@ -85,6 +109,8 @@ export function buildDefaultTalents(): TalentDefinition[] {
       id: 'capstone',
       branch: 'capstone',
       tier: 0,
+      prerequisites: BRANCH_ORDER.map((b) => `${b}-${TIERS_PER_BRANCH}`),
+      pos: { col: 1.5, row: -1 },
       effect: TalentEffect.Capstone,
       displayName: 'Stellar Convergence',
       description: 'The four paths converge - a lasting echo of mastery across every discipline. +Fleet DPS, Stardust, Tap Damage, and Offline Stardust.',
@@ -101,27 +127,23 @@ export function talentBonusAt(def: TalentDefinition, level: number): number {
 }
 
 /**
- * Whether node i's prerequisite is met. Defs are always built in the fixed order above (tier 1
- * first per branch, capstone last), so "the previous node in this branch" is simply defs[i-1] -
- * no id-based lookup needed. Tier 1 of every branch is always unlockable once the tree itself is
- * revealed (see MainPresenter's showTalents); the capstone (last def) requires every branch's
- * tier-6 node owned.
+ * Whether node i's prerequisites are met: every id in its `prerequisites` list must be owned
+ * (level>0). A node with no prerequisites is always unlockable. This is a real id-based graph
+ * check (not positional), so unlike the old "defs[i-1]" rule it can support a node requiring
+ * MULTIPLE prior nodes at once (a merge point) once the tree data itself uses that.
  */
 export function isTalentNodeUnlocked(defs: TalentDefinition[], levels: number[], i: number): boolean {
-  const def = defs[i]
-  if (def.branch === 'capstone') {
-    return BRANCH_ORDER.every((branch) => {
-      const topIdx = defs.findIndex((d) => d.branch === branch && d.tier === TIERS_PER_BRANCH)
-      return topIdx >= 0 && levels[topIdx] > 0
-    })
-  }
-  if (def.tier <= 1) return true
-  return levels[i - 1] > 0
+  const byId = new Map(defs.map((d, idx) => [d.id, idx]))
+  return defs[i].prerequisites.every((id) => {
+    const idx = byId.get(id)
+    return idx !== undefined && levels[idx] > 0
+  })
 }
 
 /** Human-readable prerequisite for a locked node's row (mirrors artifactUnlockLabel). */
 export function talentUnlockLabel(defs: TalentDefinition[], i: number): string {
   const def = defs[i]
   if (def.branch === 'capstone') return 'Max out the final node of every branch'
-  return `Requires ${defs[i - 1].displayName}`
+  const prereq = defs.find((d) => d.id === def.prerequisites[0])
+  return prereq ? `Requires ${prereq.displayName}` : ''
 }
