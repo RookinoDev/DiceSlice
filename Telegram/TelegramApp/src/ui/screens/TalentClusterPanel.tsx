@@ -10,6 +10,12 @@ import type { TalentDefinition } from '../../game/config/TalentDefinition'
 import { TalentNode } from './TalentNode'
 
 const ROW_PX = 84
+/** Breathing room above the topmost node (the Nexus) and below the bottommost (the trunk root) -
+ *  without this, those two nodes sit flush against the panel's own edge (their y is exactly
+ *  ROW_PX/2 with nothing above), which reads as clipped/cramped against the screen edge. Added
+ *  directly to the y math (not CSS padding) since these nodes are position:absolute and would
+ *  ignore a padding change on their positioned ancestor. */
+const EDGE_MARGIN_PX = 48
 
 interface TalentClusterPanelProps {
   session: GameSession
@@ -37,7 +43,7 @@ export function TalentClusterPanel({ session: s, nodeIndices, onToast, onOpenSoc
   const numRows = Math.max(...rows) - minRow + 1
 
   const xPct = (col: number) => ((col - minCol + 0.5) / numCols) * 100
-  const yPx = (row: number) => (row - minRow) * ROW_PX + ROW_PX / 2
+  const yPx = (row: number) => (row - minRow) * ROW_PX + ROW_PX / 2 + EDGE_MARGIN_PX
 
   const byId = new Map(nodes.map((n) => [n.def.id, n]))
   const edges: Edge[] = []
@@ -48,7 +54,7 @@ export function TalentClusterPanel({ session: s, nodeIndices, onToast, onOpenSoc
     }
   }
 
-  const heightPx = numRows * ROW_PX
+  const heightPx = numRows * ROW_PX + EDGE_MARGIN_PX * 2
 
   return (
     <div className="talent-cluster-panel" style={{ height: heightPx }}>

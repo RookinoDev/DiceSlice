@@ -94,22 +94,45 @@ describe('TalentService', () => {
       expect(t.unspentPoints).toBe(pointsBefore - 2)
     })
 
-    it('the Grand Nexus (a real 4-way merge) requires ALL 4 branch keystones, not just some', () => {
+    it('core-merge (a real 2-way merge) requires BOTH lane tops owned, not just one', () => {
+      const t = freshService()
+      const merge = indexOf(t, 'core-merge')
+      const levels = new Array(t.count).fill(0)
+
+      expect(t.isUnlocked(merge)).toBe(false)
+      levels[indexOf(t, 'a2-5')] = 1
+      t.restoreLevels(levels)
+      expect(t.isUnlocked(merge)).toBe(false) // only one of two lane tops owned
+      levels[indexOf(t, 'b-8')] = 1
+      t.restoreLevels(levels)
+      expect(t.isUnlocked(merge)).toBe(true)
+    })
+
+    it('the Grand Nexus requires BOTH final keystones, not just one', () => {
       const t = freshService()
       const nexus = indexOf(t, 'nexus')
-      const keystoneIds = ['combat-keystone', 'precision-keystone', 'economy-keystone', 'continuum-keystone']
-      const keystoneIdx = keystoneIds.map((id) => indexOf(t, id))
       const levels = new Array(t.count).fill(0)
 
       expect(t.isUnlocked(nexus)).toBe(false)
-      for (let k = 0; k < keystoneIdx.length - 1; k++) {
-        levels[keystoneIdx[k]] = 1
-        t.restoreLevels(levels)
-        expect(t.isUnlocked(nexus)).toBe(false) // still missing one
-      }
-      levels[keystoneIdx[keystoneIdx.length - 1]] = 1
+      levels[indexOf(t, 'final-a-keystone')] = 1
+      t.restoreLevels(levels)
+      expect(t.isUnlocked(nexus)).toBe(false) // still missing the other
+      levels[indexOf(t, 'final-b-keystone')] = 1
       t.restoreLevels(levels)
       expect(t.isUnlocked(nexus)).toBe(true)
+    })
+
+    it('a short dead end (merge-dead) is buyable on its own - nothing above it requires it', () => {
+      const t = freshService()
+      t.grantXp(100_000)
+      unlockPathTo(t, 'merge-dead')
+      const deadEnd = indexOf(t, 'merge-dead')
+      expect(t.isUnlocked(deadEnd)).toBe(true)
+      expect(t.buyNode(deadEnd)).toBe(true)
+      expect(t.levelOf(deadEnd)).toBe(1)
+      // Buying it doesn't unlock anything else - it has no dependents in the graph at all.
+      expect(t.def(deadEnd).maxLevel).toBe(1)
+      expect(t.buyNode(deadEnd)).toBe(false) // already maxed
     })
 
     it('refuses once a node is already at its max level', () => {
@@ -126,9 +149,9 @@ describe('TalentService', () => {
     it('a Gem Socket node behaves like any other node for unlock purposes (1 point, no bonus)', () => {
       const t = freshService()
       t.grantXp(1000)
-      const gem = indexOf(t, 'combat-gem-1')
+      const gem = indexOf(t, 'final-a-gem-1')
       expect(t.isUnlocked(gem)).toBe(false)
-      unlockPathTo(t, 'combat-gem-1') // seed combat-1..4 (and their own ancestors) as owned
+      unlockPathTo(t, 'final-a-gem-1')
       expect(t.isUnlocked(gem)).toBe(true)
       expect(t.buyNode(gem)).toBe(true)
       expect(t.levelOf(gem)).toBe(1)
@@ -136,48 +159,48 @@ describe('TalentService', () => {
     })
   })
 
-  it('dpsMultiplier compounds across every owned Dps-tagged node (Combat branch)', () => {
+  it('dpsMultiplier compounds across every owned Dps-tagged node (final-A climb)', () => {
     const t = freshService()
     t.grantXp(100_000)
     expect(t.dpsMultiplier().toNumber()).toBeCloseTo(1, 6) // nothing bought yet
-    unlockPathTo(t, 'combat-2') // combat-2 is the branch's Dps-tagged node
-    t.buyNode(indexOf(t, 'combat-2'))
+    unlockPathTo(t, 'final-a-1') // final-a-1 is the climb's Dps-tagged node
+    t.buyNode(indexOf(t, 'final-a-1'))
     expect(t.dpsMultiplier().toNumber()).toBeGreaterThan(1)
   })
 
-  it('tapCritChance/shipCritChance sum Precision branch nodes and cap below 1', () => {
+  it('tapCritChance/shipCritChance sum nodes from different parts of the lattice and cap below 1', () => {
     const t = freshService()
     t.grantXp(100_000)
     expect(t.tapCritChance()).toBe(0)
     expect(t.shipCritChance()).toBe(0)
-    unlockPathTo(t, 'precision-2')
-    t.buyNode(indexOf(t, 'precision-1')) // TapCritChance
-    t.buyNode(indexOf(t, 'precision-2')) // ShipCritChance
+    unlockPathTo(t, 'a-dead-1') // Lane A's short dead-end spur (ShipCritChance)
+    t.buyNode(indexOf(t, 'a1-2')) // TapCritChance, on Lane A's main climb
+    t.buyNode(indexOf(t, 'a-dead-1')) // ShipCritChance
     expect(t.tapCritChance()).toBeGreaterThan(0)
     expect(t.shipCritChance()).toBeGreaterThan(0)
     expect(t.tapCritChance()).toBeLessThan(1)
     expect(t.shipCritChance()).toBeLessThan(1)
   })
 
-  it('relicGainMultiplier only reflects RelicGain-tagged nodes, not OfflineReward', () => {
+  it('relicGainMultiplier only reflects RelicGain-tagged nodes, not XpGain', () => {
     const t = freshService()
     t.grantXp(100_000)
     expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(1, 6)
     // Seeds the shared trunk (Capstone-tagged, which DOES buff RelicGain - see CAPSTONE_EFFECTS)
     // as owned, so the baseline to compare against is whatever the trunk alone contributes, not 1.
-    unlockPathTo(t, 'continuum-2')
+    unlockPathTo(t, 'final-b-2')
     const baseline = t.relicGainMultiplier().toNumber()
     expect(baseline).toBeGreaterThan(1) // trunk's Capstone bonus alone already moved this
 
-    t.buyNode(indexOf(t, 'continuum-1')) // OfflineReward
-    expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(baseline, 6) // unaffected - wrong effect
-    expect(t.offlineRewardMultiplier().toNumber()).toBeGreaterThan(1)
-
-    t.buyNode(indexOf(t, 'continuum-2')) // RelicGain
+    t.buyNode(indexOf(t, 'final-b-1')) // RelicGain
     expect(t.relicGainMultiplier().toNumber()).toBeGreaterThan(baseline)
+
+    const afterRelicGain = t.relicGainMultiplier().toNumber()
+    t.buyNode(indexOf(t, 'final-b-2')) // XpGain - shouldn't move relicGainMultiplier further
+    expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(afterRelicGain, 6)
   })
 
-  it('trunk/wing Capstone nodes each add their own bonus to CAPSTONE_EFFECTS stats, not just one', () => {
+  it('trunk Capstone nodes each add their own bonus to CAPSTONE_EFFECTS stats, not just one', () => {
     const t = freshService()
     t.grantXp(100_000)
     const before = t.dpsMultiplier().toNumber()

@@ -12,8 +12,9 @@ export const TalentEffect = {
   /** Multiplies the Relics gained on a Stellar Ascension - see PrestigeService.prestige(). */
   RelicGain: 7,
   /** Sentinel for a small "boosts nearly everything" node (the shared trunk/wings the tree
-   *  climbs out of, and the Grand Nexus at its top): never matched by the per-stat aggregation
-   *  loop directly, but summed into every one of CAPSTONE_EFFECTS by TalentService.multiplier(). */
+   *  climbs out of, the merge point, and the Grand Nexus at its top): never matched by the
+   *  per-stat aggregation loop directly, but summed into every one of CAPSTONE_EFFECTS by
+   *  TalentService.multiplier(). */
   Capstone: 8,
   /** Sentinel for a Gem Socket slot: carries no bonus of its own (the socketed card's ability
    *  does, via GemSocketService) - this only exists so the aggregation loop skips it. */
@@ -27,24 +28,19 @@ export type TalentEffect = (typeof TalentEffect)[keyof typeof TalentEffect]
  *  always been excluded). */
 export const CAPSTONE_EFFECTS: TalentEffect[] = [TalentEffect.Dps, TalentEffect.Gold, TalentEffect.TapDamage, TalentEffect.OfflineReward, TalentEffect.RelicGain]
 
-/** The tree's 4 final branches (what you're actually climbing once you're out of the shared
- *  trunk) - purely an internal wiring/layout concept (which column, which prerequisite chain).
- *  Deliberately never surfaced as a named category in the UI: no legend, no branch-specific
- *  color - see talentTreeMeta.tsx. 'trunk' tags the shared foundation below the first fork. */
-export type TalentCluster = 'combat' | 'precision' | 'economy' | 'continuum'
-export const CLUSTER_ORDER: TalentCluster[] = ['combat', 'precision', 'economy', 'continuum']
-
 export interface TalentDefinition {
-  /** Stable id, e.g. 'trunk-1', 'combat-gem-1', 'nexus' - never rename (it's the prerequisite
+  /** Stable id, e.g. 'trunk-1', 'a-dead-2', 'nexus' - never rename (it's the prerequisite
    *  graph's own vocabulary, not just a debug label - also the Gem Socket save format's key). */
   id: string
-  branch: TalentCluster | 'trunk' | 'nexus'
+  /** Purely an internal wiring tag (which hand-authored segment a node came from) - never
+   *  surfaced to the player as a named category (no legend, no per-segment color; see
+   *  talentTreeMeta.tsx, which colors/icons every regular node the same way regardless of this). */
+  branch: string
   /** ALL listed ids must be owned (level>0) before this node unlocks. Empty = always unlockable. */
   prerequisites: string[]
   /** Layout coordinate for the SVG tree renderer (TalentClusterPanel.tsx) - one shared coordinate
    *  space for the WHOLE tree: row 0 is the Grand Nexus at the very top, the highest row number
-   *  is the trunk's first node at the very bottom - the tree reads bottom-to-top, widening from
-   *  one shared trunk into 4 straight branches as it climbs. */
+   *  is the trunk's first node at the very bottom - the tree reads bottom-to-top. */
   pos: { col: number; row: number }
   effect: TalentEffect
   /** What this node actually does, e.g. "Tap Damage" - shown as the node's label instead of a
@@ -58,14 +54,16 @@ export interface TalentDefinition {
   maxLevel: number
 }
 
-/** Per-node-role bonus formula, reused by every branch so power/investment tradeoffs read
- *  consistently: a root is a cheap, weak opener (the trunk); a fork is the main per-level pace
- *  (every regular branch node); a keystone is one big single-level spike (the top of each
- *  branch); a gem carries no bonus of its own - its "level" (0 or 1) only tracks whether the
- *  slot is unlocked. */
+/** Per-node-role bonus formula: a root is a cheap, weak opener (the trunk); a fork is the main
+ *  per-level pace (every regular climbing node); a merge rewards successfully converging two
+ *  paths back into one with a stronger multi-level bonus; a keystone is one big single-level
+ *  spike (used both for the top of a long climb AND for a short dead-end's own payoff - see
+ *  buildDefaultTalents); a gem carries no bonus of its own - its "level" (0 or 1) only tracks
+ *  whether the slot is unlocked. */
 const ROLE_FORMULA = {
   root: { firstLevelBonus: 0.03, bonusPerLevel: 0.015, maxLevel: 4 },
   fork: { firstLevelBonus: 0.04, bonusPerLevel: 0.02, maxLevel: 5 },
+  merge: { firstLevelBonus: 0.07, bonusPerLevel: 0.03, maxLevel: 5 },
   keystone: { firstLevelBonus: 0.12, bonusPerLevel: 0, maxLevel: 1 },
   gem: { firstLevelBonus: 0, bonusPerLevel: 0, maxLevel: 1 },
 } as const
@@ -99,98 +97,144 @@ const EFFECT_DESCRIPTION: Record<TalentEffect, string> = {
   [TalentEffect.GemSocket]: 'Socket an owned card here to channel its power.',
 }
 
-function node(id: string, branch: TalentDefinition['branch'], prerequisites: string[], pos: { col: number; row: number }, effect: TalentEffect, role: NodeRole): TalentDefinition {
+function node(id: string, branch: string, prerequisites: string[], pos: { col: number; row: number }, effect: TalentEffect, role: NodeRole): TalentDefinition {
   return { id, branch, prerequisites, pos, effect, displayName: EFFECT_LABEL[effect], description: EFFECT_DESCRIPTION[effect], ...ROLE_FORMULA[role] }
 }
 
-/** Every branch's own step pattern: 13 regular point nodes (alternating the branch's two paired
- *  effects) with 2 Gem Sockets spread through it, ending in a keystone - a long, plain climb, no
- *  internal forks or merges (those only happen once, on the way OUT of the shared trunk). */
-const BRANCH_STEPS: Array<'point' | 'gem'> = ['point', 'point', 'point', 'point', 'gem', 'point', 'point', 'point', 'point', 'point', 'gem', 'point', 'point', 'point', 'point']
+type Step = { effect: TalentEffect } | { gem: true }
 
-/**
- * A single straight climb from the fork that starts it to a keystone at the top - one of the
- * tree's 4 final branches. `startRow` is the branch's first (lowest, closest to the trunk) node;
- * each subsequent node is one row higher (numerically lower `row`).
- */
-function buildBranch(id: TalentCluster, primary: TalentEffect, secondary: TalentEffect, col: number, wingPrereq: string, startRow: number): TalentDefinition[] {
+/** Alternates between two effects for `count` point nodes, dropping a Gem Socket in right after
+ *  the point node at each index listed in `gemAfter` (1-based). */
+function alternatingSteps(a: TalentEffect, b: TalentEffect, count: number, gemAfter: number[] = []): Step[] {
+  const steps: Step[] = []
+  for (let i = 1; i <= count; i++) {
+    steps.push({ effect: i % 2 === 1 ? a : b })
+    if (gemAfter.includes(i)) steps.push({ gem: true })
+  }
+  return steps
+}
+
+/** Builds a straight run of nodes from `steps`, chaining each to the previous (or to `prereq`
+ *  for the first one), climbing one row per step. Returns the last node's id and the next free
+ *  row so callers can continue the chain (a fork, a merge, another run) without hand-computing
+ *  row numbers. */
+function buildRun(idPrefix: string, branch: string, col: number, prereq: string, startRow: number, steps: Step[], role: NodeRole = 'fork'): { defs: TalentDefinition[]; lastId: string; nextRow: number } {
   const defs: TalentDefinition[] = []
-  let prev = wingPrereq
+  let prev = prereq
   let row = startRow
   let pointCount = 0
   let gemCount = 0
-  for (const step of BRANCH_STEPS) {
-    if (step === 'gem') {
+  for (const step of steps) {
+    if ('gem' in step) {
       gemCount++
-      const id_ = `${id}-gem-${gemCount}`
-      defs.push(node(id_, id, [prev], { col, row }, TalentEffect.GemSocket, 'gem'))
-      prev = id_
+      const id = `${idPrefix}-gem-${gemCount}`
+      defs.push(node(id, branch, [prev], { col, row }, TalentEffect.GemSocket, 'gem'))
+      prev = id
     } else {
       pointCount++
-      const id_ = `${id}-${pointCount}`
-      defs.push(node(id_, id, [prev], { col, row }, pointCount % 2 === 1 ? primary : secondary, 'fork'))
-      prev = id_
+      const id = `${idPrefix}-${pointCount}`
+      defs.push(node(id, branch, [prev], { col, row }, step.effect, role))
+      prev = id
     }
     row--
   }
-  // Continues the same alternation one more step for the keystone (odd pointCount -> primary was
-  // last used, so the next in line is secondary, and vice versa).
-  const keystoneEffect = pointCount % 2 === 1 ? secondary : primary
-  defs.push(node(`${id}-keystone`, id, [prev], { col, row }, keystoneEffect, 'keystone'))
-  return defs
+  return { defs, lastId: prev, nextRow: row }
 }
 
 /**
- * One shared trunk (5 nodes) climbing to a first fork (2 "wings"), each wing forking again into
- * 2 of the tree's 4 final branches (16 nodes each: 13 point + 2 gem + 1 keystone - see
- * buildBranch), converging on 1 Grand Nexus at the very top. Reads bottom-to-top: one line at
- * the bottom, gradually branching, ending as 4 long parallel lines - a single legible shape with
- * no internal forks/merges once you're committed to a branch, and no named categories anywhere
- * in the UI (see talentTreeMeta.tsx).
+ * A hand-authored lattice, not a single repeated template - the branch count moves both up AND
+ * down as it climbs, and two short dead ends let a small investment stand on its own instead of
+ * demanding the player commit all the way to the top:
  *
- *                    nexus
- *          combat  precision  economy  continuum   (keystones)
- *             |        |         |         |
- *          (14 more nodes each, straight up, 2 gem sockets spread through)
- *             |        |         |         |
- *          wing-combat         wing-economy
- *                \    /           \    /
- *                trunk-5 --------------
- *                   |
- *                  ...
- *                   |
- *                trunk-1
+ *                                    nexus
+ *                    final-a-keystone      final-b-keystone
+ *                           |                     |
+ *                  (12 nodes, 2 gems)     (12 nodes, 2 gems)
+ *                           |                     |
+ *                     final-a-1             final-b-1     merge-dead (single node, terminal -
+ *                            \                  /           take just this one and stop)
+ *                             \                /                  |
+ *                              \              /                core-merge
+ *                               \            /                 /
+ *                                core-merge (requires BOTH lane tops)
+ *                               /                            \
+ *                        [lane A: 8 nodes]              [lane B: 8 nodes]
+ *                         /         \                          |
+ *                  a-dead-1,2   (continues, 5 more)             |
+ *                  (terminal,    /                              |
+ *                   2 nodes)    /                                |
+ *                       (3 shared nodes)                         |
+ *                           |                                    |
+ *                        wing-a                               wing-b
+ *                              \                              /
+ *                               \____________ trunk-5 ________/
+ *                                                 |
+ *                                              trunk-1..4
  *
- * Full max (every node, every gem, the Nexus): 5 root(max4) + 2 fork(max5, wings) + 4*(13
- * fork(max5) + 2 gem(max1) + 1 keystone(max1)) + 1 nexus(max1) = 20 + 10 + 4*68 + 1 = 303 points
- * - see BalanceConfig.ts's talentXpCurve* constants for the level curve tuned to that target.
+ * Branch count over the climb: 1 (trunk) -> 2 (wings) -> 3 (lane A's own early fork adds a third
+ * live path, one of which - a-dead - terminates almost immediately) -> 1 (core-merge, a real
+ * reconvergence, not just more forking) -> 3 again (final-a, final-b, and merge-dead, which also
+ * terminates immediately) -> 2 (only final-a/final-b continue) -> 1 (nexus).
  */
 export function buildDefaultTalents(): TalentDefinition[] {
-  return [
-    node('trunk-1', 'trunk', [], { col: 1.5, row: 22 }, TalentEffect.Capstone, 'root'),
-    node('trunk-2', 'trunk', ['trunk-1'], { col: 1.5, row: 21 }, TalentEffect.Capstone, 'root'),
-    node('trunk-3', 'trunk', ['trunk-2'], { col: 1.5, row: 20 }, TalentEffect.Capstone, 'root'),
-    node('trunk-4', 'trunk', ['trunk-3'], { col: 1.5, row: 19 }, TalentEffect.Capstone, 'root'),
-    node('trunk-5', 'trunk', ['trunk-4'], { col: 1.5, row: 18 }, TalentEffect.Capstone, 'root'),
-    node('wing-combat', 'trunk', ['trunk-5'], { col: 0.5, row: 17 }, TalentEffect.Capstone, 'fork'),
-    node('wing-economy', 'trunk', ['trunk-5'], { col: 2.5, row: 17 }, TalentEffect.Capstone, 'fork'),
-    ...buildBranch('combat', TalentEffect.TapDamage, TalentEffect.Dps, 0, 'wing-combat', 16),
-    ...buildBranch('precision', TalentEffect.TapCritChance, TalentEffect.ShipCritChance, 1, 'wing-combat', 16),
-    ...buildBranch('economy', TalentEffect.Gold, TalentEffect.XpGain, 2, 'wing-economy', 16),
-    ...buildBranch('continuum', TalentEffect.OfflineReward, TalentEffect.RelicGain, 3, 'wing-economy', 16),
-    {
-      id: 'nexus',
-      branch: 'nexus',
-      prerequisites: CLUSTER_ORDER.map((c) => `${c}-keystone`),
-      pos: { col: 1.5, row: 0 },
-      effect: TalentEffect.Capstone,
-      displayName: 'Grand Nexus',
-      description: 'All four disciplines converge - a lasting echo of total mastery.',
-      firstLevelBonus: 0.05,
-      bonusPerLevel: 0,
-      maxLevel: 1,
-    },
-  ]
+  const defs: TalentDefinition[] = []
+
+  // Trunk: 5 cheap nodes, shared by every path - nothing here commits you to anything yet.
+  defs.push(node('trunk-1', 'trunk', [], { col: 3, row: 30 }, TalentEffect.Capstone, 'root'))
+  defs.push(node('trunk-2', 'trunk', ['trunk-1'], { col: 3, row: 29 }, TalentEffect.Capstone, 'root'))
+  defs.push(node('trunk-3', 'trunk', ['trunk-2'], { col: 3, row: 28 }, TalentEffect.Capstone, 'root'))
+  defs.push(node('trunk-4', 'trunk', ['trunk-3'], { col: 3, row: 27 }, TalentEffect.Capstone, 'root'))
+  defs.push(node('trunk-5', 'trunk', ['trunk-4'], { col: 3, row: 26 }, TalentEffect.Capstone, 'root'))
+
+  // First fork: two wings.
+  defs.push(node('wing-a', 'trunk', ['trunk-5'], { col: 1.5, row: 25 }, TalentEffect.Capstone, 'fork'))
+  defs.push(node('wing-b', 'trunk', ['trunk-5'], { col: 4.5, row: 25 }, TalentEffect.Capstone, 'fork'))
+
+  // Lane A: 3 shared nodes, THEN its own early fork into [continue, 5 more] + [a short dead
+  // end, 2 nodes, terminal - a real "just take this one path and stop" option].
+  const a1 = buildRun('a1', 'a', 1.5, 'wing-a', 24, alternatingSteps(TalentEffect.TapDamage, TalentEffect.TapCritChance, 3))
+  defs.push(...a1.defs)
+  const a2 = buildRun('a2', 'a', 0.8, a1.lastId, a1.nextRow, alternatingSteps(TalentEffect.TapCritChance, TalentEffect.TapDamage, 5))
+  defs.push(...a2.defs)
+  const aDead = buildRun('a-dead', 'a-dead', 2.3, a1.lastId, a1.nextRow, [{ effect: TalentEffect.ShipCritChance }], 'fork')
+  defs.push(...aDead.defs)
+  defs.push(node('a-dead-2', 'a-dead', [aDead.lastId], { col: 2.3, row: aDead.nextRow }, TalentEffect.ShipCritChance, 'keystone'))
+
+  // Lane B: straight, no internal fork - the asymmetry with Lane A is deliberate.
+  const b = buildRun('b', 'b', 4.5, 'wing-b', 24, alternatingSteps(TalentEffect.Gold, TalentEffect.XpGain, 8))
+  defs.push(...b.defs)
+
+  // Reconvergence: branch count drops from 2 live paths (a2, b) back to 1. A real merge, not
+  // just more forking.
+  defs.push(node('core-merge', 'merge', [a2.lastId, b.lastId], { col: 2.65, row: b.nextRow - 1 }, TalentEffect.Capstone, 'merge'))
+  const afterMergeRow = b.nextRow - 2
+
+  // Second fork, into 3: two long final climbs, plus another short dead end right off the merge.
+  defs.push(node('merge-dead', 'merge-dead', ['core-merge'], { col: 2.65, row: afterMergeRow }, TalentEffect.OfflineReward, 'keystone'))
+
+  const finalA = buildRun('final-a', 'final-a', 1.2, 'core-merge', afterMergeRow, alternatingSteps(TalentEffect.Dps, TalentEffect.OfflineReward, 12, [2, 5]))
+  defs.push(...finalA.defs)
+  defs.push(node('final-a-keystone', 'final-a', [finalA.lastId], { col: 1.2, row: finalA.nextRow }, TalentEffect.Dps, 'keystone'))
+
+  const finalB = buildRun('final-b', 'final-b', 4.1, 'core-merge', afterMergeRow, alternatingSteps(TalentEffect.RelicGain, TalentEffect.XpGain, 12, [2, 5]))
+  defs.push(...finalB.defs)
+  defs.push(node('final-b-keystone', 'final-b', [finalB.lastId], { col: 4.1, row: finalB.nextRow }, TalentEffect.RelicGain, 'keystone'))
+
+  const nexusRow = Math.min(finalA.nextRow, finalB.nextRow) - 1
+  defs.push({
+    id: 'nexus',
+    branch: 'nexus',
+    prerequisites: ['final-a-keystone', 'final-b-keystone'],
+    pos: { col: 2.65, row: nexusRow },
+    effect: TalentEffect.Capstone,
+    displayName: 'Grand Nexus',
+    description: 'Two hard-won paths converge - a lasting echo of total mastery.',
+    firstLevelBonus: 0.05,
+    bonusPerLevel: 0,
+    maxLevel: 1,
+  })
+
+  return defs
 }
 
 /** Fractional bonus at a given level (0 for level <= 0) - same formula as artifactBonusAt. */
@@ -201,8 +245,7 @@ export function talentBonusAt(def: TalentDefinition, level: number): number {
 /**
  * Whether node i's prerequisites are met: every id in its `prerequisites` list must be owned
  * (level>0). A node with no prerequisites is always unlockable. Supports true multi-prerequisite
- * merge nodes (2+ ids at once, e.g. the Grand Nexus requiring all 4 keystones), not just a linear
- * chain.
+ * merge nodes (2+ ids at once, e.g. core-merge requiring both lane tops), not just a linear chain.
  */
 export function isTalentNodeUnlocked(defs: TalentDefinition[], levels: number[], i: number): boolean {
   const byId = new Map(defs.map((d, idx) => [d.id, idx]))

@@ -2031,6 +2031,7 @@
   width: 100%;
   height: 100%;
   overflow: visible;
+  z-index: 0;
 }
 .talent-connector-svg path {
   fill: none;
@@ -2043,6 +2044,7 @@
 .talent-node-slot {
   /* width is set inline per-instance (100/numCols%) - a cluster panel's column count varies. */
   position: absolute;
+  z-index: 1;
   transform: translate(-50%, -50%);
 }
 
