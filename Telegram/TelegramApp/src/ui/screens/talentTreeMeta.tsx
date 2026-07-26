@@ -2,7 +2,7 @@
 // only export components (keeps Fast Refresh happy), same split as artifactEffectMeta.ts.
 import type { ReactElement } from 'react'
 import type { TalentCluster } from '../../game/config/TalentDefinition'
-import { TalentAssaultIcon, TalentFleetIcon, TalentWealthIcon, TalentAscendantIcon, TalentCapstoneIcon } from '../icons'
+import { TalentAssaultIcon, TalentFleetIcon, TalentWealthIcon, TalentAscendantIcon, TalentCapstoneIcon, TalentPrecisionIcon, TalentContinuumIcon } from '../icons'
 
 export const CLUSTER_LABEL: Record<TalentCluster, string> = {
   assault: 'ASSAULT',
@@ -22,8 +22,6 @@ export const CLUSTER_COLOR: Record<TalentCluster, string> = {
   continuum: '#B07CFF',
 }
 
-// Precision/Continuum reuse existing icons for now (topology comes before art in this rollout -
-// see the M6 polish milestone) rather than block the tree's structure on new icon art.
 export function clusterIcon(branch: TalentCluster | 'nexus'): ReactElement {
   switch (branch) {
     case 'assault':
@@ -35,9 +33,9 @@ export function clusterIcon(branch: TalentCluster | 'nexus'): ReactElement {
     case 'ascendant':
       return <TalentAscendantIcon />
     case 'precision':
-      return <TalentAssaultIcon />
+      return <TalentPrecisionIcon />
     case 'continuum':
-      return <TalentWealthIcon />
+      return <TalentContinuumIcon />
     case 'nexus':
       return <TalentCapstoneIcon />
   }

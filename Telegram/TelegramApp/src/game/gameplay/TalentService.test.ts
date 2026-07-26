@@ -29,11 +29,11 @@ describe('TalentService', () => {
     const levelsSeen: number[] = []
     t.onLevelUp.on((lvl) => levelsSeen.push(lvl))
 
-    t.grantXp(500) // crosses level 1->2->3->4 given the default curve (40, 113, 208 xp thresholds)
+    t.grantXp(500) // crosses level 1->9 given the default curve (12, 24, 36, ... linear thresholds)
 
-    expect(t.level).toBe(4)
-    expect(t.unspentPoints).toBe(3) // exactly 1 point per level gained, not per XP grant
-    expect(levelsSeen).toEqual([2, 3, 4])
+    expect(t.level).toBe(9)
+    expect(t.unspentPoints).toBe(8) // exactly 1 point per level gained, not per XP grant
+    expect(levelsSeen).toEqual([2, 3, 4, 5, 6, 7, 8, 9])
     expect(t.xp).toBeGreaterThanOrEqual(0)
     expect(t.xp).toBeLessThan(t.xpToNextLevel()) // leftover xp never exceeds the next threshold
   })

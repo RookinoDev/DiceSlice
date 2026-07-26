@@ -391,3 +391,32 @@ export function TalentCapstoneIcon({ size = 28 }: IconProps) {
     </svg>
   )
 }
+
+/** Precision cluster - a scope reticle with a dart striking dead-center (tap/ship crit chance). */
+export function TalentPrecisionIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="9" stroke="#FF9F5A" strokeWidth="1.4" opacity="0.55" />
+      <circle cx="12" cy="12" r="5.5" stroke="#FF9F5A" strokeWidth="1.4" />
+      <path d="M3 12h4M17 12h4M12 3v4M12 17v4" stroke="#FF9F5A" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M4 20l7-7" stroke="#FFCE9E" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="1.8" fill="#FF9F5A" />
+    </svg>
+  )
+}
+
+/** Continuum cluster - an infinity loop (offline reward compounding forever, relic gain carrying
+ *  across Ascensions). */
+export function TalentContinuumIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path
+        d="M7 8.5a3.5 3.5 0 100 7c1.9 0 3.4-1.6 5-3.5 1.6-1.9 3.1-3.5 5-3.5a3.5 3.5 0 110 7c-1.9 0-3.4-1.6-5-3.5C10.4 10.1 8.9 8.5 7 8.5z"
+        stroke="#B07CFF"
+        strokeWidth="1.8"
+      />
+      <circle cx="7" cy="12" r="1.4" fill="#B07CFF" />
+      <circle cx="17" cy="12" r="1.4" fill="#B07CFF" />
+    </svg>
+  )
+}
