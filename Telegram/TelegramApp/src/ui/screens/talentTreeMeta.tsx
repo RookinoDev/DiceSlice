@@ -2,40 +2,34 @@
 // only export components (keeps Fast Refresh happy), same split as artifactEffectMeta.ts.
 import type { ReactElement } from 'react'
 import type { TalentCluster } from '../../game/config/TalentDefinition'
-import { TalentAssaultIcon, TalentFleetIcon, TalentWealthIcon, TalentAscendantIcon, TalentCapstoneIcon, TalentPrecisionIcon, TalentContinuumIcon } from '../icons'
+import { TalentAssaultIcon, TalentPrecisionIcon, TalentWealthIcon, TalentContinuumIcon, TalentTrunkIcon, TalentCapstoneIcon } from '../icons'
 
 export const CLUSTER_LABEL: Record<TalentCluster, string> = {
-  assault: 'ASSAULT',
-  armada: 'ARMADA',
-  wealth: 'WEALTH',
-  ascendant: 'ASCENDANT',
+  combat: 'COMBAT',
   precision: 'PRECISION',
+  economy: 'ECONOMY',
   continuum: 'CONTINUUM',
 }
 
 export const CLUSTER_COLOR: Record<TalentCluster, string> = {
-  assault: '#FF6B6B',
-  armada: '#43DDEE',
-  wealth: '#FFD873',
-  ascendant: '#7CFFB2',
+  combat: '#FF6B6B',
   precision: '#FF9F5A',
+  economy: '#FFD873',
   continuum: '#B07CFF',
 }
 
-export function clusterIcon(branch: TalentCluster | 'nexus'): ReactElement {
+export function clusterIcon(branch: TalentCluster | 'trunk' | 'nexus'): ReactElement {
   switch (branch) {
-    case 'assault':
+    case 'combat':
       return <TalentAssaultIcon />
-    case 'armada':
-      return <TalentFleetIcon />
-    case 'wealth':
-      return <TalentWealthIcon />
-    case 'ascendant':
-      return <TalentAscendantIcon />
     case 'precision':
       return <TalentPrecisionIcon />
+    case 'economy':
+      return <TalentWealthIcon />
     case 'continuum':
       return <TalentContinuumIcon />
+    case 'trunk':
+      return <TalentTrunkIcon />
     case 'nexus':
       return <TalentCapstoneIcon />
   }

@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { buildDefaultTalents, isTalentNodeUnlocked, talentBonusAt, CLUSTER_ORDER, TalentEffect } from './TalentDefinition'
 
 describe('talent tree node catalog', () => {
-  it('builds 6 clusters x 13 nodes (11 point + 2 gem) + 1 Grand Nexus = 79 nodes', () => {
+  it('builds 3 trunk + 2 wings + 4 branches x 9 nodes + 1 Grand Nexus = 42 nodes', () => {
     const defs = buildDefaultTalents()
-    expect(defs.length).toBe(CLUSTER_ORDER.length * 13 + 1)
+    expect(defs.length).toBe(3 + 2 + CLUSTER_ORDER.length * 9 + 1)
+    expect(defs.filter((d) => d.branch === 'trunk').length).toBe(5) // 3 trunk + 2 wings
     for (const cluster of CLUSTER_ORDER) {
       const clusterDefs = defs.filter((d) => d.branch === cluster)
-      expect(clusterDefs.length).toBe(13)
-      expect(clusterDefs.filter((d) => d.effect === TalentEffect.GemSocket).length).toBe(2)
+      expect(clusterDefs.length).toBe(9)
+      expect(clusterDefs.filter((d) => d.effect === TalentEffect.GemSocket).length).toBe(1)
     }
     expect(defs.filter((d) => d.branch === 'nexus').length).toBe(1)
   })
@@ -27,52 +28,64 @@ describe('talent tree node catalog', () => {
     }
   })
 
-  it('every cluster root has no prerequisites, and every other node in the cluster does', () => {
+  it('the tree has exactly one node with no prerequisites - the shared trunk root', () => {
+    const defs = buildDefaultTalents()
+    const roots = defs.filter((d) => d.prerequisites.length === 0)
+    expect(roots.map((d) => d.id)).toEqual(['trunk-1'])
+  })
+
+  it('every branch is a straight chain (1 prerequisite each) from its wing to its keystone', () => {
     const defs = buildDefaultTalents()
     for (const cluster of CLUSTER_ORDER) {
-      const root = defs.find((d) => d.id === `${cluster}-core`)!
-      expect(root.prerequisites).toEqual([])
-      for (const d of defs.filter((x) => x.branch === cluster && x.id !== root.id)) {
-        expect(d.prerequisites.length).toBeGreaterThan(0)
+      for (const d of defs.filter((x) => x.branch === cluster)) {
+        expect(d.prerequisites.length).toBe(1)
       }
     }
   })
 
-  it('a cluster keystone requires both fork-2 outputs AND both gem sockets (a real 4-way merge)', () => {
+  it('the two wings both require trunk-3, and each branch traces back to exactly one wing', () => {
     const defs = buildDefaultTalents()
-    for (const cluster of CLUSTER_ORDER) {
-      const keystone = defs.find((d) => d.id === `${cluster}-keystone`)!
-      expect(new Set(keystone.prerequisites)).toEqual(new Set([`${cluster}-d1`, `${cluster}-d2`, `${cluster}-gem-1`, `${cluster}-gem-2`]))
-    }
+    const wingCombat = defs.find((d) => d.id === 'wing-combat')!
+    const wingEconomy = defs.find((d) => d.id === 'wing-economy')!
+    expect(wingCombat.prerequisites).toEqual(['trunk-3'])
+    expect(wingEconomy.prerequisites).toEqual(['trunk-3'])
+    expect(defs.find((d) => d.id === 'combat-1')!.prerequisites).toEqual(['wing-combat'])
+    expect(defs.find((d) => d.id === 'precision-1')!.prerequisites).toEqual(['wing-combat'])
+    expect(defs.find((d) => d.id === 'economy-1')!.prerequisites).toEqual(['wing-economy'])
+    expect(defs.find((d) => d.id === 'continuum-1')!.prerequisites).toEqual(['wing-economy'])
   })
 
-  it('the Grand Nexus requires every cluster keystone', () => {
+  it('the Grand Nexus requires every branch keystone (a real 4-way merge)', () => {
     const defs = buildDefaultTalents()
     const nexus = defs.find((d) => d.id === 'nexus')!
     expect(new Set(nexus.prerequisites)).toEqual(new Set(CLUSTER_ORDER.map((c) => `${c}-keystone`)))
   })
 
-  it('single-effect clusters (assault/armada/wealth/ascendant) tag every point node with one effect', () => {
+  it('trunk/wing nodes carry the Capstone sentinel (a small boost to nearly everything, not yet committed to a branch)', () => {
     const defs = buildDefaultTalents()
-    const expected: Record<string, TalentEffect> = {
-      assault: TalentEffect.TapDamage,
-      armada: TalentEffect.Dps,
-      wealth: TalentEffect.Gold,
-      ascendant: TalentEffect.XpGain,
+    for (const d of defs.filter((x) => x.branch === 'trunk')) expect(d.effect).toBe(TalentEffect.Capstone)
+  })
+
+  it('each branch alternates between its own two paired effects', () => {
+    const defs = buildDefaultTalents()
+    const expected: Record<string, [TalentEffect, TalentEffect]> = {
+      combat: [TalentEffect.TapDamage, TalentEffect.Dps],
+      precision: [TalentEffect.TapCritChance, TalentEffect.ShipCritChance],
+      economy: [TalentEffect.Gold, TalentEffect.XpGain],
+      continuum: [TalentEffect.OfflineReward, TalentEffect.RelicGain],
     }
-    for (const [cluster, effect] of Object.entries(expected)) {
-      const pointNodes = defs.filter((d) => d.branch === cluster && d.effect !== TalentEffect.GemSocket)
-      expect(pointNodes.length).toBe(11)
-      for (const d of pointNodes) expect(d.effect).toBe(effect)
+    for (const [cluster, [a, b]] of Object.entries(expected)) {
+      const pointEffects = new Set(defs.filter((d) => d.branch === cluster && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
+      expect(pointEffects).toEqual(new Set([a, b]))
     }
   })
 
-  it('split-effect clusters (precision/continuum) use both of their paired effects', () => {
+  it('every node label is derived from what it does, not a flavor name', () => {
     const defs = buildDefaultTalents()
-    const precisionEffects = new Set(defs.filter((d) => d.branch === 'precision' && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
-    expect(precisionEffects).toEqual(new Set([TalentEffect.TapCritChance, TalentEffect.ShipCritChance]))
-    const continuumEffects = new Set(defs.filter((d) => d.branch === 'continuum' && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
-    expect(continuumEffects).toEqual(new Set([TalentEffect.OfflineReward, TalentEffect.RelicGain]))
+    const dpsNode = defs.find((d) => d.effect === TalentEffect.Dps)!
+    expect(dpsNode.displayName).toBe('Fleet DPS')
+    const gemNode = defs.find((d) => d.effect === TalentEffect.GemSocket)!
+    expect(gemNode.displayName).toBe('Gem Socket')
   })
 
   it('gem socket nodes carry no bonus of their own', () => {
@@ -84,57 +97,36 @@ describe('talent tree node catalog', () => {
   })
 
   describe('isTalentNodeUnlocked', () => {
-    it('every cluster root is always unlockable (no prior levels needed)', () => {
+    it('the trunk root is always unlockable (no prior levels needed)', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      for (const cluster of CLUSTER_ORDER) {
-        const i = defs.findIndex((d) => d.id === `${cluster}-core`)
-        expect(isTalentNodeUnlocked(defs, levels, i)).toBe(true)
-      }
+      const i = defs.findIndex((d) => d.id === 'trunk-1')
+      expect(isTalentNodeUnlocked(defs, levels, i)).toBe(true)
     })
 
-    it('a 2-way fork is blocked until its root is owned', () => {
+    it('a wing is blocked until the trunk is fully climbed', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      const root = defs.findIndex((d) => d.id === 'assault-core')
-      const a1 = defs.findIndex((d) => d.id === 'assault-a1')
+      const wing = defs.findIndex((d) => d.id === 'wing-combat')
+      const trunk3 = defs.findIndex((d) => d.id === 'trunk-3')
 
-      expect(isTalentNodeUnlocked(defs, levels, a1)).toBe(false)
-      levels[root] = 1
-      expect(isTalentNodeUnlocked(defs, levels, a1)).toBe(true)
+      expect(isTalentNodeUnlocked(defs, levels, wing)).toBe(false)
+      levels[trunk3] = 1
+      expect(isTalentNodeUnlocked(defs, levels, wing)).toBe(true)
     })
 
-    it('a merge node requires BOTH fork paths owned, not just one', () => {
+    it('a branch is blocked until its wing is owned', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      const a1 = defs.findIndex((d) => d.id === 'assault-a1')
-      const b1 = defs.findIndex((d) => d.id === 'assault-b1')
-      const ab = defs.findIndex((d) => d.id === 'assault-ab')
+      const combat1 = defs.findIndex((d) => d.id === 'combat-1')
+      const wing = defs.findIndex((d) => d.id === 'wing-combat')
 
-      expect(isTalentNodeUnlocked(defs, levels, ab)).toBe(false)
-      levels[a1] = 1
-      expect(isTalentNodeUnlocked(defs, levels, ab)).toBe(false) // only one of two prereqs owned
-      levels[b1] = 1
-      expect(isTalentNodeUnlocked(defs, levels, ab)).toBe(true)
+      expect(isTalentNodeUnlocked(defs, levels, combat1)).toBe(false)
+      levels[wing] = 1
+      expect(isTalentNodeUnlocked(defs, levels, combat1)).toBe(true)
     })
 
-    it('a keystone requires all 4 of its prerequisites (3-way fork chain + both gems), in any order', () => {
-      const defs = buildDefaultTalents()
-      const levels = new Array(defs.length).fill(0)
-      const keystone = defs.findIndex((d) => d.id === 'assault-keystone')
-      const prereqIds = ['assault-d1', 'assault-d2', 'assault-gem-1', 'assault-gem-2']
-      const prereqIndices = prereqIds.map((id) => defs.findIndex((d) => d.id === id))
-
-      expect(isTalentNodeUnlocked(defs, levels, keystone)).toBe(false)
-      for (let k = 0; k < prereqIndices.length - 1; k++) {
-        levels[prereqIndices[k]] = 1
-        expect(isTalentNodeUnlocked(defs, levels, keystone)).toBe(false) // still missing one
-      }
-      levels[prereqIndices[prereqIndices.length - 1]] = 1
-      expect(isTalentNodeUnlocked(defs, levels, keystone)).toBe(true)
-    })
-
-    it('the Grand Nexus is blocked until every cluster keystone is owned, in any order', () => {
+    it('the Grand Nexus is blocked until every branch keystone is owned, in any order', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
       const nexus = defs.findIndex((d) => d.id === 'nexus')

@@ -355,31 +355,12 @@ export function TalentAssaultIcon({ size = 24 }: IconProps) {
   )
 }
 
-export function TalentFleetIcon({ size = 24 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24">
-      <path d="M12 2l5 13-5-3-5 3z" fill="#43DDEE" />
-      <path d="M5 15l3 7-4-2-2 2z" fill="#8FE9F5" opacity="0.8" />
-      <path d="M19 15l-3 7 4-2 2 2z" fill="#8FE9F5" opacity="0.8" />
-    </svg>
-  )
-}
-
 export function TalentWealthIcon({ size = 24 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
       <circle cx="9" cy="15" r="6" fill="#FFD873" />
       <circle cx="9" cy="15" r="6" stroke="#E8930F" strokeWidth="1.4" />
       <circle cx="15" cy="8" r="6" fill="#FFE9B0" stroke="#E8930F" strokeWidth="1.4" />
-    </svg>
-  )
-}
-
-export function TalentAscendantIcon({ size = 24 }: IconProps) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <path d="M4 20l6-9 4 5 6-11" stroke="#7CFFB2" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="20" cy="5" r="2" fill="#7CFFB2" />
     </svg>
   )
 }
@@ -401,6 +382,17 @@ export function TalentPrecisionIcon({ size = 24 }: IconProps) {
       <path d="M3 12h4M17 12h4M12 3v4M12 17v4" stroke="#FF9F5A" strokeWidth="1.4" strokeLinecap="round" />
       <path d="M4 20l7-7" stroke="#FFCE9E" strokeWidth="1.8" strokeLinecap="round" />
       <circle cx="12" cy="12" r="1.8" fill="#FF9F5A" />
+    </svg>
+  )
+}
+
+/** The shared trunk/wing nodes below the tree's first fork - a plain hexagonal core, neutral and
+ *  undecided (you haven't committed to a branch yet). */
+export function TalentTrunkIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 3l7.8 4.5v9L12 21l-7.8-4.5v-9z" stroke="#9AA5C7" strokeWidth="1.6" />
+      <circle cx="12" cy="12" r="2.6" fill="#9AA5C7" />
     </svg>
   )
 }

@@ -106,20 +106,17 @@ export class TalentService {
   }
 
   /** Aggregate multiplier for a stat = prod(1 + bonus(level)) across every owned node tagged
-   *  with `effect`, PLUS the capstone's bonus if owned and this stat is one of CAPSTONE_EFFECTS
-   *  (the capstone's own effect tag is the Capstone sentinel, so it's never double-counted by
-   *  the main loop below). Same shape as ArtifactService.multiplier(). */
+   *  with `effect`, PLUS every owned Capstone-tagged node if this stat is one of CAPSTONE_EFFECTS
+   *  (the shared trunk/wings and the Grand Nexus all carry the Capstone sentinel, not a specific
+   *  stat tag, so they're summed here rather than by the main per-effect check above - multiple
+   *  Capstone nodes all count, not just one). Same shape as ArtifactService.multiplier(). */
   multiplier(effect: TalentEffect): BigNumber {
     let mult = BigNumber.One
+    const alsoCapstone = CAPSTONE_EFFECTS.includes(effect)
     for (let i = 0; i < this.defs.length; i++) {
-      if (this.defs[i].effect !== effect || this.levels[i] <= 0) continue
+      const matches = this.defs[i].effect === effect || (alsoCapstone && this.defs[i].effect === TalentEffect.Capstone)
+      if (!matches || this.levels[i] <= 0) continue
       mult = mult.mul(new BigNumber(1 + talentBonusAt(this.defs[i], this.levels[i])))
-    }
-    if (CAPSTONE_EFFECTS.includes(effect)) {
-      const capstoneIdx = this.defs.findIndex((d) => d.effect === TalentEffect.Capstone)
-      if (capstoneIdx >= 0 && this.levels[capstoneIdx] > 0) {
-        mult = mult.mul(new BigNumber(1 + talentBonusAt(this.defs[capstoneIdx], this.levels[capstoneIdx])))
-      }
     }
     return mult
   }

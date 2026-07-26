@@ -1,13 +1,11 @@
-// The talent tree: 6 clusters, each its own fork-merge-fork-merge lattice (see
-// TalentClusterPanel.tsx's SVG connector rendering and TalentDefinition.ts's buildCluster
-// diagram), stacked vertically down one scrollable screen and converging on 1 Grand Nexus card
-// at the top. Stacked rather than side-by-side (unlike the original 4-branch layout) because
-// each cluster is 3 columns wide internally now - 6 of those side by side would never fit a
-// phone screen, but the screen already scrolls vertically for free.
+// The talent tree: one unified shape (see TalentDefinition.ts's buildDefaultTalents diagram) -
+// a shared trunk at the bottom climbing through a first fork into 4 straight branches at the
+// top, all rendered as a single SVG panel (TalentClusterPanel.tsx already computes edges/
+// positions generically from whatever node indices it's given - feeding it every node at once
+// turns it into one continuous tree instead of the old 6-separate-panels layout).
 import type { GameSession } from '../../game/gameplay/GameSession'
-import { CLUSTER_ORDER, talentUnlockLabel, type TalentCluster } from '../../game/config/TalentDefinition'
+import { CLUSTER_ORDER } from '../../game/config/TalentDefinition'
 import { LevelBadge } from '../LevelBadge'
-import { TalentNode } from './TalentNode'
 import { TalentClusterPanel } from './TalentClusterPanel'
 import { CLUSTER_LABEL, CLUSTER_COLOR } from './talentTreeMeta'
 
@@ -19,11 +17,7 @@ interface TalentsScreenProps {
 
 export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScreenProps) {
   const t = s.talents
-  const defs = Array.from({ length: t.count }, (_, i) => t.def(i))
-  const nexusIndex = defs.findIndex((d) => d.branch === 'nexus')
-  const nexusUnlocked = nexusIndex >= 0 && t.isUnlocked(nexusIndex)
-
-  const clusterIndices = (cluster: TalentCluster): number[] => defs.map((_, i) => i).filter((i) => defs[i].branch === cluster)
+  const allIndices = Array.from({ length: t.count }, (_, i) => i)
 
   return (
     <div className="screen talents-screen">
@@ -39,23 +33,15 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
         </div>
       </div>
 
-      {nexusIndex >= 0 && (
-        <div className={`talent-capstone-card ${nexusUnlocked ? '' : 'is-locked'}`}>
-          <TalentNode session={s} index={nexusIndex} onToast={onToast} onOpenSocket={onOpenSocket} />
-          {!nexusUnlocked && <div className="talent-capstone-req">{talentUnlockLabel(defs, nexusIndex)}</div>}
-        </div>
-      )}
-
-      <div className="talent-tree-clusters">
+      <div className="talent-tree-legend">
         {CLUSTER_ORDER.map((cluster) => (
-          <div key={cluster} className="talent-cluster-row">
-            <div className="talent-cluster-label" style={{ color: CLUSTER_COLOR[cluster] }}>
-              {CLUSTER_LABEL[cluster]}
-            </div>
-            <TalentClusterPanel session={s} nodeIndices={clusterIndices(cluster)} onToast={onToast} onOpenSocket={onOpenSocket} />
+          <div key={cluster} className="talent-tree-legend-item" style={{ color: CLUSTER_COLOR[cluster] }}>
+            {CLUSTER_LABEL[cluster]}
           </div>
         ))}
       </div>
+
+      <TalentClusterPanel session={s} nodeIndices={allIndices} onToast={onToast} onOpenSocket={onOpenSocket} />
     </div>
   )
 }

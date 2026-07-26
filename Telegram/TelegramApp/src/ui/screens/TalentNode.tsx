@@ -30,7 +30,7 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
   const maxed = lvl >= def.maxLevel
   const isGem = def.effect === TalentEffect.GemSocket
   const pct = Math.round(talentBonusAt(def, lvl) * 100)
-  const color = def.branch === 'nexus' ? '#F0E6FF' : CLUSTER_COLOR[def.branch]
+  const color = def.branch === 'nexus' ? '#F0E6FF' : def.branch === 'trunk' ? '#9AA5C7' : CLUSTER_COLOR[def.branch]
   const [popKey, setPopKey] = useState(0)
 
   const socketed = isGem && lvl > 0 ? s.gems.cardAt(def.id) : undefined

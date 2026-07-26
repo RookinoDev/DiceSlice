@@ -199,13 +199,11 @@ export const defaultBalanceConfig: BalanceConfig = {
   midasGoldPerLvl: 5,
   midasGoldBase: 10,
 
-  // Talent tree. talentXpCurveBase/Power retuned for the 79-node/313-point tree (M3+) - the
-  // original 40/1.5 pairing was tuned for a 25-node/~25-point tree topping out around 52.5K
-  // cumulative XP; left as-is it would need ~27.8M XP to fully max the new 313-point tree. 12/1
-  // (linear per-level cost) instead lands full completion around 590K cumulative XP - roughly
-  // an 11x increase, tracking the tree's own 12.5x node-count growth - while keeping the late-
-  // game per-level cost (~3.8K near level 313) close to what the OLD curve cost near ITS OWN
-  // max (level 25 was 5K), so the endgame grind feel stays consistent rather than exploding.
+  // Talent tree. talentXpCurveBase/Power (12/1, a linear per-level cost) lands full completion
+  // of the current 42-node/171-point tree (see TalentDefinition.ts's buildDefaultTalents) around
+  // 176K cumulative XP - the per-level cost tops out around 2K near the final level, keeping the
+  // endgame grind reasonable rather than exploding the way the original 40/1.5 pairing (tuned for
+  // a much smaller 25-point tree) would have on a bigger one.
   talentXpBase: 3,
   talentXpPerStage: 1.5,
   talentBossXpBonusMultiplier: 4,

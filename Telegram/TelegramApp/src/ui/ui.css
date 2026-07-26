@@ -2017,51 +2017,24 @@
   color: var(--palette-gold-label);
 }
 
-.talent-capstone-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* Small color-coded legend for the tree's 4 final branches - node labels show what they DO
+   (e.g. "Tap Damage") rather than a branch name, so this is the only place branch identity is
+   spelled out; the nodes themselves stay color-coded to match as you scan up a column. */
+.talent-tree-legend {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
-  padding: 12px;
-  margin-bottom: 18px;
-  border-radius: 20px;
-  background: radial-gradient(circle at 50% 0%, rgba(176, 124, 255, 0.18), var(--palette-panel) 75%);
-  border: 1px solid rgba(176, 124, 255, 0.3);
+  padding-bottom: 12px;
 }
-.talent-capstone-card.is-locked {
-  opacity: 0.75;
-}
-.talent-capstone-req {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--palette-text-dim);
-  text-align: center;
-  max-width: 220px;
-}
-
-/* 6 clusters stacked vertically (each is 3 columns wide internally - 6 of those side by side
-   would never fit a phone screen, but the screen already scrolls vertically for free). */
-.talent-tree-clusters {
-  display: flex;
-  flex-direction: column;
-  gap: 26px;
-  padding-bottom: 20px;
-}
-.talent-cluster-row {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.talent-cluster-label {
+.talent-tree-legend-item {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: 11px;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  letter-spacing: 0.06em;
   text-align: center;
-  margin-bottom: 10px;
 }
-/* One cluster's node graph: SVG connector lines under absolutely-positioned node slots, both
+
+/* One continuous tree: SVG connector lines under absolutely-positioned node slots, both
    driven by the same col/row coordinates (see TalentClusterPanel.tsx). Replaces the old
    DOM-adjacent-sibling CSS bars - this can draw a line between ANY two nodes, not just visually
    next to each other, which a fork/merge tree needs. */
