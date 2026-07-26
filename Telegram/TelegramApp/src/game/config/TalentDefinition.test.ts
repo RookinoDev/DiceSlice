@@ -2,14 +2,14 @@ import { describe, expect, it } from 'vitest'
 import { buildDefaultTalents, isTalentNodeUnlocked, talentBonusAt, CLUSTER_ORDER, TalentEffect } from './TalentDefinition'
 
 describe('talent tree node catalog', () => {
-  it('builds 3 trunk + 2 wings + 4 branches x 9 nodes + 1 Grand Nexus = 42 nodes', () => {
+  it('builds 5 trunk + 2 wings + 4 branches x 16 nodes + 1 Grand Nexus = 72 nodes', () => {
     const defs = buildDefaultTalents()
-    expect(defs.length).toBe(3 + 2 + CLUSTER_ORDER.length * 9 + 1)
-    expect(defs.filter((d) => d.branch === 'trunk').length).toBe(5) // 3 trunk + 2 wings
+    expect(defs.length).toBe(5 + 2 + CLUSTER_ORDER.length * 16 + 1)
+    expect(defs.filter((d) => d.branch === 'trunk').length).toBe(7) // 5 trunk + 2 wings
     for (const cluster of CLUSTER_ORDER) {
       const clusterDefs = defs.filter((d) => d.branch === cluster)
-      expect(clusterDefs.length).toBe(9)
-      expect(clusterDefs.filter((d) => d.effect === TalentEffect.GemSocket).length).toBe(1)
+      expect(clusterDefs.length).toBe(16)
+      expect(clusterDefs.filter((d) => d.effect === TalentEffect.GemSocket).length).toBe(2)
     }
     expect(defs.filter((d) => d.branch === 'nexus').length).toBe(1)
   })
@@ -43,12 +43,20 @@ describe('talent tree node catalog', () => {
     }
   })
 
-  it('the two wings both require trunk-3, and each branch traces back to exactly one wing', () => {
+  it('the trunk is a straight 5-node chain feeding both wings', () => {
     const defs = buildDefaultTalents()
+    expect(defs.find((d) => d.id === 'trunk-2')!.prerequisites).toEqual(['trunk-1'])
+    expect(defs.find((d) => d.id === 'trunk-3')!.prerequisites).toEqual(['trunk-2'])
+    expect(defs.find((d) => d.id === 'trunk-4')!.prerequisites).toEqual(['trunk-3'])
+    expect(defs.find((d) => d.id === 'trunk-5')!.prerequisites).toEqual(['trunk-4'])
     const wingCombat = defs.find((d) => d.id === 'wing-combat')!
     const wingEconomy = defs.find((d) => d.id === 'wing-economy')!
-    expect(wingCombat.prerequisites).toEqual(['trunk-3'])
-    expect(wingEconomy.prerequisites).toEqual(['trunk-3'])
+    expect(wingCombat.prerequisites).toEqual(['trunk-5'])
+    expect(wingEconomy.prerequisites).toEqual(['trunk-5'])
+  })
+
+  it('each wing feeds exactly 2 of the 4 final branches', () => {
+    const defs = buildDefaultTalents()
     expect(defs.find((d) => d.id === 'combat-1')!.prerequisites).toEqual(['wing-combat'])
     expect(defs.find((d) => d.id === 'precision-1')!.prerequisites).toEqual(['wing-combat'])
     expect(defs.find((d) => d.id === 'economy-1')!.prerequisites).toEqual(['wing-economy'])
@@ -66,7 +74,7 @@ describe('talent tree node catalog', () => {
     for (const d of defs.filter((x) => x.branch === 'trunk')) expect(d.effect).toBe(TalentEffect.Capstone)
   })
 
-  it('each branch alternates between its own two paired effects', () => {
+  it('each branch alternates between its own two paired effects, with 2 gem sockets spread through', () => {
     const defs = buildDefaultTalents()
     const expected: Record<string, [TalentEffect, TalentEffect]> = {
       combat: [TalentEffect.TapDamage, TalentEffect.Dps],
@@ -77,6 +85,8 @@ describe('talent tree node catalog', () => {
     for (const [cluster, [a, b]] of Object.entries(expected)) {
       const pointEffects = new Set(defs.filter((d) => d.branch === cluster && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
       expect(pointEffects).toEqual(new Set([a, b]))
+      const gemIds = defs.filter((d) => d.branch === cluster && d.effect === TalentEffect.GemSocket).map((d) => d.id)
+      expect(new Set(gemIds)).toEqual(new Set([`${cluster}-gem-1`, `${cluster}-gem-2`]))
     }
   })
 
@@ -108,10 +118,10 @@ describe('talent tree node catalog', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
       const wing = defs.findIndex((d) => d.id === 'wing-combat')
-      const trunk3 = defs.findIndex((d) => d.id === 'trunk-3')
+      const trunk5 = defs.findIndex((d) => d.id === 'trunk-5')
 
       expect(isTalentNodeUnlocked(defs, levels, wing)).toBe(false)
-      levels[trunk3] = 1
+      levels[trunk5] = 1
       expect(isTalentNodeUnlocked(defs, levels, wing)).toBe(true)
     })
 

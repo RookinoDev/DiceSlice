@@ -9,7 +9,7 @@ import type { GameSession } from '../../game/gameplay/GameSession'
 import type { TalentDefinition } from '../../game/config/TalentDefinition'
 import { TalentNode } from './TalentNode'
 
-const ROW_PX = 68
+const ROW_PX = 84
 
 interface TalentClusterPanelProps {
   session: GameSession

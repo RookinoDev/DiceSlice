@@ -1,36 +1,36 @@
-// Shared label/color/icon lookup for talent clusters - split out so TalentNode.tsx/TalentsScreen.tsx
-// only export components (keeps Fast Refresh happy), same split as artifactEffectMeta.ts.
+// Shared color/icon lookup for talent nodes - split out so TalentNode.tsx/TalentsScreen.tsx only
+// export components (keeps Fast Refresh happy), same split as artifactEffectMeta.ts.
+//
+// Deliberately NOT keyed by branch/cluster: the tree isn't meant to read as named categories -
+// no legend, no per-branch color - just one continuous climb. Icons are keyed by what a node
+// actually DOES (its effect), which two different branches can share, rather than which of the
+// 4 branches it happens to sit in.
 import type { ReactElement } from 'react'
-import type { TalentCluster } from '../../game/config/TalentDefinition'
-import { TalentAssaultIcon, TalentPrecisionIcon, TalentWealthIcon, TalentContinuumIcon, TalentTrunkIcon, TalentCapstoneIcon } from '../icons'
+import { TalentEffect } from '../../game/config/TalentDefinition'
+import { TalentAssaultIcon, TalentPrecisionIcon, TalentWealthIcon, TalentContinuumIcon, TalentTrunkIcon, GemIcon } from '../icons'
 
-export const CLUSTER_LABEL: Record<TalentCluster, string> = {
-  combat: 'COMBAT',
-  precision: 'PRECISION',
-  economy: 'ECONOMY',
-  continuum: 'CONTINUUM',
-}
+/** One uniform accent for every regular investable node (trunk, wing, and all 4 branches).
+ *  Gem sockets and the Grand Nexus get their own colors in TalentNode.tsx - those are distinct
+ *  structural roles, not categories. */
+export const TALENT_NODE_COLOR = '#43DDEE'
 
-export const CLUSTER_COLOR: Record<TalentCluster, string> = {
-  combat: '#FF6B6B',
-  precision: '#FF9F5A',
-  economy: '#FFD873',
-  continuum: '#B07CFF',
-}
-
-export function clusterIcon(branch: TalentCluster | 'trunk' | 'nexus'): ReactElement {
-  switch (branch) {
-    case 'combat':
+export function effectIcon(effect: TalentEffect): ReactElement {
+  switch (effect) {
+    case TalentEffect.TapDamage:
+    case TalentEffect.Dps:
       return <TalentAssaultIcon />
-    case 'precision':
-      return <TalentPrecisionIcon />
-    case 'economy':
+    case TalentEffect.Gold:
+    case TalentEffect.XpGain:
       return <TalentWealthIcon />
-    case 'continuum':
+    case TalentEffect.TapCritChance:
+    case TalentEffect.ShipCritChance:
+      return <TalentPrecisionIcon />
+    case TalentEffect.OfflineReward:
+    case TalentEffect.RelicGain:
       return <TalentContinuumIcon />
-    case 'trunk':
+    case TalentEffect.Capstone:
       return <TalentTrunkIcon />
-    case 'nexus':
-      return <TalentCapstoneIcon />
+    case TalentEffect.GemSocket:
+      return <GemIcon />
   }
 }

@@ -2017,23 +2017,6 @@
   color: var(--palette-gold-label);
 }
 
-/* Small color-coded legend for the tree's 4 final branches - node labels show what they DO
-   (e.g. "Tap Damage") rather than a branch name, so this is the only place branch identity is
-   spelled out; the nodes themselves stay color-coded to match as you scan up a column. */
-.talent-tree-legend {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  padding-bottom: 12px;
-}
-.talent-tree-legend-item {
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-align: center;
-}
-
 /* One continuous tree: SVG connector lines under absolutely-positioned node slots, both
    driven by the same col/row coordinates (see TalentClusterPanel.tsx). Replaces the old
    DOM-adjacent-sibling CSS bars - this can draw a line between ANY two nodes, not just visually

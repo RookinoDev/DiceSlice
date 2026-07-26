@@ -27,23 +27,24 @@ export type TalentEffect = (typeof TalentEffect)[keyof typeof TalentEffect]
  *  always been excluded). */
 export const CAPSTONE_EFFECTS: TalentEffect[] = [TalentEffect.Dps, TalentEffect.Gold, TalentEffect.TapDamage, TalentEffect.OfflineReward, TalentEffect.RelicGain]
 
-/** The tree's 4 final branches (what you're actually committing to once you've climbed out of
- *  the shared trunk). 'trunk' tags the shared foundation nodes below the first fork - not a
- *  final destination, just shared groundwork every path passes through. */
+/** The tree's 4 final branches (what you're actually climbing once you're out of the shared
+ *  trunk) - purely an internal wiring/layout concept (which column, which prerequisite chain).
+ *  Deliberately never surfaced as a named category in the UI: no legend, no branch-specific
+ *  color - see talentTreeMeta.tsx. 'trunk' tags the shared foundation below the first fork. */
 export type TalentCluster = 'combat' | 'precision' | 'economy' | 'continuum'
 export const CLUSTER_ORDER: TalentCluster[] = ['combat', 'precision', 'economy', 'continuum']
 
 export interface TalentDefinition {
-  /** Stable id, e.g. 'trunk-1', 'combat-gem', 'nexus' - never rename (it's the prerequisite
+  /** Stable id, e.g. 'trunk-1', 'combat-gem-1', 'nexus' - never rename (it's the prerequisite
    *  graph's own vocabulary, not just a debug label - also the Gem Socket save format's key). */
   id: string
   branch: TalentCluster | 'trunk' | 'nexus'
   /** ALL listed ids must be owned (level>0) before this node unlocks. Empty = always unlockable. */
   prerequisites: string[]
   /** Layout coordinate for the SVG tree renderer (TalentClusterPanel.tsx) - one shared coordinate
-   *  space for the WHOLE tree now (not per-cluster-local): row 0 is the Grand Nexus at the very
-   *  top, the highest row number is the trunk's first node at the very bottom - the tree reads
-   *  bottom-to-top, widening from one shared trunk into 4 straight branches as it climbs. */
+   *  space for the WHOLE tree: row 0 is the Grand Nexus at the very top, the highest row number
+   *  is the trunk's first node at the very bottom - the tree reads bottom-to-top, widening from
+   *  one shared trunk into 4 straight branches as it climbs. */
   pos: { col: number; row: number }
   effect: TalentEffect
   /** What this node actually does, e.g. "Tap Damage" - shown as the node's label instead of a
@@ -59,8 +60,9 @@ export interface TalentDefinition {
 
 /** Per-node-role bonus formula, reused by every branch so power/investment tradeoffs read
  *  consistently: a root is a cheap, weak opener (the trunk); a fork is the main per-level pace
- *  (every other node); a keystone is one big single-level spike (the top of each branch); a gem
- *  carries no bonus of its own - its "level" (0 or 1) only tracks whether the slot is unlocked. */
+ *  (every regular branch node); a keystone is one big single-level spike (the top of each
+ *  branch); a gem carries no bonus of its own - its "level" (0 or 1) only tracks whether the
+ *  slot is unlocked. */
 const ROLE_FORMULA = {
   root: { firstLevelBonus: 0.03, bonusPerLevel: 0.015, maxLevel: 4 },
   fork: { firstLevelBonus: 0.04, bonusPerLevel: 0.02, maxLevel: 5 },
@@ -71,7 +73,7 @@ type NodeRole = keyof typeof ROLE_FORMULA
 
 /** Short label + one-line description per effect - every node's displayName/description is
  *  derived from its own effect via this table, so authoring a node is just "pick an effect,
- *  everything else follows" rather than hand-writing 42 unique flavor names. */
+ *  everything else follows" rather than hand-writing dozens of unique flavor names. */
 const EFFECT_LABEL: Record<TalentEffect, string> = {
   [TalentEffect.Dps]: 'Fleet DPS',
   [TalentEffect.Gold]: 'Stardust',
@@ -101,64 +103,81 @@ function node(id: string, branch: TalentDefinition['branch'], prerequisites: str
   return { id, branch, prerequisites, pos, effect, displayName: EFFECT_LABEL[effect], description: EFFECT_DESCRIPTION[effect], ...ROLE_FORMULA[role] }
 }
 
+/** Every branch's own step pattern: 13 regular point nodes (alternating the branch's two paired
+ *  effects) with 2 Gem Sockets spread through it, ending in a keystone - a long, plain climb, no
+ *  internal forks or merges (those only happen once, on the way OUT of the shared trunk). */
+const BRANCH_STEPS: Array<'point' | 'gem'> = ['point', 'point', 'point', 'point', 'gem', 'point', 'point', 'point', 'point', 'point', 'gem', 'point', 'point', 'point', 'point']
+
 /**
  * A single straight climb from the fork that starts it to a keystone at the top - one of the
- * tree's 4 final branches. Alternates between two related effects node-to-node (mirroring how
- * Precision/Continuum already paired effects before this redesign) with one Gem Socket partway
- * up. `startRow` is the branch's first (lowest, closest to the trunk) node; each subsequent node
- * is one row higher (numerically lower `row`), ending at `startRow - 8` for the keystone.
+ * tree's 4 final branches. `startRow` is the branch's first (lowest, closest to the trunk) node;
+ * each subsequent node is one row higher (numerically lower `row`).
  */
 function buildBranch(id: TalentCluster, primary: TalentEffect, secondary: TalentEffect, col: number, wingPrereq: string, startRow: number): TalentDefinition[] {
-  const r = (n: number) => startRow - n
-  return [
-    node(`${id}-1`, id, [wingPrereq], { col, row: r(0) }, primary, 'fork'),
-    node(`${id}-2`, id, [`${id}-1`], { col, row: r(1) }, secondary, 'fork'),
-    node(`${id}-3`, id, [`${id}-2`], { col, row: r(2) }, primary, 'fork'),
-    node(`${id}-gem`, id, [`${id}-3`], { col, row: r(3) }, TalentEffect.GemSocket, 'gem'),
-    node(`${id}-4`, id, [`${id}-gem`], { col, row: r(4) }, secondary, 'fork'),
-    node(`${id}-5`, id, [`${id}-4`], { col, row: r(5) }, primary, 'fork'),
-    node(`${id}-6`, id, [`${id}-5`], { col, row: r(6) }, secondary, 'fork'),
-    node(`${id}-7`, id, [`${id}-6`], { col, row: r(7) }, primary, 'fork'),
-    node(`${id}-keystone`, id, [`${id}-7`], { col, row: r(8) }, secondary, 'keystone'),
-  ]
+  const defs: TalentDefinition[] = []
+  let prev = wingPrereq
+  let row = startRow
+  let pointCount = 0
+  let gemCount = 0
+  for (const step of BRANCH_STEPS) {
+    if (step === 'gem') {
+      gemCount++
+      const id_ = `${id}-gem-${gemCount}`
+      defs.push(node(id_, id, [prev], { col, row }, TalentEffect.GemSocket, 'gem'))
+      prev = id_
+    } else {
+      pointCount++
+      const id_ = `${id}-${pointCount}`
+      defs.push(node(id_, id, [prev], { col, row }, pointCount % 2 === 1 ? primary : secondary, 'fork'))
+      prev = id_
+    }
+    row--
+  }
+  // Continues the same alternation one more step for the keystone (odd pointCount -> primary was
+  // last used, so the next in line is secondary, and vice versa).
+  const keystoneEffect = pointCount % 2 === 1 ? secondary : primary
+  defs.push(node(`${id}-keystone`, id, [prev], { col, row }, keystoneEffect, 'keystone'))
+  return defs
 }
 
 /**
- * 42 nodes: one shared trunk (3 nodes) climbing to a first fork (2 "wings"), each wing forking
- * again into 2 of the tree's 4 final branches (9 nodes each, straight climbs - see buildBranch),
- * converging on 1 Grand Nexus at the very top. Reads bottom-to-top: one line at the bottom,
- * gradually branching, ending as 4 parallel lines - replacing the old 6-independent-clusters
- * layout (each with its own root, forking AND re-merging internally) with a single legible shape.
+ * One shared trunk (5 nodes) climbing to a first fork (2 "wings"), each wing forking again into
+ * 2 of the tree's 4 final branches (16 nodes each: 13 point + 2 gem + 1 keystone - see
+ * buildBranch), converging on 1 Grand Nexus at the very top. Reads bottom-to-top: one line at
+ * the bottom, gradually branching, ending as 4 long parallel lines - a single legible shape with
+ * no internal forks/merges once you're committed to a branch, and no named categories anywhere
+ * in the UI (see talentTreeMeta.tsx).
  *
  *                    nexus
  *          combat  precision  economy  continuum   (keystones)
  *             |        |         |         |
- *           (7 more nodes each, straight up, 1 gem socket partway)
+ *          (14 more nodes each, straight up, 2 gem sockets spread through)
  *             |        |         |         |
  *          wing-combat         wing-economy
  *                \    /           \    /
- *                trunk-3 --------------
+ *                trunk-5 --------------
  *                   |
- *                trunk-2
+ *                  ...
  *                   |
  *                trunk-1
  *
- * Full max (every node, every gem, the Nexus): 3 root(max4) + 2 fork(max5, wings) + 4*(7
- * fork(max5) + 1 gem(max1) + 1 keystone(max1)) + 1 nexus(max1) = 12 + 10 + 4*(35+1+1) + 1 = 171
- * points - see BalanceConfig.ts's talentXpCurve* constants for the level curve tuned to that
- * (smaller, lighter) target.
+ * Full max (every node, every gem, the Nexus): 5 root(max4) + 2 fork(max5, wings) + 4*(13
+ * fork(max5) + 2 gem(max1) + 1 keystone(max1)) + 1 nexus(max1) = 20 + 10 + 4*68 + 1 = 303 points
+ * - see BalanceConfig.ts's talentXpCurve* constants for the level curve tuned to that target.
  */
 export function buildDefaultTalents(): TalentDefinition[] {
   return [
-    node('trunk-1', 'trunk', [], { col: 1.5, row: 13 }, TalentEffect.Capstone, 'root'),
-    node('trunk-2', 'trunk', ['trunk-1'], { col: 1.5, row: 12 }, TalentEffect.Capstone, 'root'),
-    node('trunk-3', 'trunk', ['trunk-2'], { col: 1.5, row: 11 }, TalentEffect.Capstone, 'root'),
-    node('wing-combat', 'trunk', ['trunk-3'], { col: 0.5, row: 10 }, TalentEffect.Capstone, 'fork'),
-    node('wing-economy', 'trunk', ['trunk-3'], { col: 2.5, row: 10 }, TalentEffect.Capstone, 'fork'),
-    ...buildBranch('combat', TalentEffect.TapDamage, TalentEffect.Dps, 0, 'wing-combat', 9),
-    ...buildBranch('precision', TalentEffect.TapCritChance, TalentEffect.ShipCritChance, 1, 'wing-combat', 9),
-    ...buildBranch('economy', TalentEffect.Gold, TalentEffect.XpGain, 2, 'wing-economy', 9),
-    ...buildBranch('continuum', TalentEffect.OfflineReward, TalentEffect.RelicGain, 3, 'wing-economy', 9),
+    node('trunk-1', 'trunk', [], { col: 1.5, row: 22 }, TalentEffect.Capstone, 'root'),
+    node('trunk-2', 'trunk', ['trunk-1'], { col: 1.5, row: 21 }, TalentEffect.Capstone, 'root'),
+    node('trunk-3', 'trunk', ['trunk-2'], { col: 1.5, row: 20 }, TalentEffect.Capstone, 'root'),
+    node('trunk-4', 'trunk', ['trunk-3'], { col: 1.5, row: 19 }, TalentEffect.Capstone, 'root'),
+    node('trunk-5', 'trunk', ['trunk-4'], { col: 1.5, row: 18 }, TalentEffect.Capstone, 'root'),
+    node('wing-combat', 'trunk', ['trunk-5'], { col: 0.5, row: 17 }, TalentEffect.Capstone, 'fork'),
+    node('wing-economy', 'trunk', ['trunk-5'], { col: 2.5, row: 17 }, TalentEffect.Capstone, 'fork'),
+    ...buildBranch('combat', TalentEffect.TapDamage, TalentEffect.Dps, 0, 'wing-combat', 16),
+    ...buildBranch('precision', TalentEffect.TapCritChance, TalentEffect.ShipCritChance, 1, 'wing-combat', 16),
+    ...buildBranch('economy', TalentEffect.Gold, TalentEffect.XpGain, 2, 'wing-economy', 16),
+    ...buildBranch('continuum', TalentEffect.OfflineReward, TalentEffect.RelicGain, 3, 'wing-economy', 16),
     {
       id: 'nexus',
       branch: 'nexus',

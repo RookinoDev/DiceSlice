@@ -126,9 +126,9 @@ describe('TalentService', () => {
     it('a Gem Socket node behaves like any other node for unlock purposes (1 point, no bonus)', () => {
       const t = freshService()
       t.grantXp(1000)
-      const gem = indexOf(t, 'combat-gem')
+      const gem = indexOf(t, 'combat-gem-1')
       expect(t.isUnlocked(gem)).toBe(false)
-      unlockPathTo(t, 'combat-gem') // seed combat-1/2/3 (and their own ancestors) as owned
+      unlockPathTo(t, 'combat-gem-1') // seed combat-1..4 (and their own ancestors) as owned
       expect(t.isUnlocked(gem)).toBe(true)
       expect(t.buyNode(gem)).toBe(true)
       expect(t.levelOf(gem)).toBe(1)

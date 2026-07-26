@@ -10,8 +10,8 @@ import { talentBonusAt, talentUnlockLabel, TalentEffect } from '../../game/confi
 import { cardById } from '../../game/cards/generatedCards'
 import { hapticAction, hapticTap } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
-import { LockIcon, GemIcon } from '../icons'
-import { CLUSTER_COLOR, clusterIcon } from './talentTreeMeta'
+import { LockIcon, GemIcon, TalentCapstoneIcon } from '../icons'
+import { TALENT_NODE_COLOR, effectIcon } from './talentTreeMeta'
 
 interface TalentNodeProps {
   session: GameSession
@@ -30,7 +30,11 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
   const maxed = lvl >= def.maxLevel
   const isGem = def.effect === TalentEffect.GemSocket
   const pct = Math.round(talentBonusAt(def, lvl) * 100)
-  const color = def.branch === 'nexus' ? '#F0E6FF' : def.branch === 'trunk' ? '#9AA5C7' : CLUSTER_COLOR[def.branch]
+  const isNexus = def.branch === 'nexus'
+  // One uniform color for every regular node (trunk, wing, all 4 branches) - the tree isn't
+  // categorized, so nodes don't get a per-branch color. Gem sockets and the Nexus are distinct
+  // structural roles, not categories, so they keep their own colors.
+  const color = isNexus ? '#F0E6FF' : isGem ? '#D6A8FF' : TALENT_NODE_COLOR
   const [popKey, setPopKey] = useState(0)
 
   const socketed = isGem && lvl > 0 ? s.gems.cardAt(def.id) : undefined
@@ -62,12 +66,12 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
 
   return (
     <button
-      className={`talent-node ${def.branch === 'nexus' ? 'talent-node--capstone' : ''} ${!unlocked ? 'is-locked' : ''} ${maxed ? 'is-maxed' : ''} ${lvl > 0 ? 'is-owned' : ''} ${isGem ? 'talent-node--gem' : ''}`}
+      className={`talent-node ${isNexus ? 'talent-node--capstone' : ''} ${!unlocked ? 'is-locked' : ''} ${maxed ? 'is-maxed' : ''} ${lvl > 0 ? 'is-owned' : ''} ${isGem ? 'talent-node--gem' : ''}`}
       onClick={handleTap}
       style={{ '--talent-color': color } as CSSProperties}
     >
       <div key={popKey} className="talent-node-icon row-icon-pop">
-        {!unlocked ? <LockIcon /> : isGem ? <GemIcon filled={!!socketed} /> : clusterIcon(def.branch)}
+        {!unlocked ? <LockIcon /> : isGem ? <GemIcon filled={!!socketed} /> : isNexus ? <TalentCapstoneIcon /> : effectIcon(def.effect)}
       </div>
       <div className="talent-node-level">
         {lvl}/{def.maxLevel}

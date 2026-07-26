@@ -2,12 +2,11 @@
 // a shared trunk at the bottom climbing through a first fork into 4 straight branches at the
 // top, all rendered as a single SVG panel (TalentClusterPanel.tsx already computes edges/
 // positions generically from whatever node indices it's given - feeding it every node at once
-// turns it into one continuous tree instead of the old 6-separate-panels layout).
+// turns it into one continuous tree). Deliberately uncategorized: no legend, no per-branch
+// labeling - just one long climb, read bottom-to-top by scrolling.
 import type { GameSession } from '../../game/gameplay/GameSession'
-import { CLUSTER_ORDER } from '../../game/config/TalentDefinition'
 import { LevelBadge } from '../LevelBadge'
 import { TalentClusterPanel } from './TalentClusterPanel'
-import { CLUSTER_LABEL, CLUSTER_COLOR } from './talentTreeMeta'
 
 interface TalentsScreenProps {
   session: GameSession
@@ -31,14 +30,6 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
         <div className="talent-points-available">
           {t.unspentPoints} POINT{t.unspentPoints === 1 ? '' : 'S'} AVAILABLE
         </div>
-      </div>
-
-      <div className="talent-tree-legend">
-        {CLUSTER_ORDER.map((cluster) => (
-          <div key={cluster} className="talent-tree-legend-item" style={{ color: CLUSTER_COLOR[cluster] }}>
-            {CLUSTER_LABEL[cluster]}
-          </div>
-        ))}
       </div>
 
       <TalentClusterPanel session={s} nodeIndices={allIndices} onToast={onToast} onOpenSocket={onOpenSocket} />
