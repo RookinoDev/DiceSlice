@@ -2061,20 +2061,33 @@
   margin-bottom: 10px;
   min-height: 22px;
 }
-.talent-node-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+/* One cluster's node graph: SVG connector lines under absolutely-positioned node slots, both
+   driven by the same col/row coordinates (see TalentClusterPanel.tsx). Replaces the old
+   DOM-adjacent-sibling CSS bars - this can draw a line between ANY two nodes, not just visually
+   next to each other, which a fork/merge tree needs. */
+.talent-cluster-panel {
+  position: relative;
+  width: 100%;
 }
-.talent-connector {
-  width: 2px;
-  height: 14px;
-  background: rgba(255, 255, 255, 0.1);
+.talent-connector-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
 }
-.talent-connector.is-lit {
-  /* Sibling of .talent-node, not a descendant - can't inherit its inline --talent-color, so this
-     is a fixed accent rather than per-branch tinted. */
-  background: var(--palette-success);
+.talent-connector-svg path {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 2;
+}
+.talent-connector-svg path.is-lit {
+  stroke: var(--palette-success);
+}
+.talent-node-slot {
+  /* width is set inline per-instance (100/numCols%) - a cluster panel's column count varies. */
+  position: absolute;
+  transform: translate(-50%, -50%);
 }
 
 .talent-node {

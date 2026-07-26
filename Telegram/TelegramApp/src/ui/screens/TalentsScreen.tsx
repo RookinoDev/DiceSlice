@@ -1,11 +1,14 @@
 // The talent tree: 4 branch columns (linear 6-node chains, tier 6 at top down to tier 1 at
 // bottom - node i requires node i-1 in the same branch owned) converging on 1 capstone card at
-// the top. Simpler than a free-form branching graph (no line-geometry/measurement code needed -
-// connectors are just CSS bars between DOM-adjacent nodes), while still reading as a real tree.
+// the top. Each branch renders as a TalentClusterPanel (SVG connector lines over the node data's
+// own pos:{col,row} - see TalentDefinition.ts) rather than CSS bars between DOM-adjacent nodes,
+// so the renderer already supports a fork/merge topology even though today's tree is still a
+// straight chain per branch.
 import type { GameSession } from '../../game/gameplay/GameSession'
 import { BRANCH_ORDER, talentUnlockLabel, type TalentBranch } from '../../game/config/TalentDefinition'
 import { LevelBadge } from '../LevelBadge'
 import { TalentNode } from './TalentNode'
+import { TalentClusterPanel } from './TalentClusterPanel'
 import { BRANCH_LABEL, BRANCH_COLOR } from './talentTreeMeta'
 
 interface TalentsScreenProps {
@@ -19,12 +22,7 @@ export function TalentsScreen({ session: s, onToast }: TalentsScreenProps) {
   const capstoneIndex = defs.findIndex((d) => d.branch === 'capstone')
   const capstoneUnlocked = capstoneIndex >= 0 && t.isUnlocked(capstoneIndex)
 
-  const branchIndices = (branch: TalentBranch): number[] =>
-    defs
-      .map((d, i) => ({ d, i }))
-      .filter(({ d }) => d.branch === branch)
-      .sort((a, b) => b.d.tier - a.d.tier) // tier 6 first (rendered top) down to tier 1 (bottom)
-      .map(({ i }) => i)
+  const branchIndices = (branch: TalentBranch): number[] => defs.map((_, i) => i).filter((i) => defs[i].branch === branch)
 
   return (
     <div className="screen talents-screen">
@@ -48,22 +46,14 @@ export function TalentsScreen({ session: s, onToast }: TalentsScreenProps) {
       )}
 
       <div className="talent-tree-columns">
-        {BRANCH_ORDER.map((branch) => {
-          const indices = branchIndices(branch)
-          return (
-            <div key={branch} className="talent-branch-column">
-              <div className="talent-branch-label" style={{ color: BRANCH_COLOR[branch] }}>
-                {BRANCH_LABEL[branch]}
-              </div>
-              {indices.map((i, pos) => (
-                <div key={i} className="talent-node-wrap">
-                  <TalentNode session={s} index={i} onToast={onToast} />
-                  {pos < indices.length - 1 && <div className={`talent-connector ${t.levelOf(indices[pos + 1]) > 0 ? 'is-lit' : ''}`} />}
-                </div>
-              ))}
+        {BRANCH_ORDER.map((branch) => (
+          <div key={branch} className="talent-branch-column">
+            <div className="talent-branch-label" style={{ color: BRANCH_COLOR[branch] }}>
+              {BRANCH_LABEL[branch]}
             </div>
-          )
-        })}
+            <TalentClusterPanel session={s} nodeIndices={branchIndices(branch)} onToast={onToast} />
+          </div>
+        ))}
       </div>
     </div>
   )
