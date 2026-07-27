@@ -38,6 +38,21 @@ describe('selectActiveStep', () => {
     const step = selectActiveStep(seen, makeCtx(session))
     expect(step).toBeUndefined()
   })
+
+  it('picks the gem-socket step once any branch has unlocked a Gem Socket node (5 branch points)', () => {
+    const session = createGameSession()
+    session.talents.grantXp(1_000_000) // plenty of points
+    const branch = session.talents.def(0).branch
+    const branchIndices = Array.from({ length: session.talents.count }, (_, i) => i).filter((i) => session.talents.def(i).branch === branch)
+    // Multiple passes: buying tier-1 nodes raises the branch's point total, which unlocks the
+    // gem/tier-2 nodes bought in a later pass, and so on up the chain.
+    for (let pass = 0; pass < 4; pass++) {
+      for (const i of branchIndices) while (session.talents.buyNode(i)) {}
+    }
+    const seen = new Set(TUTORIAL_STEPS.map((s) => s.id).filter((id) => id !== 'gem-socket'))
+    const step = selectActiveStep(seen, makeCtx(session))
+    expect(step?.id).toBe('gem-socket')
+  })
 })
 
 describe('needsRetroactiveSkip', () => {

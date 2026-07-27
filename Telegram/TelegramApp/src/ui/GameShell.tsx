@@ -287,13 +287,20 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // Show the offline-rewards sheet once at launch, else the Shop (with its Daily Reward banner
   // up top) if the daily claim is ready - the free reward is the hook that gets them into the
   // Shop, not a standalone popup that would let them skip it entirely.
+  //
+  // Never on a player's very first-ever session (lastClaimDay still -Infinity, i.e. they've
+  // never claimed once): canClaim() is unconditionally true then, which used to pop the Shop
+  // open immediately on launch, right on top of the "Welcome, Commander! Tap the planet..."
+  // welcome step - two competing prompts on the very first screen. The tutorial's own "extras"
+  // step already tells them to open the Shop for their Daily Reward, so day 1 is a self-guided
+  // discovery; the auto-open kicks in starting day 2, once there's a real streak to protect.
   useEffect(() => {
     if (offline) {
       setOfflineOpen(true)
       setReturningBoost(true)
       const t = setTimeout(() => setReturningBoost(false), 10000)
       return () => clearTimeout(t)
-    } else if (session.daily.canClaim(nowUnixSeconds())) setShopOpen(true)
+    } else if (Number.isFinite(session.daily.lastClaimDay) && session.daily.canClaim(nowUnixSeconds())) setShopOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

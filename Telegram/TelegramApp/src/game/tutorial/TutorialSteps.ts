@@ -8,6 +8,7 @@ import type { GameSession } from '../gameplay/GameSession'
 import type { MainViewModel } from '../ui/MainPresenter'
 import type { NavTab } from '../../ui/BottomNav'
 import type { PendingPack } from '../cards/cardsApi'
+import { TalentEffect } from '../config/TalentDefinition'
 
 export interface TutorialContext {
   session: GameSession
@@ -110,4 +111,22 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     trigger: (ctx) => ctx.session.talents.level >= 2,
     autoAdvanceOn: (ctx) => ctx.tab === 'talents',
   },
+  {
+    id: 'gem-socket',
+    landmark: null,
+    title: 'Gem Sockets',
+    body: 'Some Talent nodes are Gem Sockets - tap one to unlock it, then tap again to slot in an owned card for a bonus based on its rarity!',
+    trigger: (ctx) => anyGemSocketUnlocked(ctx.session),
+  },
 ]
+
+/** Whether the player has unlocked at least one Gem Socket node in any branch - the moment
+ *  Gem Sockets first become relevant (see gameplay/GemSocketService.ts for what socketing a
+ *  card actually does; this file only decides when to explain the concept exists). */
+function anyGemSocketUnlocked(session: GameSession): boolean {
+  const t = session.talents
+  for (let i = 0; i < t.count; i++) {
+    if (t.def(i).effect === TalentEffect.GemSocket && t.isUnlocked(i)) return true
+  }
+  return false
+}
