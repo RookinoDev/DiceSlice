@@ -317,13 +317,20 @@ export class GameSession {
   }
 
   private handleKill(planet: Planet, overkill: BigNumber): void {
-    const gold = this.stage
+    let gold = this.stage
       .goldFor(planet.stage)
       .mul(this.artifacts.goldMultiplier())
       .mul(this.talents.goldMultiplier())
       .mul(this.gems.goldMultiplier())
       .mul(this.skills.goldMultiplier())
       .mul(this.boosts.vipGoldMultiplier())
+    // First-ever kill: guarantee enough Stardust to afford the first Tap Damage upgrade right
+    // away (see TutorialSteps.ts's 'tap-upgrade' step, and BalanceConfig's tapUpgradeBaseCost) -
+    // otherwise a new player can clear planet 1 and still be short of the very next tutorial
+    // action being affordable, stalling the flow on a second kill before it can even happen.
+    // stats.planetsDestroyed++ is a separate onPlanetKilled listener registered AFTER this one,
+    // so it's still 0 here on the first kill.
+    if (this.stats.planetsDestroyed === 0) gold = gold.max(new BigNumber(this.cfg.tapUpgradeBaseCost))
     this.wallet.add(gold)
     this.onReward.emit({ planet, gold, overkill })
   }

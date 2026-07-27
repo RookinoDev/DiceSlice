@@ -28,6 +28,20 @@ describe('GameSession integration', () => {
     expect(maxHp.gt(BigNumber.Zero)).toBe(true)
   })
 
+  it('the first kill always grants enough Stardust to afford the first Tap Damage upgrade (tutorial flow)', () => {
+    const session = createGameSession()
+    session.begin()
+    let firstKillGold: BigNumber | null = null
+    session.onReward.on(({ gold }) => {
+      if (firstKillGold === null) firstKillGold = gold
+    })
+    for (let i = 0; i < 100_000 && firstKillGold === null; i++) session.tap()
+
+    expect(firstKillGold).not.toBeNull()
+    expect(session.wallet.balance.gte(session.tapUpgrade.nextCost)).toBe(true)
+    expect(session.upgradeTapDamage()).toBe(true)
+  })
+
   it('cannot afford a ship with zero Stardust', () => {
     const session = createGameSession()
     expect(session.wallet.balance.eq(BigNumber.Zero)).toBe(true)
