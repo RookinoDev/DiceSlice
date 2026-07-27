@@ -15,10 +15,12 @@ import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import { variantRank } from '../../game/cards/variants'
 import type { OwnedSummary } from '../../game/cards/collectionSummary'
 import { loadFavorites, recordCardView, toggleFavorite } from '../../game/cards/cardPrefs'
+import { gemAbilityForCard } from '../../game/cards/gemAbility'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticTap } from '../../telegram'
 import { useParticles } from '../combatFx/useParticles'
 import { ParticleLayer } from '../combatFx/ParticleLayer'
+import { GemIcon } from '../icons'
 import type { HoloLightVector } from './HoloOverlay'
 
 const HoloOverlay = lazy(() => import('./HoloOverlay').then((m) => ({ default: m.HoloOverlay })))
@@ -188,6 +190,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
   if (!open || !card) return null
   const color = RARITY_COLOR[card.rarity]
   const locked = !owned
+  const gemAbility = !locked ? gemAbilityForCard(card.id) : undefined
   const variantClass = owned && owned.bestVariant !== 'standard' ? `card-detail-flip--${owned.bestVariant}` : ''
   const rarityClass = card.rarity === 'legendary' || card.rarity === 'ultra' ? `card-detail-flip--${card.rarity}` : ''
 
@@ -359,6 +362,12 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                 <div className="card-detail-name-block">
                   <div className="card-detail-name">{locked ? '???' : card.name}</div>
                   <div className="card-detail-type-tag">{locked ? 'UNDISCOVERED' : card.classification}</div>
+                  {gemAbility && (
+                    <div className="card-detail-gem-ability">
+                      <GemIcon size={11} />
+                      <span>{gemAbility.label}</span>
+                    </div>
+                  )}
                 </div>
 
                 {!locked && (

@@ -4519,6 +4519,23 @@
   text-transform: uppercase;
   color: var(--rarity-color, var(--palette-text-dim));
 }
+/* What this card grants if socketed into a Talent Tree Gem node - same gem-purple used by
+   TalentNode/SocketPickerSheet so it reads as "this is a gem thing" wherever it shows up. */
+.card-detail-gem-ability {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(214, 168, 255, 0.35);
+  background: rgba(214, 168, 255, 0.1);
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #d6a8ff;
+}
 
 .card-detail-stat-grid {
   width: 100%;
