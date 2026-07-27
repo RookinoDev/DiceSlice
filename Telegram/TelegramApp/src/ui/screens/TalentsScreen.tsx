@@ -1,12 +1,13 @@
-// The talent tree: one unified shape (see TalentDefinition.ts's buildDefaultTalents diagram) -
-// a shared trunk at the bottom climbing through a first fork into 4 straight branches at the
-// top, all rendered as a single SVG panel (TalentClusterPanel.tsx already computes edges/
-// positions generically from whatever node indices it's given - feeding it every node at once
-// turns it into one continuous tree). Deliberately uncategorized: no legend, no per-branch
-// labeling - just one long climb, read bottom-to-top by scrolling.
+// The talent tree: 5 named branches (Cannon, Fleet, Core, Salvage, Warp - see TalentDefinition.ts
+// for the full design), each its own panel, with a combo talent bridging every adjacent pair in
+// the ring (Cannon-Fleet, Fleet-Core, Core-Salvage, Salvage-Warp, and Warp-Cannon wrapping back
+// to the start). Unlike the earlier single connected tree, there's no SVG/connector rendering
+// here at all - unlock is "N points spent in this branch," a threshold check, not a graph edge.
 import type { GameSession } from '../../game/gameplay/GameSession'
+import { BRANCH_ORDER, type TalentBranch } from '../../game/config/TalentDefinition'
 import { LevelBadge } from '../LevelBadge'
-import { TalentClusterPanel } from './TalentClusterPanel'
+import { BranchPanel } from './BranchPanel'
+import { TalentNode } from './TalentNode'
 
 interface TalentsScreenProps {
   session: GameSession
@@ -16,7 +17,10 @@ interface TalentsScreenProps {
 
 export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScreenProps) {
   const t = s.talents
-  const allIndices = Array.from({ length: t.count }, (_, i) => i)
+  const allDefs = Array.from({ length: t.count }, (_, i) => t.def(i))
+
+  const branchIndices = (branch: TalentBranch): number[] => allDefs.map((_, i) => i).filter((i) => allDefs[i].branch === branch)
+  const comboIndexBetween = (a: TalentBranch, b: TalentBranch): number => allDefs.findIndex((d) => d.id === `combo-${a}-${b}`)
 
   return (
     <div className="screen talents-screen">
@@ -32,7 +36,20 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
         </div>
       </div>
 
-      <TalentClusterPanel session={s} nodeIndices={allIndices} onToast={onToast} onOpenSocket={onOpenSocket} />
+      {BRANCH_ORDER.map((branch, i) => {
+        const nextBranch = BRANCH_ORDER[(i + 1) % BRANCH_ORDER.length]
+        const comboIndex = comboIndexBetween(branch, nextBranch)
+        return (
+          <div key={branch} className="branch-section">
+            <BranchPanel session={s} branch={branch} nodeIndices={branchIndices(branch)} onToast={onToast} onOpenSocket={onOpenSocket} />
+            {comboIndex >= 0 && (
+              <div className="combo-row">
+                <TalentNode session={s} index={comboIndex} onToast={onToast} onOpenSocket={onOpenSocket} />
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

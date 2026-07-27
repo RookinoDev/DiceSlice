@@ -1,17 +1,16 @@
-// One node in the talent tree - compact (multiple stack per cluster panel, unlike ArtifactRow's
-// single wide list) but the same interaction model: one tap = one level, 1 Talent Point, reusing
-// the exact row-icon-pop flourish + haptic + purchase sound ArtifactRow already established.
-// Gem Socket nodes use this same buy-a-level flow to unlock the slot itself (see TalentEffect.
-// GemSocket's own comment); once unlocked, tapping it again opens SocketPickerSheet to choose
-// which owned card fills it (see onOpenSocket).
+// One node in the talent tree - the same interaction model as before: one tap = one level, 1
+// Talent Point, reusing the row-icon-pop flourish + haptic + purchase sound ArtifactRow already
+// established. Gem Socket nodes use this same buy-a-level flow to unlock the slot itself (see
+// TalentEffect.GemSocket's own comment); once unlocked, tapping it again opens SocketPickerSheet
+// to choose which owned card fills it (see onOpenSocket).
 import { useState, type CSSProperties } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
-import { talentBonusAt, talentUnlockLabel, TalentEffect } from '../../game/config/TalentDefinition'
+import { talentBonusAt, talentUnlockLabel, TalentEffect, BRANCH_COLOR, type TalentBranch } from '../../game/config/TalentDefinition'
 import { cardById } from '../../game/cards/generatedCards'
 import { hapticAction, hapticTap } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
-import { LockIcon, GemIcon, TalentCapstoneIcon } from '../icons'
-import { TALENT_NODE_COLOR, effectIcon } from './talentTreeMeta'
+import { LockIcon, GemIcon } from '../icons'
+import { branchIcon } from './talentTreeMeta'
 
 interface TalentNodeProps {
   session: GameSession
@@ -30,11 +29,9 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
   const maxed = lvl >= def.maxLevel
   const isGem = def.effect === TalentEffect.GemSocket
   const pct = Math.round(talentBonusAt(def, lvl) * 100)
-  const isNexus = def.branch === 'nexus'
-  // One uniform color for every regular node (trunk, wing, all 4 branches) - the tree isn't
-  // categorized, so nodes don't get a per-branch color. Gem sockets and the Nexus are distinct
-  // structural roles, not categories, so they keep their own colors.
-  const color = isNexus ? '#F0E6FF' : isGem ? '#D6A8FF' : TALENT_NODE_COLOR
+  // Combo talents bridge 2 branches, not owned by either - a distinct lavender, same idea as the
+  // old single Grand Nexus. Regular nodes take their branch's own color.
+  const color = def.branch === 'combo' ? '#F0E6FF' : isGem ? '#D6A8FF' : BRANCH_COLOR[def.branch as TalentBranch]
   const [popKey, setPopKey] = useState(0)
 
   const socketed = isGem && lvl > 0 ? s.gems.cardAt(def.id) : undefined
@@ -66,12 +63,12 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
 
   return (
     <button
-      className={`talent-node ${isNexus ? 'talent-node--capstone' : ''} ${!unlocked ? 'is-locked' : ''} ${maxed ? 'is-maxed' : ''} ${lvl > 0 ? 'is-owned' : ''} ${isGem ? 'talent-node--gem' : ''}`}
+      className={`talent-node ${def.isCapstone ? 'talent-node--capstone' : ''} ${!unlocked ? 'is-locked' : ''} ${maxed ? 'is-maxed' : ''} ${lvl > 0 ? 'is-owned' : ''} ${isGem ? 'talent-node--gem' : ''}`}
       onClick={handleTap}
       style={{ '--talent-color': color } as CSSProperties}
     >
       <div key={popKey} className="talent-node-icon row-icon-pop">
-        {!unlocked ? <LockIcon /> : isGem ? <GemIcon filled={!!socketed} /> : isNexus ? <TalentCapstoneIcon /> : effectIcon(def.effect)}
+        {!unlocked ? <LockIcon /> : isGem ? <GemIcon filled={!!socketed} /> : branchIcon(def.branch)}
       </div>
       <div className="talent-node-level">
         {lvl}/{def.maxLevel}

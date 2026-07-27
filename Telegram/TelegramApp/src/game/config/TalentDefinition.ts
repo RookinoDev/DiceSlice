@@ -1,5 +1,16 @@
 // Talent tree node catalog. Mirrors ArtifactDefinition.ts's def+formula shape: static data here,
 // level-tracking + spending logic lives in gameplay/TalentService.ts.
+//
+// Phase 1 of a larger design (see the "Stellar Breaker talent tree" design doc): 5 named,
+// creatively-flavored branches (Cannon, Fleet, Core, Salvage, Warp) each with real identity, plus
+// 5 cross-branch combo talents. Every talent's flavor/mechanic description matches the full
+// design, but only the ones that map cleanly onto stats this game already tracks (tap damage,
+// fleet DPS, gold, offline reward, crit chance, relic gain) carry a real numeric bonus in this
+// phase - Core's whole branch (an energy-for-active-skills resource that doesn't exist yet) uses
+// the Capstone sentinel as an honest "boosts a bit of everything for now" placeholder until that
+// system is built. Combat Rhythm's real combo-counter, Armor Fracture's real debuff, Ricochet's
+// real bounce, etc. are the same story: the node exists, is buyable, and does something useful
+// today, but the bespoke mechanic in its description is a later phase.
 export const TalentEffect = {
   Dps: 0,
   Gold: 1,
@@ -11,10 +22,10 @@ export const TalentEffect = {
   ShipCritChance: 6,
   /** Multiplies the Relics gained on a Stellar Ascension - see PrestigeService.prestige(). */
   RelicGain: 7,
-  /** Sentinel for a small "boosts nearly everything" node (the shared trunk/wings the tree
-   *  climbs out of, the merge point, and the Grand Nexus at its top): never matched by the
-   *  per-stat aggregation loop directly, but summed into every one of CAPSTONE_EFFECTS by
-   *  TalentService.multiplier(). */
+  /** Sentinel for a small "boosts nearly everything" node - used here for the whole Core Engine
+   *  branch, whose real payoff (an energy resource for active skills) doesn't exist yet: never
+   *  matched by the per-stat aggregation loop directly, but summed into every one of
+   *  CAPSTONE_EFFECTS by TalentService.multiplier(). */
   Capstone: 8,
   /** Sentinel for a Gem Socket slot: carries no bonus of its own (the socketed card's ability
    *  does, via GemSocketService) - this only exists so the aggregation loop skips it. */
@@ -28,52 +39,66 @@ export type TalentEffect = (typeof TalentEffect)[keyof typeof TalentEffect]
  *  always been excluded). */
 export const CAPSTONE_EFFECTS: TalentEffect[] = [TalentEffect.Dps, TalentEffect.Gold, TalentEffect.TapDamage, TalentEffect.OfflineReward, TalentEffect.RelicGain]
 
+/** The tree's 5 named branches - real identity here, unlike the previous uncategorized design:
+ *  each is a distinct playstyle (see the design doc), shown to the player as a labeled section. */
+export type TalentBranch = 'cannon' | 'fleet' | 'core' | 'salvage' | 'warp'
+/** Ring order - also the order combo talents bridge (cannon-fleet, fleet-core, core-salvage,
+ *  salvage-warp, warp-cannon wraps back to the start). */
+export const BRANCH_ORDER: TalentBranch[] = ['cannon', 'fleet', 'core', 'salvage', 'warp']
+export const BRANCH_LABEL: Record<TalentBranch, string> = {
+  cannon: 'VANGUARD CANNON',
+  fleet: 'AUTONOMOUS FLEET',
+  core: 'CORE ENGINE',
+  salvage: 'GALACTIC SALVAGE',
+  warp: 'WARP COMMAND',
+}
+export const BRANCH_COLOR: Record<TalentBranch, string> = {
+  cannon: '#FF6B6B',
+  fleet: '#43DDEE',
+  core: '#B07CFF',
+  salvage: '#FFD873',
+  warp: '#7CFFB2',
+}
+
 export interface TalentDefinition {
-  /** Stable id, e.g. 'trunk-1', 'a-dead-2', 'nexus' - never rename (it's the prerequisite
-   *  graph's own vocabulary, not just a debug label - also the Gem Socket save format's key). */
+  /** Stable id, e.g. 'cannon-pulse-amplifier', 'combo-cannon-fleet' - never rename (also the Gem
+   *  Socket save format's key). */
   id: string
-  /** Purely an internal wiring tag (which hand-authored segment a node came from) - never
-   *  surfaced to the player as a named category (no legend, no per-segment color; see
-   *  talentTreeMeta.tsx, which colors/icons every regular node the same way regardless of this). */
-  branch: string
-  /** ALL listed ids must be owned (level>0) before this node unlocks. Empty = always unlockable. */
-  prerequisites: string[]
-  /** Layout coordinate for the SVG tree renderer (TalentClusterPanel.tsx) - one shared coordinate
-   *  space for the WHOLE tree: row 0 is the Grand Nexus at the very top, the highest row number
-   *  is the trunk's first node at the very bottom - the tree reads bottom-to-top. */
-  pos: { col: number; row: number }
+  branch: TalentBranch | 'combo'
+  /** Unlocked once TOTAL points spent in each listed branch reaches its threshold - not a
+   *  prerequisite graph. A tier-1 node has an empty array (always unlockable); a combo talent
+   *  lists both of the branches it bridges, each needing its own threshold. */
+  unlockRequirements: Array<{ branch: TalentBranch; points: number }>
   effect: TalentEffect
-  /** What this node actually does, e.g. "Tap Damage" - shown as the node's label instead of a
-   *  flavor name, so a glance at the tree tells you what you're investing in. */
+  /** The talent's real, creative name (e.g. "Nova Lance") - the whole point of this design is
+   *  each talent having real personality, not a generic effect label. */
   displayName: string
+  /** The talent's full intended mechanic, even where the mechanic itself is a later phase - see
+   *  the file header. */
   description: string
   /** Bonus granted immediately at level 1 (e.g. 0.045 = +4.5%). 0 for a Gem Socket node. */
   firstLevelBonus: number
   /** Additional bonus per level beyond level 1. */
   bonusPerLevel: number
   maxLevel: number
+  /** True only for the 5 branch capstones (Nova Lance, Hive Carrier, ...) - the UI gives these a
+   *  bigger, distinct treatment, same idea as the old single Grand Nexus card. */
+  isCapstone: boolean
 }
 
-/** Per-node-role bonus formula: a root is a cheap, weak opener (the trunk); a fork is the main
- *  per-level pace (most regular climbing nodes); a spike is a cheap one-off milestone dropped
- *  partway up a long climb - a single bigger jolt breaking up the steady fork/fork/fork rhythm;
- *  a merge rewards successfully converging two paths back into one with a stronger multi-level
- *  bonus; a keystone is the biggest single-level spike (used both for the top of a long climb
- *  AND for a short dead-end's own payoff - see buildDefaultTalents); a gem carries no bonus of
- *  its own - its "level" (0 or 1) only tracks whether the slot is unlocked. */
+/** Per-node-role bonus formula. A regular talent runs 5 ranks at the main pace; a "special" runs
+ *  only 3 (matching the design doc's own split) at a slightly punchier per-level rate, so its
+ *  smaller rank count doesn't read as strictly weaker; a keystone is a branch's capstone - one
+ *  big single-level payoff; a gem carries no bonus of its own - its "level" (0 or 1) only tracks
+ *  whether the slot is unlocked. */
 const ROLE_FORMULA = {
-  root: { firstLevelBonus: 0.03, bonusPerLevel: 0.015, maxLevel: 4 },
-  fork: { firstLevelBonus: 0.04, bonusPerLevel: 0.02, maxLevel: 5 },
-  spike: { firstLevelBonus: 0.09, bonusPerLevel: 0, maxLevel: 1 },
-  merge: { firstLevelBonus: 0.07, bonusPerLevel: 0.03, maxLevel: 5 },
-  keystone: { firstLevelBonus: 0.12, bonusPerLevel: 0, maxLevel: 1 },
+  regular: { firstLevelBonus: 0.04, bonusPerLevel: 0.02, maxLevel: 5 },
+  special: { firstLevelBonus: 0.06, bonusPerLevel: 0.03, maxLevel: 3 },
+  keystone: { firstLevelBonus: 0.15, bonusPerLevel: 0, maxLevel: 1 },
   gem: { firstLevelBonus: 0, bonusPerLevel: 0, maxLevel: 1 },
 } as const
 type NodeRole = keyof typeof ROLE_FORMULA
 
-/** Short label + one-line description per effect - every node's displayName/description is
- *  derived from its own effect via this table, so authoring a node is just "pick an effect,
- *  everything else follows" rather than hand-writing dozens of unique flavor names. */
 const EFFECT_LABEL: Record<TalentEffect, string> = {
   [TalentEffect.Dps]: 'Fleet DPS',
   [TalentEffect.Gold]: 'Stardust',
@@ -86,178 +111,428 @@ const EFFECT_LABEL: Record<TalentEffect, string> = {
   [TalentEffect.Capstone]: 'Core Systems',
   [TalentEffect.GemSocket]: 'Gem Socket',
 }
-const EFFECT_DESCRIPTION: Record<TalentEffect, string> = {
-  [TalentEffect.Dps]: "Increases your fleet's automatic damage output.",
-  [TalentEffect.Gold]: 'Increases Stardust earned from every kill.',
-  [TalentEffect.TapDamage]: 'Increases the damage of every tap.',
-  [TalentEffect.OfflineReward]: 'Increases Stardust earned while you were away.',
-  [TalentEffect.XpGain]: 'Increases XP earned toward your next Talent Point.',
-  [TalentEffect.TapCritChance]: 'Chance for a tap to land a critical hit.',
-  [TalentEffect.ShipCritChance]: "Chance for your fleet's damage to critically strike.",
-  [TalentEffect.RelicGain]: 'Increases Relics gained on your next Stellar Ascension.',
-  [TalentEffect.Capstone]: 'A small boost to nearly everything.',
-  [TalentEffect.GemSocket]: 'Socket an owned card here to channel its power.',
+
+interface TalentSpec {
+  localId: string
+  displayName: string
+  description: string
+  effect: TalentEffect
+  role: Exclude<NodeRole, 'gem'>
 }
 
-function node(id: string, branch: string, prerequisites: string[], pos: { col: number; row: number }, effect: TalentEffect, role: NodeRole): TalentDefinition {
-  return { id, branch, prerequisites, pos, effect, displayName: EFFECT_LABEL[effect], description: EFFECT_DESCRIPTION[effect], ...ROLE_FORMULA[role] }
+interface BranchSpec {
+  id: TalentBranch
+  /** 4 tiers, 2 talents each - gated by cumulative points spent in THIS branch (0/5/12/22). */
+  tiers: [TalentSpec, TalentSpec][]
+  capstone: TalentSpec
 }
 
-type Step = { effect: TalentEffect; role?: NodeRole } | { gem: true }
+const TIER_THRESHOLDS = [0, 5, 12, 22]
+const CAPSTONE_THRESHOLD = 35
+/** Two Gem Sockets per branch, unlocked alongside tier 2 and tier 4 - early and late access to
+ *  card synergy as you climb. */
+const GEM_THRESHOLDS = [5, 22]
 
-/** Cycles through `effects` (in order, wrapping around) for `count` point nodes - not just
- *  alternating between two, so a long climb doesn't read as the same 2 things over and over.
- *  Drops a Gem Socket right after the point node at each index listed in `gemAfter` (1-based),
- *  and tags the point node at each index in `spikeAt` (1-based) with the 'spike' role instead of
- *  the run's default, for an occasional bigger one-off jolt mid-climb. */
-function cyclingSteps(effects: TalentEffect[], count: number, gemAfter: number[] = [], spikeAt: number[] = []): Step[] {
-  const steps: Step[] = []
-  for (let i = 1; i <= count; i++) {
-    steps.push({ effect: effects[(i - 1) % effects.length], role: spikeAt.includes(i) ? 'spike' : undefined })
-    if (gemAfter.includes(i)) steps.push({ gem: true })
-  }
-  return steps
-}
-
-/** Builds a straight run of nodes from `steps`, chaining each to the previous (or to `prereq`
- *  for the first one), climbing one row per step. Returns the last node's id and the next free
- *  row so callers can continue the chain (a fork, a merge, another run) without hand-computing
- *  row numbers. */
-function buildRun(idPrefix: string, branch: string, col: number, prereq: string, startRow: number, steps: Step[], defaultRole: NodeRole = 'fork'): { defs: TalentDefinition[]; lastId: string; nextRow: number } {
+function buildBranch(spec: BranchSpec): TalentDefinition[] {
   const defs: TalentDefinition[] = []
-  let prev = prereq
-  let row = startRow
-  let pointCount = 0
-  let gemCount = 0
-  for (const step of steps) {
-    if ('gem' in step) {
-      gemCount++
-      const id = `${idPrefix}-gem-${gemCount}`
-      defs.push(node(id, branch, [prev], { col, row }, TalentEffect.GemSocket, 'gem'))
-      prev = id
-    } else {
-      pointCount++
-      const id = `${idPrefix}-${pointCount}`
-      defs.push(node(id, branch, [prev], { col, row }, step.effect, step.role ?? defaultRole))
-      prev = id
+  spec.tiers.forEach((pair, tierIdx) => {
+    const points = TIER_THRESHOLDS[tierIdx]
+    for (const t of pair) {
+      defs.push({
+        id: `${spec.id}-${t.localId}`,
+        branch: spec.id,
+        unlockRequirements: points > 0 ? [{ branch: spec.id, points }] : [],
+        effect: t.effect,
+        displayName: t.displayName,
+        description: t.description,
+        isCapstone: false,
+        ...ROLE_FORMULA[t.role],
+      })
     }
-    row--
+  })
+  defs.push({
+    id: `${spec.id}-${spec.capstone.localId}`,
+    branch: spec.id,
+    unlockRequirements: [{ branch: spec.id, points: CAPSTONE_THRESHOLD }],
+    effect: spec.capstone.effect,
+    displayName: spec.capstone.displayName,
+    description: spec.capstone.description,
+    isCapstone: true,
+    ...ROLE_FORMULA[spec.capstone.role],
+  })
+  GEM_THRESHOLDS.forEach((points, i) => {
+    defs.push({
+      id: `${spec.id}-gem-${i + 1}`,
+      branch: spec.id,
+      unlockRequirements: [{ branch: spec.id, points }],
+      effect: TalentEffect.GemSocket,
+      displayName: EFFECT_LABEL[TalentEffect.GemSocket],
+      description: 'Socket an owned card here to channel its power.',
+      isCapstone: false,
+      ...ROLE_FORMULA.gem,
+    })
+  })
+  return defs
+}
+
+const CANNON: BranchSpec = {
+  id: 'cannon',
+  tiers: [
+    [
+      { localId: 'pulse-amplifier', displayName: 'Pulse Amplifier', description: 'Increases tap damage per rank.', effect: TalentEffect.TapDamage, role: 'regular' },
+      { localId: 'precision-optics', displayName: 'Precision Optics', description: 'Increases tap crit chance and crit damage per rank.', effect: TalentEffect.TapCritChance, role: 'regular' },
+    ],
+    [
+      {
+        localId: 'combat-rhythm',
+        displayName: 'Combat Rhythm',
+        description: 'Consecutive taps under 0.7s build a combo stack, each adding tap damage (Phase 2: real combo counter).',
+        effect: TalentEffect.TapDamage,
+        role: 'regular',
+      },
+      {
+        localId: 'armor-fracture',
+        displayName: 'Armor Fracture',
+        description: "Every 15 taps, cracks the target's armor for 5s (Phase 2: real armor debuff) - for now, boosts tap damage.",
+        effect: TalentEffect.TapDamage,
+        role: 'regular',
+      },
+    ],
+    [
+      {
+        localId: 'ricochet-protocol',
+        displayName: 'Ricochet Protocol',
+        description: 'Crits have a chance to bounce to another target (Phase 2: real ricochet) - for now, boosts crit chance.',
+        effect: TalentEffect.TapCritChance,
+        role: 'special',
+      },
+      {
+        localId: 'core-lock',
+        displayName: 'Core Lock',
+        description: "5 crits in 3s exposes the enemy's core for 4s, boosting tap damage (Phase 2: real core-lock window).",
+        effect: TalentEffect.TapDamage,
+        role: 'regular',
+      },
+    ],
+    [
+      {
+        localId: 'thermal-overrun',
+        displayName: 'Thermal Overrun',
+        description: 'Every ~30-40 taps, fires a huge heat-wave shot (Phase 2: real periodic burst) - for now, boosts tap damage.',
+        effect: TalentEffect.TapDamage,
+        role: 'special',
+      },
+      {
+        localId: 'execution-beam',
+        displayName: 'Execution Beam',
+        description: 'Tap damage against targets under 25% HP is increased.',
+        effect: TalentEffect.TapDamage,
+        role: 'regular',
+      },
+    ],
+  ],
+  capstone: {
+    localId: 'nova-lance',
+    displayName: 'Nova Lance',
+    description: 'Every 100 taps, charges a Nova shot: 5000% tap damage, always crits, exposes the core for 6s, banks up to 60 taps into the next stage (Phase 2: real charge-up). For now, a permanent tap damage spike.',
+    effect: TalentEffect.TapDamage,
+    role: 'keystone',
+  },
+}
+
+const FLEET: BranchSpec = {
+  id: 'fleet',
+  tiers: [
+    [
+      { localId: 'autonomous-turrets', displayName: 'Autonomous Turrets', description: "Increases the fleet's automatic damage per rank.", effect: TalentEffect.Dps, role: 'regular' },
+      { localId: 'drone-hangar', displayName: 'Drone Hangar', description: 'Increases drone damage per rank; adds a drone at ranks 3 and 5 (Phase 2: real drone count).', effect: TalentEffect.Dps, role: 'regular' },
+    ],
+    [
+      {
+        localId: 'synchronized-volley',
+        displayName: 'Synchronized Volley',
+        description: 'Every 8s, every drone fires at once (Phase 2: real timed volley) - for now, boosts fleet DPS.',
+        effect: TalentEffect.Dps,
+        role: 'regular',
+      },
+      {
+        localId: 'replicator-nanites',
+        displayName: 'Replicator Nanites',
+        description: 'Chance to spawn a temporary drone on kill (Phase 2: real temp drones) - for now, boosts fleet DPS.',
+        effect: TalentEffect.Dps,
+        role: 'special',
+      },
+    ],
+    [
+      { localId: 'priority-targeting', displayName: 'Priority Targeting', description: 'Drones deal bonus damage to bosses and elites.', effect: TalentEffect.Dps, role: 'regular' },
+      {
+        localId: 'echo-command',
+        displayName: 'Echo Command',
+        description: 'Every 15 taps, drones fire a small volley (Phase 2: real tap-linked volley) - for now, boosts fleet DPS.',
+        effect: TalentEffect.Dps,
+        role: 'regular',
+      },
+    ],
+    [
+      {
+        localId: 'adaptive-formation',
+        displayName: 'Adaptive Formation',
+        description: 'Choose a drone formation - Aggressive, Siege, or Patrol (Phase 2: real formation choice). For now, a flat fleet power boost.',
+        effect: TalentEffect.Dps,
+        role: 'keystone',
+      },
+      { localId: 'deep-space-patrol', displayName: 'Deep-Space Patrol', description: 'Increases offline earning duration and offline damage efficiency per rank.', effect: TalentEffect.OfflineReward, role: 'regular' },
+    ],
+  ],
+  capstone: {
+    localId: 'hive-carrier',
+    displayName: 'Hive Carrier',
+    description: 'Every 20s, drones merge into a mini-carrier for 6s: 2.5x drone damage, double volleys, boss targeting always on (Phase 2: real transform). For now, a permanent fleet DPS spike.',
+    effect: TalentEffect.Dps,
+    role: 'keystone',
+  },
+}
+
+const CORE: BranchSpec = {
+  id: 'core',
+  tiers: [
+    [
+      { localId: 'expanded-reactor', displayName: 'Expanded Reactor', description: 'Increases max energy per rank (Phase 2: real energy pool).', effect: TalentEffect.Capstone, role: 'regular' },
+      { localId: 'flux-recharge', displayName: 'Flux Recharge', description: 'Increases energy regen speed per rank (Phase 2: real energy pool).', effect: TalentEffect.Capstone, role: 'regular' },
+    ],
+    [
+      { localId: 'thermal-recycling', displayName: 'Thermal Recycling', description: 'Reduces active skill cooldowns per rank.', effect: TalentEffect.Capstone, role: 'regular' },
+      { localId: 'sustained-overdrive', displayName: 'Sustained Overdrive', description: 'Increases active skill duration per rank.', effect: TalentEffect.Capstone, role: 'regular' },
+    ],
+    [
+      {
+        localId: 'chain-reaction',
+        displayName: 'Chain Reaction',
+        description: 'Using two different skills within 4s empowers the second (Phase 2: real chain bonus) - for now, a small universal boost.',
+        effect: TalentEffect.Capstone,
+        role: 'regular',
+      },
+      {
+        localId: 'emergency-cell',
+        displayName: 'Emergency Cell',
+        description: 'First time energy drops below 10% in a boss fight, refunds some energy (Phase 2: real energy pool) - for now, a small universal boost.',
+        effect: TalentEffect.Capstone,
+        role: 'special',
+      },
+    ],
+    [
+      {
+        localId: 'superconductive-grid',
+        displayName: 'Superconductive Grid',
+        description: 'Each active skill used after the first strengthens all skills (Phase 2: real chain scaling) - for now, a small universal boost.',
+        effect: TalentEffect.Capstone,
+        role: 'regular',
+      },
+      {
+        localId: 'time-lock',
+        displayName: 'Time Lock',
+        description: 'The first skill used in a boss fight briefly holds the boss timer (Phase 2: real time lock) - for now, a small universal boost.',
+        effect: TalentEffect.Capstone,
+        role: 'special',
+      },
+    ],
+  ],
+  capstone: {
+    localId: 'infinite-core',
+    displayName: 'Infinite Core',
+    description: "If energy holds at 100% for 3s, triggers an 8s Infinite Core burst: free skill casts, 3x faster cooldowns, +25% skill power, once per 90s (Phase 2: real energy pool). For now, a permanent universal boost.",
+    effect: TalentEffect.Capstone,
+    role: 'keystone',
+  },
+}
+
+const SALVAGE: BranchSpec = {
+  id: 'salvage',
+  tiers: [
+    [
+      { localId: 'salvage-lasers', displayName: 'Salvage Lasers', description: 'Increases Stardust earned from every kill per rank.', effect: TalentEffect.Gold, role: 'regular' },
+      { localId: 'tractor-array', displayName: 'Tractor Array', description: 'Auto-collects Stardust; chaining pickups increases their value (Phase 2: real loot chain).', effect: TalentEffect.Gold, role: 'regular' },
+    ],
+    [
+      { localId: 'rare-signal-scanner', displayName: 'Rare Signal Scanner', description: 'Increases rare drop chance and value per rank (Phase 2: real loot rarity).', effect: TalentEffect.Gold, role: 'regular' },
+      {
+        localId: 'bounty-matrix',
+        displayName: 'Bounty Matrix',
+        description: 'Every 20 stages, a bounty target appears - killing it fast pays extra (Phase 2: real bounty targets).',
+        effect: TalentEffect.Gold,
+        role: 'regular',
+      },
+    ],
+    [
+      { localId: 'recycling-forge', displayName: 'Recycling Forge', description: 'Duplicate parts convert to more Scrap; module upgrades cost less (Phase 2: real crafting economy).', effect: TalentEffect.Gold, role: 'regular' },
+      { localId: 'efficient-assembly', displayName: 'Efficient Assembly', description: 'Reduces ship/module upgrade costs per rank (Phase 2: real upgrade discount).', effect: TalentEffect.Gold, role: 'regular' },
+    ],
+    [
+      {
+        localId: 'golden-route',
+        displayName: 'Golden Route',
+        description: 'After a boss kill, triggers a Gold Rush window: faster spawns, more Stardust (Phase 2: real Gold Rush event).',
+        effect: TalentEffect.Gold,
+        role: 'special',
+      },
+      {
+        localId: 'smuggler-beacon',
+        displayName: 'Smuggler Beacon',
+        description: 'At the start of each Ascension, special offers appear, purchasable with that run\'s Stardust (Phase 2: real offer shop).',
+        effect: TalentEffect.Gold,
+        role: 'special',
+      },
+    ],
+  ],
+  capstone: {
+    localId: 'dyson-harvest',
+    displayName: 'Dyson Harvest',
+    description: 'Every 50 stages, converts destroyed planets into an energy source: 3x income, +50% module drops, no stage transition delay, for the next 10 stages (Phase 2: real Dyson event). For now, a permanent Stardust spike.',
+    effect: TalentEffect.Gold,
+    role: 'keystone',
+  },
+}
+
+const WARP: BranchSpec = {
+  id: 'warp',
+  tiers: [
+    [
+      { localId: 'warp-navigation', displayName: 'Warp Navigation', description: 'Reduces the delay between stages per rank (Phase 2: real transition speed) - for now, boosts Relic Gain.', effect: TalentEffect.RelicGain, role: 'regular' },
+      { localId: 'first-strike-protocol', displayName: 'First Strike Protocol', description: "Boosts all damage in an enemy's first 4 seconds per rank (Phase 2: real timing window) - for now, boosts fleet DPS.", effect: TalentEffect.Dps, role: 'regular' },
+    ],
+    [
+      { localId: 'gravity-snare', displayName: 'Gravity Snare', description: 'Increases the boss timer per rank.', effect: TalentEffect.RelicGain, role: 'regular' },
+      {
+        localId: 'hyperlane-momentum',
+        displayName: 'Hyperlane Momentum',
+        description: 'Clearing a stage in under 4s builds Momentum stacks, each boosting damage (Phase 2: real momentum system) - for now, boosts fleet DPS.',
+        effect: TalentEffect.Dps,
+        role: 'regular',
+      },
+    ],
+    [
+      {
+        localId: 'rift-skip',
+        displayName: 'Rift Skip',
+        description: 'Chance to skip the next normal stage and still collect most of its reward (Phase 2: real stage skip) - for now, boosts Relic Gain.',
+        effect: TalentEffect.RelicGain,
+        role: 'regular',
+      },
+      {
+        localId: 'temporal-insurance',
+        displayName: 'Temporal Insurance',
+        description: 'Losing to a boss retains a portion of your Warp Momentum (Phase 2: real momentum system) - for now, boosts Relic Gain.',
+        effect: TalentEffect.RelicGain,
+        role: 'special',
+      },
+    ],
+    [
+      {
+        localId: 'anomaly-hunter',
+        displayName: 'Anomaly Hunter',
+        description: 'Every 25 stages, increases the chance of a rare event stage with bonus loot and Relics (Phase 2: real event stages) - for now, boosts Relic Gain.',
+        effect: TalentEffect.RelicGain,
+        role: 'regular',
+      },
+      {
+        localId: 'paradox-echo',
+        displayName: 'Paradox Echo',
+        description: "After Ascension, a portion of last run's peak DPS carries over temporarily (Phase 2: real DPS echo) - for now, boosts Relic Gain.",
+        effect: TalentEffect.RelicGain,
+        role: 'special',
+      },
+    ],
+  ],
+  capstone: {
+    localId: 'chrono-collapse',
+    displayName: 'Chrono Collapse',
+    description: 'Killing a boss with over 50% of its timer left instantly clears the next 2 normal stages with full rewards, keeping Warp Momentum - 45s cooldown (Phase 2: real instant-clear). For now, a permanent Relic Gain spike.',
+    effect: TalentEffect.RelicGain,
+    role: 'keystone',
+  },
+}
+
+const BRANCH_SPECS: Record<TalentBranch, BranchSpec> = { cannon: CANNON, fleet: FLEET, core: CORE, salvage: SALVAGE, warp: WARP }
+
+interface ComboSpec {
+  id: string
+  branches: [TalentBranch, TalentBranch]
+  displayName: string
+  description: string
+  effect: TalentEffect
+}
+
+/** 5 combo talents, one per adjacent pair in the branch ring, each requiring 12 points already
+ *  spent in BOTH neighboring branches - a real cross-branch investment, not just a deeper single
+ *  branch. 3 ranks each, matching the design doc. */
+const COMBO_REQUIRED_POINTS = 12
+const COMBOS: ComboSpec[] = [
+  {
+    id: 'combo-cannon-fleet',
+    branches: ['cannon', 'fleet'],
+    displayName: 'Mirror Fire',
+    description: 'Every 10-20 taps, all drones volley together; cannon crits also raise the volley\'s crit chance (Phase 2: real synergy) - for now, boosts fleet DPS.',
+    effect: TalentEffect.Dps,
+  },
+  {
+    id: 'combo-fleet-core',
+    branches: ['fleet', 'core'],
+    displayName: 'Charged Swarm',
+    description: 'While energy is above 80%, drones deal bonus damage; using a skill overcharges drones for 2s (Phase 2: real energy synergy) - for now, boosts fleet DPS.',
+    effect: TalentEffect.Dps,
+  },
+  {
+    id: 'combo-core-salvage',
+    branches: ['core', 'salvage'],
+    displayName: 'Energy Arbitrage',
+    description: 'After a boss kill, unused energy converts to Stardust, boosting the boss reward (Phase 2: real energy-to-gold conversion) - for now, boosts Stardust.',
+    effect: TalentEffect.Gold,
+  },
+  {
+    id: 'combo-salvage-warp',
+    branches: ['salvage', 'warp'],
+    displayName: 'Loot Wormhole',
+    description: 'Stages skipped by Rift Skip or Chrono Collapse still pay most of their reward, and the Bounty counter survives the skip (Phase 2: real skip-loot retention) - for now, boosts Stardust.',
+    effect: TalentEffect.Gold,
+  },
+  {
+    id: 'combo-warp-cannon',
+    branches: ['warp', 'cannon'],
+    displayName: 'Chrono Trigger',
+    description: "Combo doesn't reset between stages, and the first tap of each stage always crits for extra damage (Phase 2: real combo/crit synergy) - for now, boosts tap crit chance.",
+    effect: TalentEffect.TapCritChance,
+  },
+]
+
+function buildCombo(spec: ComboSpec): TalentDefinition {
+  return {
+    id: spec.id,
+    branch: 'combo',
+    unlockRequirements: spec.branches.map((branch) => ({ branch, points: COMBO_REQUIRED_POINTS })),
+    effect: spec.effect,
+    displayName: spec.displayName,
+    description: spec.description,
+    isCapstone: false,
+    ...ROLE_FORMULA.special,
   }
-  return { defs, lastId: prev, nextRow: row }
 }
 
 /**
- * A hand-authored lattice, not a single repeated template - the branch count moves both up AND
- * down as it climbs, and two short dead ends let a small investment stand on its own instead of
- * demanding the player commit all the way to the top:
+ * 5 branches (11 nodes each: 8 tier talents + 1 capstone + 2 gem sockets = 55) + 5 cross-branch
+ * combo talents (3 ranks each) = 60 nodes total. Unlike the previous id/prerequisite graph, tiers
+ * are gated purely by cumulative points spent in that SAME branch (0/5/12/22, capstone at 35) -
+ * no specific node-to-node dependency, so the 2 talents within a tier are always siblings, pick
+ * either or both freely. Combo talents require 12 points in BOTH of the two branches they bridge.
  *
- *                                    nexus
- *                    final-a-keystone      final-b-keystone
- *                           |                     |
- *                  (12 nodes, 2 gems)     (12 nodes, 2 gems)
- *                           |                     |
- *                     final-a-1             final-b-1     merge-dead (single node, terminal -
- *                            \                  /           take just this one and stop)
- *                             \                /                  |
- *                              \              /                core-merge
- *                               \            /                 /
- *                                core-merge (requires BOTH lane tops)
- *                               /                            \
- *                        [lane A: 8 nodes]              [lane B: 8 nodes]
- *                         /         \                          |
- *                  a-dead-1,2   (continues, 5 more)             |
- *                  (terminal,    /                              |
- *                   2 nodes)    /                                |
- *                       (3 shared nodes)                         |
- *                           |                                    |
- *                        wing-a                               wing-b
- *                              \                              /
- *                               \____________ trunk-5 ________/
- *                                                 |
- *                                              trunk-1..4
- *
- * Branch count over the climb: 1 (trunk) -> 2 (wings) -> 3 (lane A's own early fork adds a third
- * live path, one of which - a-dead - terminates almost immediately) -> 1 (core-merge, a real
- * reconvergence, not just more forking) -> 3 again (final-a, final-b, and merge-dead, which also
- * terminates immediately) -> 2 (only final-a/final-b continue) -> 1 (nexus).
- *
- * Every long climb (Lane A/B, final-A/B) cycles through 4 effects, not just 2 - see the
- * LANE_A_EFFECTS/LANE_B_EFFECTS/FINAL_A_EFFECTS/FINAL_B_EFFECTS arrays below - so no stretch of
- * the tree reads as "the same two things back and forth." Post-merge climbs deliberately mix
- * both pre-merge themes rather than continuing just one. A handful of nodes partway up each long
- * climb use the 'spike' role (a cheap one-off bigger jolt) instead of the steady 'fork' pace, for
- * rhythm - not every node should feel like the same weight of investment.
+ * Max points per branch (talents only, no gems): Cannon/Core/Salvage/Warp = 37, Fleet = 35 (one
+ * fewer full-strength rank on Adaptive Formation, which is capped at 1 like a keystone). Plus 5
+ * combos x3 + 10 gems x1 = 25. Grand total = 37*4 + 35 + 25 = 208 - deliberately far more than a
+ * realistic playthrough earns (see BalanceConfig.ts's talentXpCurve* - tuned so ~70-80 points is
+ * a real, achievable milestone while fully maxing every branch stays a distant long-term goal;
+ * per the design doc, if everything is completable the choices stop mattering).
  */
 export function buildDefaultTalents(): TalentDefinition[] {
-  const defs: TalentDefinition[] = []
-
-  // Trunk: 5 cheap nodes, shared by every path - nothing here commits you to anything yet.
-  defs.push(node('trunk-1', 'trunk', [], { col: 3, row: 30 }, TalentEffect.Capstone, 'root'))
-  defs.push(node('trunk-2', 'trunk', ['trunk-1'], { col: 3, row: 29 }, TalentEffect.Capstone, 'root'))
-  defs.push(node('trunk-3', 'trunk', ['trunk-2'], { col: 3, row: 28 }, TalentEffect.Capstone, 'root'))
-  defs.push(node('trunk-4', 'trunk', ['trunk-3'], { col: 3, row: 27 }, TalentEffect.Capstone, 'root'))
-  defs.push(node('trunk-5', 'trunk', ['trunk-4'], { col: 3, row: 26 }, TalentEffect.Capstone, 'root'))
-
-  // First fork: two wings.
-  defs.push(node('wing-a', 'trunk', ['trunk-5'], { col: 1.5, row: 25 }, TalentEffect.Capstone, 'fork'))
-  defs.push(node('wing-b', 'trunk', ['trunk-5'], { col: 4.5, row: 25 }, TalentEffect.Capstone, 'fork'))
-
-  // Lane A cycles 4 effects (not just 2) so an 8-node climb never reads as "the same two things
-  // over and over": TapDamage, Dps, TapCritChance, ShipCritChance - an "offense" theme.
-  const LANE_A_EFFECTS = [TalentEffect.TapDamage, TalentEffect.Dps, TalentEffect.TapCritChance, TalentEffect.ShipCritChance]
-  // Lane A: 3 shared nodes, THEN its own early fork into [continue, 5 more] + [a short dead
-  // end, 2 nodes, terminal - a real "just take this one path and stop" option, ending on a
-  // deliberately different payoff (RelicGain) than the offense theme it branched off of].
-  const a1 = buildRun('a1', 'a', 1.5, 'wing-a', 24, cyclingSteps(LANE_A_EFFECTS, 3))
-  defs.push(...a1.defs)
-  const a2 = buildRun('a2', 'a', 0.8, a1.lastId, a1.nextRow, cyclingSteps(LANE_A_EFFECTS, 5, [], [4]))
-  defs.push(...a2.defs)
-  const aDead = buildRun('a-dead', 'a-dead', 2.3, a1.lastId, a1.nextRow, [{ effect: TalentEffect.TapCritChance }], 'fork')
-  defs.push(...aDead.defs)
-  defs.push(node('a-dead-2', 'a-dead', [aDead.lastId], { col: 2.3, row: aDead.nextRow }, TalentEffect.RelicGain, 'keystone'))
-
-  // Lane B cycles a different 4-effect set - "economy/endurance" - straight, no internal fork
-  // (the asymmetry with Lane A is deliberate).
-  const LANE_B_EFFECTS = [TalentEffect.Gold, TalentEffect.XpGain, TalentEffect.OfflineReward, TalentEffect.RelicGain]
-  const b = buildRun('b', 'b', 4.5, 'wing-b', 24, cyclingSteps(LANE_B_EFFECTS, 8, [], [5]))
-  defs.push(...b.defs)
-
-  // Reconvergence: branch count drops from 2 live paths (a2, b) back to 1. A real merge, not
-  // just more forking.
-  defs.push(node('core-merge', 'merge', [a2.lastId, b.lastId], { col: 2.65, row: b.nextRow - 1 }, TalentEffect.Capstone, 'merge'))
-  const afterMergeRow = b.nextRow - 2
-
-  // Second fork, into 3: two long final climbs, plus another short dead end right off the merge
-  // (a standalone Gold payoff - the smallest possible "take just this one talent and stop").
-  defs.push(node('merge-dead', 'merge-dead', ['core-merge'], { col: 2.65, row: afterMergeRow }, TalentEffect.Gold, 'keystone'))
-
-  // Final climbs deliberately blend the two pre-merge themes rather than picking just one - the
-  // two paths' influence mixes now that they've converged.
-  const FINAL_A_EFFECTS = [TalentEffect.Dps, TalentEffect.RelicGain, TalentEffect.TapDamage, TalentEffect.OfflineReward]
-  const finalA = buildRun('final-a', 'final-a', 1.2, 'core-merge', afterMergeRow, cyclingSteps(FINAL_A_EFFECTS, 12, [2, 5], [9]))
-  defs.push(...finalA.defs)
-  defs.push(node('final-a-keystone', 'final-a', [finalA.lastId], { col: 1.2, row: finalA.nextRow }, FINAL_A_EFFECTS[12 % FINAL_A_EFFECTS.length], 'keystone'))
-
-  const FINAL_B_EFFECTS = [TalentEffect.XpGain, TalentEffect.TapCritChance, TalentEffect.Gold, TalentEffect.ShipCritChance]
-  const finalB = buildRun('final-b', 'final-b', 4.1, 'core-merge', afterMergeRow, cyclingSteps(FINAL_B_EFFECTS, 12, [2, 5], [9]))
-  defs.push(...finalB.defs)
-  defs.push(node('final-b-keystone', 'final-b', [finalB.lastId], { col: 4.1, row: finalB.nextRow }, FINAL_B_EFFECTS[12 % FINAL_B_EFFECTS.length], 'keystone'))
-
-  const nexusRow = Math.min(finalA.nextRow, finalB.nextRow) - 1
-  defs.push({
-    id: 'nexus',
-    branch: 'nexus',
-    prerequisites: ['final-a-keystone', 'final-b-keystone'],
-    pos: { col: 2.65, row: nexusRow },
-    effect: TalentEffect.Capstone,
-    displayName: 'Grand Nexus',
-    description: 'Two hard-won paths converge - a lasting echo of total mastery.',
-    firstLevelBonus: 0.05,
-    bonusPerLevel: 0,
-    maxLevel: 1,
-  })
-
-  return defs
+  return [...BRANCH_ORDER.flatMap((b) => buildBranch(BRANCH_SPECS[b])), ...COMBOS.map(buildCombo)]
 }
 
 /** Fractional bonus at a given level (0 for level <= 0) - same formula as artifactBonusAt. */
@@ -265,23 +540,24 @@ export function talentBonusAt(def: TalentDefinition, level: number): number {
   return level <= 0 ? 0 : def.firstLevelBonus + (level - 1) * def.bonusPerLevel
 }
 
-/**
- * Whether node i's prerequisites are met: every id in its `prerequisites` list must be owned
- * (level>0). A node with no prerequisites is always unlockable. Supports true multi-prerequisite
- * merge nodes (2+ ids at once, e.g. core-merge requiring both lane tops), not just a linear chain.
- */
-export function isTalentNodeUnlocked(defs: TalentDefinition[], levels: number[], i: number): boolean {
-  const byId = new Map(defs.map((d, idx) => [d.id, idx]))
-  return defs[i].prerequisites.every((id) => {
-    const idx = byId.get(id)
-    return idx !== undefined && levels[idx] > 0
-  })
+/** Total points (summed levels) spent on nodes tagged with `branch` - the sole unlock currency
+ *  in this design, not specific prerequisite nodes. Includes gem sockets (they're still an
+ *  investment in that branch). */
+export function branchPointsSpent(defs: TalentDefinition[], levels: number[], branch: TalentBranch): number {
+  let sum = 0
+  for (let i = 0; i < defs.length; i++) if (defs[i].branch === branch) sum += levels[i]
+  return sum
 }
 
-/** Human-readable prerequisite for a locked node's row (mirrors artifactUnlockLabel). */
+/** Whether node i's unlock requirements are met: every listed branch must have at least that
+ *  many points already spent in it (an empty list is always unlockable - every tier-1 talent). */
+export function isTalentNodeUnlocked(defs: TalentDefinition[], levels: number[], i: number): boolean {
+  return defs[i].unlockRequirements.every((req) => branchPointsSpent(defs, levels, req.branch) >= req.points)
+}
+
+/** Human-readable unlock requirement for a locked node's row (mirrors artifactUnlockLabel). */
 export function talentUnlockLabel(defs: TalentDefinition[], i: number): string {
-  const def = defs[i]
-  if (def.prerequisites.length === 0) return ''
-  const names = def.prerequisites.map((id) => defs.find((d) => d.id === id)?.displayName).filter((n): n is string => !!n)
-  return `Requires ${names.join(' and ')}`
+  const reqs = defs[i].unlockRequirements
+  if (reqs.length === 0) return ''
+  return `Requires ${reqs.map((r) => `${r.points} points in ${BRANCH_LABEL[r.branch]}`).join(' and ')}`
 }

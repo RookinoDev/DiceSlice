@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { buildDefaultTalents, isTalentNodeUnlocked, talentBonusAt, TalentEffect } from './TalentDefinition'
+import { buildDefaultTalents, isTalentNodeUnlocked, branchPointsSpent, talentBonusAt, BRANCH_ORDER, TalentEffect } from './TalentDefinition'
 
 describe('talent tree node catalog', () => {
-  it('builds the full 58-node lattice', () => {
+  it('builds 5 branches x 11 nodes (8 tier + 1 capstone + 2 gem) + 5 combo talents = 60 nodes', () => {
     const defs = buildDefaultTalents()
-    expect(defs.length).toBe(58)
+    expect(defs.length).toBe(BRANCH_ORDER.length * 11 + 5)
+    for (const branch of BRANCH_ORDER) {
+      const branchDefs = defs.filter((d) => d.branch === branch)
+      expect(branchDefs.length).toBe(11)
+      expect(branchDefs.filter((d) => d.effect === TalentEffect.GemSocket).length).toBe(2)
+      expect(branchDefs.filter((d) => d.isCapstone).length).toBe(1)
+    }
+    expect(defs.filter((d) => d.branch === 'combo').length).toBe(5)
   })
 
   it('every id is unique', () => {
@@ -13,98 +20,66 @@ describe('talent tree node catalog', () => {
     expect(new Set(ids).size).toBe(ids.length)
   })
 
-  it('every prerequisite id resolves to a real node in the same catalog', () => {
+  it('every unlock requirement references a real branch', () => {
     const defs = buildDefaultTalents()
-    const ids = new Set(defs.map((d) => d.id))
     for (const d of defs) {
-      for (const p of d.prerequisites) expect(ids.has(p)).toBe(true)
+      for (const req of d.unlockRequirements) expect(BRANCH_ORDER.includes(req.branch)).toBe(true)
     }
   })
 
-  it('the tree has exactly one node with no prerequisites - the shared trunk root', () => {
+  it('every tier-1 talent in every branch is always unlockable (empty requirements)', () => {
     const defs = buildDefaultTalents()
-    const roots = defs.filter((d) => d.prerequisites.length === 0)
-    expect(roots.map((d) => d.id)).toEqual(['trunk-1'])
-  })
-
-  it('the trunk is a straight 5-node chain feeding both wings', () => {
-    const defs = buildDefaultTalents()
-    expect(defs.find((d) => d.id === 'trunk-2')!.prerequisites).toEqual(['trunk-1'])
-    expect(defs.find((d) => d.id === 'trunk-5')!.prerequisites).toEqual(['trunk-4'])
-    expect(defs.find((d) => d.id === 'wing-a')!.prerequisites).toEqual(['trunk-5'])
-    expect(defs.find((d) => d.id === 'wing-b')!.prerequisites).toEqual(['trunk-5'])
-  })
-
-  it("Lane A forks partway up into a continuing path and a short dead end that terminates - nothing requires a-dead-2", () => {
-    const defs = buildDefaultTalents()
-    const forkPoint = defs.find((d) => d.id === 'a1-3')!
-    expect(defs.find((d) => d.id === 'a2-1')!.prerequisites).toEqual([forkPoint.id])
-    expect(defs.find((d) => d.id === 'a-dead-1')!.prerequisites).toEqual([forkPoint.id])
-    const deadEnd = defs.find((d) => d.id === 'a-dead-2')!
-    expect(defs.some((d) => d.prerequisites.includes(deadEnd.id))).toBe(false)
-  })
-
-  it('core-merge is a real 2-way merge requiring both lane tops, reducing 2 live paths back to 1', () => {
-    const defs = buildDefaultTalents()
-    const merge = defs.find((d) => d.id === 'core-merge')!
-    expect(merge.prerequisites.length).toBe(2)
-    expect(new Set(merge.prerequisites)).toEqual(new Set(['a2-5', 'b-8']))
-  })
-
-  it("merge-dead is a single terminal node right off the merge - take just it and stop, nothing above requires it", () => {
-    const defs = buildDefaultTalents()
-    const deadEnd = defs.find((d) => d.id === 'merge-dead')!
-    expect(deadEnd.prerequisites).toEqual(['core-merge'])
-    expect(defs.some((d) => d.prerequisites.includes('merge-dead'))).toBe(false)
-  })
-
-  it('the second fork off core-merge starts both long final climbs', () => {
-    const defs = buildDefaultTalents()
-    expect(defs.find((d) => d.id === 'final-a-1')!.prerequisites).toEqual(['core-merge'])
-    expect(defs.find((d) => d.id === 'final-b-1')!.prerequisites).toEqual(['core-merge'])
-  })
-
-  it('the Grand Nexus requires both final keystones (a real 2-way merge at the very top)', () => {
-    const defs = buildDefaultTalents()
-    const nexus = defs.find((d) => d.id === 'nexus')!
-    expect(new Set(nexus.prerequisites)).toEqual(new Set(['final-a-keystone', 'final-b-keystone']))
-  })
-
-  it('trunk/wing/merge/nexus nodes carry the Capstone sentinel (a small boost to nearly everything)', () => {
-    const defs = buildDefaultTalents()
-    for (const id of ['trunk-1', 'wing-a', 'wing-b', 'core-merge', 'nexus']) {
-      expect(defs.find((d) => d.id === id)!.effect).toBe(TalentEffect.Capstone)
+    for (const branch of BRANCH_ORDER) {
+      const branchDefs = defs.filter((d) => d.branch === branch)
+      // The first 2 nodes pushed per branch are always tier 1 (see buildBranch's push order).
+      expect(branchDefs[0].unlockRequirements).toEqual([])
+      expect(branchDefs[1].unlockRequirements).toEqual([])
     }
   })
 
-  it('each long climb cycles through 4 distinct effects (not just 2), each with 2 gem sockets', () => {
+  it('tier thresholds climb 0/5/12/22 within a branch, capstone at 35', () => {
     const defs = buildDefaultTalents()
-    const effectsOf = (branch: string) => new Set(defs.filter((d) => d.branch === branch && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
-    const gemsOf = (branch: string) => defs.filter((d) => d.branch === branch && d.effect === TalentEffect.GemSocket)
-
-    expect(effectsOf('final-a')).toEqual(new Set([TalentEffect.Dps, TalentEffect.RelicGain, TalentEffect.TapDamage, TalentEffect.OfflineReward]))
-    expect(gemsOf('final-a').length).toBe(2)
-
-    expect(effectsOf('final-b')).toEqual(new Set([TalentEffect.XpGain, TalentEffect.TapCritChance, TalentEffect.Gold, TalentEffect.ShipCritChance]))
-    expect(gemsOf('final-b').length).toBe(2)
-
-    // Lane A/B (pre-merge) also cycle 4 effects each - no gems there, those only start post-merge.
-    expect(effectsOf('a')).toEqual(new Set([TalentEffect.TapDamage, TalentEffect.Dps, TalentEffect.TapCritChance, TalentEffect.ShipCritChance]))
-    expect(effectsOf('b')).toEqual(new Set([TalentEffect.Gold, TalentEffect.XpGain, TalentEffect.OfflineReward, TalentEffect.RelicGain]))
+    const cannon = defs.filter((d) => d.branch === 'cannon')
+    // Order matches buildBranch's push order: tier1 pair, tier2 pair, tier3 pair, tier4 pair, capstone, gem-1, gem-2.
+    expect(cannon[2].unlockRequirements).toEqual([{ branch: 'cannon', points: 5 }])
+    expect(cannon[4].unlockRequirements).toEqual([{ branch: 'cannon', points: 12 }])
+    expect(cannon[6].unlockRequirements).toEqual([{ branch: 'cannon', points: 22 }])
+    expect(cannon[8].unlockRequirements).toEqual([{ branch: 'cannon', points: 35 }])
+    expect(cannon[8].isCapstone).toBe(true)
   })
 
-  it('a handful of nodes partway up each long climb use a cheaper single-level spike instead of the steady multi-level pace', () => {
+  it('gem sockets unlock alongside tier 2 and tier 4 (5 and 22 points)', () => {
     const defs = buildDefaultTalents()
-    const spikes = defs.filter((d) => d.maxLevel === 1 && d.bonusPerLevel === 0 && d.firstLevelBonus === 0.09)
-    expect(spikes.length).toBeGreaterThanOrEqual(4) // at least one per long climb (a2, b, final-a, final-b)
+    const cannonGems = defs.filter((d) => d.branch === 'cannon' && d.effect === TalentEffect.GemSocket)
+    expect(cannonGems.map((d) => d.unlockRequirements)).toEqual([[{ branch: 'cannon', points: 5 }], [{ branch: 'cannon', points: 22 }]])
   })
 
-  it('every node label is derived from what it does, not a flavor name', () => {
+  it('each combo talent requires 12 points in BOTH of the two branches it bridges, and bridges every adjacent ring pair', () => {
     const defs = buildDefaultTalents()
-    const dpsNode = defs.find((d) => d.effect === TalentEffect.Dps)!
-    expect(dpsNode.displayName).toBe('Fleet DPS')
-    const gemNode = defs.find((d) => d.effect === TalentEffect.GemSocket)!
-    expect(gemNode.displayName).toBe('Gem Socket')
+    const combos = defs.filter((d) => d.branch === 'combo')
+    expect(combos.length).toBe(5)
+    for (const combo of combos) {
+      expect(combo.unlockRequirements.length).toBe(2)
+      for (const req of combo.unlockRequirements) expect(req.points).toBe(12)
+    }
+    for (let i = 0; i < BRANCH_ORDER.length; i++) {
+      const a = BRANCH_ORDER[i]
+      const b = BRANCH_ORDER[(i + 1) % BRANCH_ORDER.length]
+      expect(defs.some((d) => d.id === `combo-${a}-${b}`)).toBe(true)
+    }
+  })
+
+  it('combo talents run 3 ranks (matching the design doc), branch talents run 5 or 3, capstones run 1', () => {
+    const defs = buildDefaultTalents()
+    for (const combo of defs.filter((d) => d.branch === 'combo')) expect(combo.maxLevel).toBe(3)
+    for (const capstone of defs.filter((d) => d.isCapstone)) expect(capstone.maxLevel).toBe(1)
+  })
+
+  it('every talent keeps its real flavor name (not a generic effect label) - this design wants personality', () => {
+    const defs = buildDefaultTalents()
+    expect(defs.find((d) => d.id === 'cannon-nova-lance')!.displayName).toBe('Nova Lance')
+    expect(defs.find((d) => d.id === 'salvage-dyson-harvest')!.displayName).toBe('Dyson Harvest')
+    expect(defs.find((d) => d.id === 'combo-cannon-fleet')!.displayName).toBe('Mirror Fire')
   })
 
   it('gem socket nodes carry no bonus of their own', () => {
@@ -115,60 +90,92 @@ describe('talent tree node catalog', () => {
     }
   })
 
-  it('the Nexus sits above both final keystones (a smaller row number, closer to the top)', () => {
-    const defs = buildDefaultTalents()
-    const nexus = defs.find((d) => d.id === 'nexus')!
-    const keystoneA = defs.find((d) => d.id === 'final-a-keystone')!
-    const keystoneB = defs.find((d) => d.id === 'final-b-keystone')!
-    expect(nexus.pos.row).toBeLessThan(keystoneA.pos.row)
-    expect(nexus.pos.row).toBeLessThan(keystoneB.pos.row)
+  describe('branchPointsSpent', () => {
+    it('sums levels of every node tagged with that branch, including gems, excluding other branches', () => {
+      const defs = buildDefaultTalents()
+      const levels = new Array(defs.length).fill(0)
+      const cannonFirst = defs.findIndex((d) => d.branch === 'cannon')
+      const fleetFirst = defs.findIndex((d) => d.branch === 'fleet')
+      levels[cannonFirst] = 3
+      levels[fleetFirst] = 5
+      expect(branchPointsSpent(defs, levels, 'cannon')).toBe(3)
+      expect(branchPointsSpent(defs, levels, 'fleet')).toBe(5)
+      expect(branchPointsSpent(defs, levels, 'core')).toBe(0)
+    })
   })
 
   describe('isTalentNodeUnlocked', () => {
-    it('the trunk root is always unlockable (no prior levels needed)', () => {
+    it('a tier-1 talent is always unlockable regardless of levels', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      const i = defs.findIndex((d) => d.id === 'trunk-1')
+      const i = defs.findIndex((d) => d.id === 'cannon-pulse-amplifier')
       expect(isTalentNodeUnlocked(defs, levels, i)).toBe(true)
     })
 
-    it('a wing is blocked until the trunk is fully climbed', () => {
+    it('a tier-2 talent is blocked until 5 points are spent in the SAME branch (any node, not a specific one)', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      const wing = defs.findIndex((d) => d.id === 'wing-a')
-      const trunk5 = defs.findIndex((d) => d.id === 'trunk-5')
+      const combatRhythm = defs.findIndex((d) => d.id === 'cannon-combat-rhythm')
+      const pulseAmp = defs.findIndex((d) => d.id === 'cannon-pulse-amplifier')
+      const precisionOptics = defs.findIndex((d) => d.id === 'cannon-precision-optics')
 
-      expect(isTalentNodeUnlocked(defs, levels, wing)).toBe(false)
-      levels[trunk5] = 1
-      expect(isTalentNodeUnlocked(defs, levels, wing)).toBe(true)
+      expect(isTalentNodeUnlocked(defs, levels, combatRhythm)).toBe(false)
+      levels[pulseAmp] = 3
+      expect(isTalentNodeUnlocked(defs, levels, combatRhythm)).toBe(false) // only 3 of 5
+      levels[precisionOptics] = 2 // 3 + 2 = 5, from a DIFFERENT tier-1 node - still counts
+      expect(isTalentNodeUnlocked(defs, levels, combatRhythm)).toBe(true)
     })
 
-    it('core-merge requires BOTH lane tops owned, not just one', () => {
+    it('points spent in a DIFFERENT branch never unlock this branch\'s tiers', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      const merge = defs.findIndex((d) => d.id === 'core-merge')
-      const a25 = defs.findIndex((d) => d.id === 'a2-5')
-      const b8 = defs.findIndex((d) => d.id === 'b-8')
-
-      expect(isTalentNodeUnlocked(defs, levels, merge)).toBe(false)
-      levels[a25] = 1
-      expect(isTalentNodeUnlocked(defs, levels, merge)).toBe(false) // only one of two
-      levels[b8] = 1
-      expect(isTalentNodeUnlocked(defs, levels, merge)).toBe(true)
+      const combatRhythm = defs.findIndex((d) => d.id === 'cannon-combat-rhythm')
+      const fleetFirst = defs.findIndex((d) => d.branch === 'fleet')
+      levels[fleetFirst] = 5
+      expect(isTalentNodeUnlocked(defs, levels, combatRhythm)).toBe(false)
     })
 
-    it('the Grand Nexus is blocked until both final keystones are owned, in any order', () => {
+    it('a combo talent requires 12 points in BOTH bridged branches, not just one', () => {
       const defs = buildDefaultTalents()
       const levels = new Array(defs.length).fill(0)
-      const nexus = defs.findIndex((d) => d.id === 'nexus')
-      const keystoneA = defs.findIndex((d) => d.id === 'final-a-keystone')
-      const keystoneB = defs.findIndex((d) => d.id === 'final-b-keystone')
+      const combo = defs.findIndex((d) => d.id === 'combo-cannon-fleet')
+      const cannonFirst = defs.findIndex((d) => d.branch === 'cannon')
+      const fleetFirst = defs.findIndex((d) => d.branch === 'fleet')
 
-      expect(isTalentNodeUnlocked(defs, levels, nexus)).toBe(false)
-      levels[keystoneA] = 1
-      expect(isTalentNodeUnlocked(defs, levels, nexus)).toBe(false)
-      levels[keystoneB] = 1
-      expect(isTalentNodeUnlocked(defs, levels, nexus)).toBe(true)
+      expect(isTalentNodeUnlocked(defs, levels, combo)).toBe(false)
+      levels[cannonFirst] = 5 // cap is 5 for one node; spread across a couple to reach 12
+      const cannonSecond = defs.findIndex((d, i) => d.branch === 'cannon' && i !== cannonFirst)
+      levels[cannonSecond] = 5
+      const cannonThird = defs.findIndex((d, i) => d.branch === 'cannon' && i !== cannonFirst && i !== cannonSecond)
+      levels[cannonThird] = 2 // 5+5+2 = 12
+      expect(isTalentNodeUnlocked(defs, levels, combo)).toBe(false) // cannon alone isn't enough
+      levels[fleetFirst] = 5
+      const fleetSecond = defs.findIndex((d, i) => d.branch === 'fleet' && i !== fleetFirst)
+      levels[fleetSecond] = 5
+      const fleetThird = defs.findIndex((d, i) => d.branch === 'fleet' && i !== fleetFirst && i !== fleetSecond)
+      levels[fleetThird] = 2
+      expect(isTalentNodeUnlocked(defs, levels, combo)).toBe(true)
+    })
+
+    it('a capstone requires 35 points in its own branch', () => {
+      const defs = buildDefaultTalents()
+      const levels = new Array(defs.length).fill(0)
+      const capstone = defs.findIndex((d) => d.id === 'cannon-nova-lance')
+      const cannonIdx = defs.map((d, i) => (d.branch === 'cannon' ? i : -1)).filter((i) => i >= 0)
+
+      expect(isTalentNodeUnlocked(defs, levels, capstone)).toBe(false)
+      // Max out enough regular tier nodes to reach 34 (just under threshold).
+      let remaining = 34
+      for (const i of cannonIdx) {
+        if (defs[i].isCapstone || defs[i].effect === TalentEffect.GemSocket) continue
+        const grant = Math.min(remaining, defs[i].maxLevel)
+        levels[i] = grant
+        remaining -= grant
+        if (remaining <= 0) break
+      }
+      expect(isTalentNodeUnlocked(defs, levels, capstone)).toBe(false)
+      levels[cannonIdx[0]] += 1 // push to 35
+      expect(isTalentNodeUnlocked(defs, levels, capstone)).toBe(true)
     })
   })
 })

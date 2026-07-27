@@ -2017,35 +2017,71 @@
   color: var(--palette-gold-label);
 }
 
-/* One continuous tree: SVG connector lines under absolutely-positioned node slots, both
-   driven by the same col/row coordinates (see TalentClusterPanel.tsx). Replaces the old
-   DOM-adjacent-sibling CSS bars - this can draw a line between ANY two nodes, not just visually
-   next to each other, which a fork/merge tree needs. */
-.talent-cluster-panel {
-  position: relative;
-  width: 100%;
+/* Branch panels: 5 named branches, each its own card - a 2-column grid of the 4 tiers, a small
+   row of 2 Gem Sockets, and the capstone below. No connector lines at all: unlock is "N points
+   spent in this branch" (a threshold), not a specific prerequisite node, so there's nothing to
+   draw a line between - see TalentDefinition.ts's isTalentNodeUnlocked. */
+.branch-section {
+  margin-bottom: 22px;
 }
-.talent-connector-svg {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  z-index: 0;
+.branch-panel {
+  padding: 14px 12px 16px;
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--branch-color, var(--palette-panel)) 6%, var(--palette-panel));
+  border: 1px solid color-mix(in srgb, var(--branch-color, transparent) 30%, transparent);
 }
-.talent-connector-svg path {
-  fill: none;
-  stroke: rgba(255, 255, 255, 0.1);
-  stroke-width: 2;
+.branch-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
 }
-.talent-connector-svg path.is-lit {
-  stroke: var(--palette-success);
+.branch-panel-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.talent-node-slot {
-  /* width is set inline per-instance (100/numCols%) - a cluster panel's column count varies. */
-  position: absolute;
-  z-index: 1;
-  transform: translate(-50%, -50%);
+.branch-panel-label {
+  flex: 1;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--branch-color, var(--palette-text-primary));
+}
+.branch-panel-points {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 10.5px;
+  color: var(--palette-text-dim);
+}
+.branch-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.branch-gem-row {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+.branch-gem-row .talent-node {
+  width: 96px;
+}
+.branch-capstone-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+.combo-row {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0 0;
+}
+.combo-row .talent-node {
+  width: auto;
+  min-width: 140px;
 }
 
 .talent-node {

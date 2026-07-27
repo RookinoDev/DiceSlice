@@ -412,3 +412,15 @@ export function TalentContinuumIcon({ size = 24 }: IconProps) {
     </svg>
   )
 }
+
+/** Fleet branch - a small drone/pod flanked by two escort blips (autonomous turrets + drones). */
+export function TalentFleetDroneIcon({ size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="9" y="9" width="6" height="6" rx="1.5" fill="#43DDEE" />
+      <circle cx="4" cy="12" r="2.2" stroke="#8FE9F5" strokeWidth="1.5" />
+      <circle cx="20" cy="12" r="2.2" stroke="#8FE9F5" strokeWidth="1.5" />
+      <path d="M6.2 12h2.6M15.2 12h2.6" stroke="#8FE9F5" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  )
+}

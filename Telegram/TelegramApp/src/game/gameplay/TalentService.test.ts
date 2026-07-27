@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultBalanceConfig } from '../config/BalanceConfig'
-import { buildDefaultTalents, TalentEffect } from '../config/TalentDefinition'
+import { buildDefaultTalents, TalentEffect, type TalentBranch } from '../config/TalentDefinition'
 import { TalentService } from './TalentService'
 
 function freshService(): TalentService {
@@ -8,26 +8,31 @@ function freshService(): TalentService {
 }
 
 /** Id-based lookup - a stable stand-in for "some specific node," since the tree's actual node
- *  ORDER is no longer a meaningful assumption to hardcode (that's the whole point of the id/
- *  prerequisite graph - see TalentDefinition.ts). */
+ *  ORDER is no longer a meaningful assumption to hardcode. */
 function indexOf(t: TalentService, id: string): number {
   for (let i = 0; i < t.count; i++) if (t.def(i).id === id) return i
   throw new Error(`no talent node with id ${id}`)
 }
 
-/** Seeds every ANCESTOR of `id` (walking the real prerequisite graph) as already owned, so `id`
- *  itself becomes immediately buyable - a shortcut around buying through a long chain by hand,
- *  built on the existing save-restore path (restoreLevels) rather than a new test-only backdoor. */
-function unlockPathTo(t: TalentService, id: string): void {
+/** Directly grants `points` worth of levels in `branch` (spread across that branch's regular/
+ *  special tier nodes - never the capstone or gems, so "points spent toward the capstone
+ *  threshold" doesn't circularly involve leveling the capstone itself) via the existing
+ *  save-restore path - a shortcut around buying through several real purchases by hand, to set
+ *  up "N points already spent" test preconditions for tier/combo/capstone gating. */
+function grantBranchPoints(t: TalentService, branch: TalentBranch, points: number): void {
   const levels = new Array(t.count).fill(0)
-  const byId = new Map(Array.from({ length: t.count }, (_, i) => [t.def(i).id, i] as const))
-  const visit = (nodeId: string) => {
-    const i = byId.get(nodeId)!
-    if (levels[i] > 0) return
-    for (const p of t.def(i).prerequisites) visit(p)
-    levels[i] = 1
+  // Preserve levels already set by earlier calls (e.g. seeding 2 branches for a combo test).
+  for (let i = 0; i < t.count; i++) levels[i] = t.levelOf(i)
+  let remaining = points - levels.reduce((sum, lvl, i) => (t.def(i).branch === branch ? sum + lvl : sum), 0)
+  for (let i = 0; i < t.count && remaining > 0; i++) {
+    const def = t.def(i)
+    if (def.branch !== branch || def.isCapstone || def.effect === TalentEffect.GemSocket) continue
+    const capacity = def.maxLevel - levels[i]
+    if (capacity <= 0) continue
+    const grant = Math.min(remaining, capacity)
+    levels[i] += grant
+    remaining -= grant
   }
-  for (const p of t.def(byId.get(id)!).prerequisites) visit(p)
   t.restoreLevels(levels)
 }
 
@@ -44,11 +49,11 @@ describe('TalentService', () => {
     const levelsSeen: number[] = []
     t.onLevelUp.on((lvl) => levelsSeen.push(lvl))
 
-    t.grantXp(500) // crosses level 1->9 given the default curve (12, 24, 36, ... linear thresholds)
+    t.grantXp(2000) // crosses several levels given the default curve (12*L^1.7 per level)
 
-    expect(t.level).toBe(9)
-    expect(t.unspentPoints).toBe(8) // exactly 1 point per level gained, not per XP grant
-    expect(levelsSeen).toEqual([2, 3, 4, 5, 6, 7, 8, 9])
+    expect(t.level).toBeGreaterThan(1)
+    expect(t.unspentPoints).toBe(t.level - 1) // exactly 1 point per level gained, not per XP grant
+    expect(levelsSeen.length).toBe(t.level - 1)
     expect(t.xp).toBeGreaterThanOrEqual(0)
     expect(t.xp).toBeLessThan(t.xpToNextLevel()) // leftover xp never exceeds the next threshold
   })
@@ -65,93 +70,81 @@ describe('TalentService', () => {
   describe('buyNode', () => {
     it('refuses when the player has no unspent points, even on an unlocked node', () => {
       const t = freshService()
-      const root = indexOf(t, 'trunk-1')
-      expect(t.isUnlocked(root)).toBe(true)
-      expect(t.buyNode(root)).toBe(false)
-      expect(t.levelOf(root)).toBe(0)
+      const tier1 = indexOf(t, 'cannon-pulse-amplifier')
+      expect(t.isUnlocked(tier1)).toBe(true)
+      expect(t.buyNode(tier1)).toBe(false)
+      expect(t.levelOf(tier1)).toBe(0)
     })
 
-    it('refuses a locked node (prereq not met) even with points available', () => {
+    it('refuses a tier-2 talent (5 points required in-branch) even with points available, if the branch is empty', () => {
       const t = freshService()
       t.grantXp(1000) // several points banked
-      const trunk2 = indexOf(t, 'trunk-2') // requires trunk-1 owned first
-      expect(t.isUnlocked(trunk2)).toBe(false)
-      expect(t.buyNode(trunk2)).toBe(false)
-      expect(t.levelOf(trunk2)).toBe(0)
+      const tier2 = indexOf(t, 'cannon-combat-rhythm')
+      expect(t.isUnlocked(tier2)).toBe(false)
+      expect(t.buyNode(tier2)).toBe(false)
+      expect(t.levelOf(tier2)).toBe(0)
     })
 
-    it('spends exactly 1 point per level, unlocking the next node in the chain as it goes', () => {
+    it('spends exactly 1 point per level, unlocking the next tier once enough branch points are spent', () => {
       const t = freshService()
       t.grantXp(1000)
       const pointsBefore = t.unspentPoints
-      const trunk1 = indexOf(t, 'trunk-1')
-      const trunk2 = indexOf(t, 'trunk-2')
-      expect(t.buyNode(trunk1)).toBe(true)
-      expect(t.levelOf(trunk1)).toBe(1)
-      expect(t.unspentPoints).toBe(pointsBefore - 1)
-      expect(t.buyNode(trunk2)).toBe(true) // now unlocked: trunk-1 is owned
-      expect(t.levelOf(trunk2)).toBe(1)
-      expect(t.unspentPoints).toBe(pointsBefore - 2)
+      const tier1a = indexOf(t, 'cannon-pulse-amplifier')
+      const tier1b = indexOf(t, 'cannon-precision-optics')
+      const tier2 = indexOf(t, 'cannon-combat-rhythm')
+
+      for (let i = 0; i < 5; i++) expect(t.buyNode(i % 2 === 0 ? tier1a : tier1b)).toBe(true)
+      expect(t.unspentPoints).toBe(pointsBefore - 5)
+      expect(t.isUnlocked(tier2)).toBe(true) // 5 points now spent in cannon, split across 2 nodes
+      expect(t.buyNode(tier2)).toBe(true)
+      expect(t.levelOf(tier2)).toBe(1)
     })
 
-    it('core-merge (a real 2-way merge) requires BOTH lane tops owned, not just one', () => {
+    it('a combo talent requires 12 points in BOTH bridged branches, not just one', () => {
       const t = freshService()
-      const merge = indexOf(t, 'core-merge')
-      const levels = new Array(t.count).fill(0)
+      t.grantXp(1_000_000)
+      const combo = indexOf(t, 'combo-cannon-fleet')
 
-      expect(t.isUnlocked(merge)).toBe(false)
-      levels[indexOf(t, 'a2-5')] = 1
-      t.restoreLevels(levels)
-      expect(t.isUnlocked(merge)).toBe(false) // only one of two lane tops owned
-      levels[indexOf(t, 'b-8')] = 1
-      t.restoreLevels(levels)
-      expect(t.isUnlocked(merge)).toBe(true)
+      expect(t.isUnlocked(combo)).toBe(false)
+      grantBranchPoints(t, 'cannon', 12)
+      expect(t.isUnlocked(combo)).toBe(false) // cannon alone isn't enough
+      grantBranchPoints(t, 'fleet', 12)
+      expect(t.isUnlocked(combo)).toBe(true)
+      expect(t.buyNode(combo)).toBe(true)
+      expect(t.def(combo).maxLevel).toBe(3) // combo talents run 3 ranks
     })
 
-    it('the Grand Nexus requires BOTH final keystones, not just one', () => {
+    it('a branch capstone requires 35 points in its own branch', () => {
       const t = freshService()
-      const nexus = indexOf(t, 'nexus')
-      const levels = new Array(t.count).fill(0)
+      t.grantXp(1_000_000)
+      const capstone = indexOf(t, 'cannon-nova-lance')
 
-      expect(t.isUnlocked(nexus)).toBe(false)
-      levels[indexOf(t, 'final-a-keystone')] = 1
-      t.restoreLevels(levels)
-      expect(t.isUnlocked(nexus)).toBe(false) // still missing the other
-      levels[indexOf(t, 'final-b-keystone')] = 1
-      t.restoreLevels(levels)
-      expect(t.isUnlocked(nexus)).toBe(true)
-    })
-
-    it('a short dead end (merge-dead) is buyable on its own - nothing above it requires it', () => {
-      const t = freshService()
-      t.grantXp(100_000)
-      unlockPathTo(t, 'merge-dead')
-      const deadEnd = indexOf(t, 'merge-dead')
-      expect(t.isUnlocked(deadEnd)).toBe(true)
-      expect(t.buyNode(deadEnd)).toBe(true)
-      expect(t.levelOf(deadEnd)).toBe(1)
-      // Buying it doesn't unlock anything else - it has no dependents in the graph at all.
-      expect(t.def(deadEnd).maxLevel).toBe(1)
-      expect(t.buyNode(deadEnd)).toBe(false) // already maxed
+      expect(t.isUnlocked(capstone)).toBe(false)
+      grantBranchPoints(t, 'cannon', 34)
+      expect(t.isUnlocked(capstone)).toBe(false)
+      grantBranchPoints(t, 'cannon', 35)
+      expect(t.isUnlocked(capstone)).toBe(true)
+      expect(t.buyNode(capstone)).toBe(true)
+      expect(t.def(capstone).isCapstone).toBe(true)
     })
 
     it('refuses once a node is already at its max level', () => {
       const t = freshService()
-      t.grantXp(100_000) // more than enough points to max one node several times over
-      const root = indexOf(t, 'trunk-1')
-      const maxLevel = t.def(root).maxLevel
-      for (let i = 0; i < maxLevel; i++) expect(t.buyNode(root)).toBe(true)
-      expect(t.levelOf(root)).toBe(maxLevel)
-      expect(t.buyNode(root)).toBe(false)
-      expect(t.levelOf(root)).toBe(maxLevel)
+      t.grantXp(1_000_000) // more than enough points to max one node several times over
+      const tier1 = indexOf(t, 'cannon-pulse-amplifier')
+      const maxLevel = t.def(tier1).maxLevel
+      for (let i = 0; i < maxLevel; i++) expect(t.buyNode(tier1)).toBe(true)
+      expect(t.levelOf(tier1)).toBe(maxLevel)
+      expect(t.buyNode(tier1)).toBe(false)
+      expect(t.levelOf(tier1)).toBe(maxLevel)
     })
 
-    it('a Gem Socket node behaves like any other node for unlock purposes (1 point, no bonus)', () => {
+    it('a Gem Socket node behaves like any other node for unlock purposes (1 point, no bonus), unlocking at 5 branch points', () => {
       const t = freshService()
-      t.grantXp(1000)
-      const gem = indexOf(t, 'final-a-gem-1')
+      t.grantXp(1_000_000)
+      const gem = indexOf(t, 'cannon-gem-1')
       expect(t.isUnlocked(gem)).toBe(false)
-      unlockPathTo(t, 'final-a-gem-1')
+      grantBranchPoints(t, 'cannon', 5)
       expect(t.isUnlocked(gem)).toBe(true)
       expect(t.buyNode(gem)).toBe(true)
       expect(t.levelOf(gem)).toBe(1)
@@ -159,54 +152,50 @@ describe('TalentService', () => {
     })
   })
 
-  it('dpsMultiplier compounds across every owned Dps-tagged node (final-A climb)', () => {
+  it('dpsMultiplier compounds across every owned Dps-tagged node', () => {
     const t = freshService()
-    t.grantXp(100_000)
+    t.grantXp(1_000_000)
     expect(t.dpsMultiplier().toNumber()).toBeCloseTo(1, 6) // nothing bought yet
-    unlockPathTo(t, 'final-a-1') // final-a-1 is the climb's Dps-tagged node
-    t.buyNode(indexOf(t, 'final-a-1'))
+    expect(t.buyNode(indexOf(t, 'fleet-autonomous-turrets'))).toBe(true) // Dps, tier 1
     expect(t.dpsMultiplier().toNumber()).toBeGreaterThan(1)
   })
 
-  it('tapCritChance/shipCritChance sum nodes from different parts of the lattice and cap below 1', () => {
+  it('tapCritChance sums every TapCritChance-tagged node and caps below 1; shipCritChance stays 0 (no Phase-1 node maps to it yet)', () => {
     const t = freshService()
-    t.grantXp(100_000)
+    t.grantXp(1_000_000)
     expect(t.tapCritChance()).toBe(0)
     expect(t.shipCritChance()).toBe(0)
-    unlockPathTo(t, 'a2-4') // Lane A's main climb, 4 nodes up (ShipCritChance, a spike node)
-    t.buyNode(indexOf(t, 'a1-3')) // TapCritChance, on Lane A's main climb
-    t.buyNode(indexOf(t, 'a2-4')) // ShipCritChance
+    t.buyNode(indexOf(t, 'cannon-precision-optics')) // TapCritChance, tier 1
     expect(t.tapCritChance()).toBeGreaterThan(0)
-    expect(t.shipCritChance()).toBeGreaterThan(0)
     expect(t.tapCritChance()).toBeLessThan(1)
-    expect(t.shipCritChance()).toBeLessThan(1)
+    expect(t.shipCritChance()).toBe(0) // untouched - correct, not a bug
   })
 
-  it('relicGainMultiplier only reflects RelicGain-tagged nodes, not OfflineReward', () => {
+  it('relicGainMultiplier only reflects RelicGain-tagged nodes, not Dps, in the same branch', () => {
     const t = freshService()
-    t.grantXp(100_000)
+    t.grantXp(1_000_000)
     expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(1, 6)
-    // Seeds the shared trunk (Capstone-tagged, which DOES buff RelicGain - see CAPSTONE_EFFECTS)
-    // as owned, so the baseline to compare against is whatever the trunk alone contributes, not 1.
-    unlockPathTo(t, 'b-4')
+    // Seeds Core (Capstone-tagged, which DOES buff RelicGain - see CAPSTONE_EFFECTS) as owned,
+    // so the baseline to compare against is whatever Core alone contributes, not 1.
+    t.buyNode(indexOf(t, 'core-expanded-reactor'))
     const baseline = t.relicGainMultiplier().toNumber()
-    expect(baseline).toBeGreaterThan(1) // trunk's Capstone bonus alone already moved this
+    expect(baseline).toBeGreaterThan(1) // Core's Capstone bonus alone already moved this
 
-    t.buyNode(indexOf(t, 'b-3')) // OfflineReward
+    t.buyNode(indexOf(t, 'warp-first-strike-protocol')) // Dps, same branch as the RelicGain node below
     expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(baseline, 6) // unaffected - wrong effect
 
-    t.buyNode(indexOf(t, 'b-4')) // RelicGain
+    t.buyNode(indexOf(t, 'warp-warp-navigation')) // RelicGain
     expect(t.relicGainMultiplier().toNumber()).toBeGreaterThan(baseline)
   })
 
-  it('trunk Capstone nodes each add their own bonus to CAPSTONE_EFFECTS stats, not just one', () => {
+  it('Core branch Capstone nodes each add their own bonus to CAPSTONE_EFFECTS stats, not just one', () => {
     const t = freshService()
-    t.grantXp(100_000)
+    t.grantXp(1_000_000)
     const before = t.dpsMultiplier().toNumber()
-    t.buyNode(indexOf(t, 'trunk-1'))
+    t.buyNode(indexOf(t, 'core-expanded-reactor'))
     const afterOne = t.dpsMultiplier().toNumber()
     expect(afterOne).toBeGreaterThan(before)
-    t.buyNode(indexOf(t, 'trunk-2'))
+    t.buyNode(indexOf(t, 'core-flux-recharge'))
     const afterTwo = t.dpsMultiplier().toNumber()
     expect(afterTwo).toBeGreaterThan(afterOne) // a second Capstone node compounds, isn't ignored
   })
