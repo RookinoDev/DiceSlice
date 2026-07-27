@@ -5,7 +5,7 @@
 // to choose which owned card fills it (see onOpenSocket).
 import { useState, type CSSProperties } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
-import { talentBonusAt, talentUnlockLabel, TalentEffect, BRANCH_COLOR, type TalentBranch } from '../../game/config/TalentDefinition'
+import { talentBonusAt, talentUnlockLabel, TalentEffect, EFFECT_LABEL, BRANCH_COLOR, type TalentBranch } from '../../game/config/TalentDefinition'
 import { cardById } from '../../game/cards/generatedCards'
 import { hapticAction, hapticTap } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
@@ -73,7 +73,7 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
       <div className="talent-node-level">
         {lvl}/{def.maxLevel}
       </div>
-      <div className="talent-node-name">{def.displayName}</div>
+      <div className="talent-node-name">{EFFECT_LABEL[def.effect]}</div>
       {lvl > 0 && !isGem && <div className="talent-node-bonus">+{pct}%</div>}
       {isGem && lvl > 0 && <div className="talent-node-bonus talent-node-gem-fill">{socketedCard ? socketedCard.name : 'EMPTY'}</div>}
     </button>

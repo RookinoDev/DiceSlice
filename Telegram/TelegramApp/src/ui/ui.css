@@ -2055,23 +2055,25 @@
   font-size: 10.5px;
   color: var(--palette-text-dim);
 }
-.branch-tier-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+/* DOM order is capstone -> gems -> tier grid (see BranchPanel.tsx) so the panel reads
+   bottom-to-top: biggest payoff at the top, tier 1 at the very bottom. */
+.branch-capstone-row {
+  display: flex;
+  justify-content: center;
 }
 .branch-gem-row {
   display: flex;
   justify-content: center;
   gap: 10px;
-  margin-top: 10px;
+  margin-top: 12px;
 }
 .branch-gem-row .talent-node {
   width: 96px;
 }
-.branch-capstone-row {
-  display: flex;
-  justify-content: center;
+.branch-tier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
   margin-top: 12px;
 }
 .combo-row {

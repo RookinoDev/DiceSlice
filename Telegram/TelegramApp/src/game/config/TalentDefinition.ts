@@ -99,7 +99,11 @@ const ROLE_FORMULA = {
 } as const
 type NodeRole = keyof typeof ROLE_FORMULA
 
-const EFFECT_LABEL: Record<TalentEffect, string> = {
+/** What each effect actually DOES, e.g. "Tap Damage" - the tree shows this as a node's primary
+ *  label instead of its flavor name (see TalentNode.tsx), so a glance tells you what you're
+ *  investing in. The flavor name (displayName) is still real data - used for e.g. Gem Socket's
+ *  own label - just not what's shown on a regular talent's face. */
+export const EFFECT_LABEL: Record<TalentEffect, string> = {
   [TalentEffect.Dps]: 'Fleet DPS',
   [TalentEffect.Gold]: 'Stardust',
   [TalentEffect.TapDamage]: 'Tap Damage',
