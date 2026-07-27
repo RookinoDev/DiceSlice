@@ -187,20 +187,23 @@ test('openPack mints serialed cards once and refuses re-opens and foreign packs'
   const [pack] = listUnopenedPacks(600)
   const result = openPack(600, pack.id)
   assert.equal(result.packType, 'meteor')
-  assert.equal(result.cards.length, 3)
+  // Meteor's card count is itself a roll now (see cards.mjs's METEOR_CARD_COUNT_WEIGHTS) -
+  // 1/2/3/5 are the only valid outcomes, never 0 or anything else.
+  assert.ok([1, 2, 3, 5].includes(result.cards.length), `unexpected meteor card count: ${result.cards.length}`)
   for (const card of result.cards) assert.ok(card.serial >= 1)
 
   assert.equal(openPack(600, pack.id), null) // already opened
   assert.equal(openPack(601, pack.id), null) // not the owner
-  assert.equal(getCollection(600).length, 3)
+  assert.equal(getCollection(600).length, result.cards.length)
   assert.equal(listUnopenedPacks(600).length, 0)
 })
 
 test('serials increment globally per card+variant', () => {
   grantPacksFromSave(700, { version: 1, highestStage: 10, stats: { deepestBossCleared: 50, deepestStage: 10 } })
-  for (const pack of listUnopenedPacks(700)) openPack(700, pack.id)
+  let minted = 0
+  for (const pack of listUnopenedPacks(700)) minted += openPack(700, pack.id).cards.length
   const owned = getCollection(700)
-  assert.equal(owned.length, 30) // 10 meteor packs x 3 cards
+  assert.equal(owned.length, minted) // meteor's card count is itself a roll (see cards.mjs), so this can't be a fixed number
   // Group by (card, holo): serials within a group must be strictly increasing and unique.
   const groups = new Map()
   for (const c of owned) {

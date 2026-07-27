@@ -26,9 +26,15 @@ export const SLOT_WEIGHTS = { common: 55, uncommon: 25, rare: 12, epic: 5.5, leg
  */
 export const QUALITY_TILT = { common: -0.58, uncommon: 0, rare: 0.6, epic: 1.2, legendary: 2.0, ultra: 2.0 }
 
-/** Pack types. floor = slot-0 guaranteed minimum rarity; variantChance = per-card upgrade roll. */
+/** Meteor is the base/most-common pack (dropped by most bosses) - usually just 1 card, with a
+ *  shrinking chance of a bonus haul. {count: weight}, consumed by rollCardCount. */
+export const METEOR_CARD_COUNT_WEIGHTS = { 1: 95, 2: 4, 3: 0.9, 5: 0.1 }
+
+/** Pack types. floor = slot-0 guaranteed minimum rarity; variantChance = per-card upgrade roll.
+ *  cards = fixed card count; cardCountWeights = rolled count instead (see rollCardCount) - a
+ *  type has exactly one of the two. */
 export const PACK_TYPES = {
-  meteor: { cards: 3, floor: 'uncommon', variantChance: 0.06 },
+  meteor: { cardCountWeights: METEOR_CARD_COUNT_WEIGHTS, floor: 'uncommon', variantChance: 0.06 },
   stellar: { cards: 4, floor: 'rare', variantChance: 0.08 },
   deepsky: { cards: 5, floor: 'epic', variantChance: 0.1 },
   singularity: { cards: 5, floor: 'legendary', variantChance: 0.18 },
@@ -113,6 +119,19 @@ function pickCard(rng, rarity, ownedIds, packIds) {
   return pick
 }
 
+/** Weighted roll over a {count: weight} table - same roulette-wheel pattern as rollRarity and
+ *  rollVariant above, just picking a card count instead of a rarity/variant. */
+function rollCardCount(rng, weights) {
+  const entries = Object.entries(weights)
+  const total = entries.reduce((sum, [, w]) => sum + w, 0)
+  let roll = rng() * total
+  for (const [count, weight] of entries) {
+    roll -= weight
+    if (roll <= 0) return Number(count)
+  }
+  return Number(entries[entries.length - 1][0])
+}
+
 function rollVariant(rng, variantChance) {
   if (rng() >= variantChance) return 'standard'
   const entries = Object.entries(VARIANT_WEIGHTS)
@@ -137,11 +156,12 @@ const rarityAtLeast = (rarity, floor) => RARITY_ORDER.indexOf(rarity) >= RARITY_
 export function rollPack(packType, pity, ownedIds = new Set(), quality = 0, rng = Math.random) {
   const spec = PACK_TYPES[packType]
   if (!spec) throw new Error(`unknown pack type: ${packType}`)
+  const count = spec.cardCountWeights ? rollCardCount(rng, spec.cardCountWeights) : spec.cards
 
   const cards = []
   const packIds = new Set()
   // Slot 0 carries the pack's guaranteed floor; the rest roll the open table.
-  for (let i = 0; i < spec.cards; i++) {
+  for (let i = 0; i < count; i++) {
     const rarity = rollRarity(rng, i === 0 ? spec.floor : 'common', quality)
     const card = pickCard(rng, rarity, ownedIds, packIds)
     packIds.add(card.id)

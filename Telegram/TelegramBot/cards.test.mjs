@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { CARD_POOL, PACK_TYPES, RARITY_ORDER, VARIANT_ORDER, craftCost, packQualityForStage, packTypeForBossStage, refineValue, rollPack, seededRng } from './cards.mjs'
+import { CARD_POOL, METEOR_CARD_COUNT_WEIGHTS, PACK_TYPES, RARITY_ORDER, VARIANT_ORDER, craftCost, packQualityForStage, packTypeForBossStage, refineValue, rollPack, seededRng } from './cards.mjs'
 
 const rank = (r) => RARITY_ORDER.indexOf(r)
 const freshPity = () => ({ sinceEpic: 0, sinceLegendary: 0 })
@@ -29,14 +29,33 @@ test('pack types map to the boss escalation bands (interval 5, 30-boss cycle)', 
 
 test('every pack honors its guaranteed rarity floor', () => {
   for (const [type, spec] of Object.entries(PACK_TYPES)) {
+    const validCounts = spec.cardCountWeights ? Object.keys(spec.cardCountWeights).map(Number) : [spec.cards]
     for (let trial = 0; trial < 200; trial++) {
       const { cards } = rollPack(type, freshPity())
-      assert.equal(cards.length, spec.cards)
+      assert.ok(validCounts.includes(cards.length), `${type} pack rolled an unexpected count: ${cards.length}`)
       assert.ok(
         cards.some((c) => rank(c.rarity) >= rank(spec.floor)),
         `${type} pack missed its ${spec.floor} floor`,
       )
     }
+  }
+})
+
+test('meteor card count follows its published odds (95/4/0.9/0.1 for 1/2/3/5 cards)', () => {
+  const counts = { 1: 0, 2: 0, 3: 0, 5: 0 }
+  const trials = 20000
+  const rng = seededRng(99)
+  for (let i = 0; i < trials; i++) {
+    const { cards } = rollPack('meteor', freshPity(), new Set(), 0, rng)
+    counts[cards.length] = (counts[cards.length] ?? 0) + 1
+  }
+  assert.deepEqual(new Set(Object.keys(counts).map(Number)), new Set(Object.keys(METEOR_CARD_COUNT_WEIGHTS).map(Number)))
+  for (const [count, weight] of Object.entries(METEOR_CARD_COUNT_WEIGHTS)) {
+    const expected = (weight / 100) * trials
+    const actual = counts[count]
+    // Generous tolerance for the 0.1%-weight tail (5 cards, ~20 expected hits over 20000 trials)
+    // while still catching a badly wrong table or a reordered/broken roll.
+    assert.ok(Math.abs(actual - expected) < Math.max(30, expected * 0.5), `count=${count}: expected ~${expected}, got ${actual}`)
   }
 })
 
