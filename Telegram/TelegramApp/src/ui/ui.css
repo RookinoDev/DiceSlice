@@ -2016,6 +2016,21 @@
   letter-spacing: 0.3px;
   color: var(--palette-gold-label);
 }
+/* Unspent points sitting idle get the same "come tap something" breathing invitation the tap
+   button uses when affordable (.combat-tap-upgrade.affordable) - here it's a text glow since
+   there's no single button to point at. */
+.talent-tree-summary--spendable .talent-points-available {
+  animation: talent-points-glow 2.2s ease-in-out infinite;
+}
+@keyframes talent-points-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(255, 178, 56, 0);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(255, 178, 56, 0.65);
+  }
+}
 
 /* Branch panels: 5 named branches, each its own card - a 2-column grid of the 4 tiers, a small
    row of 2 Gem Sockets, and the capstone below. No connector lines at all: unlock is "N points
@@ -2025,21 +2040,41 @@
   margin-bottom: 22px;
 }
 .branch-panel {
+  position: relative;
   padding: 14px 12px 16px;
   border-radius: 18px;
-  background: color-mix(in srgb, var(--branch-color, var(--palette-panel)) 6%, var(--palette-panel));
+  background: linear-gradient(180deg, color-mix(in srgb, var(--branch-color, var(--palette-panel)) 12%, var(--palette-panel)), var(--palette-panel) 70%);
   border: 1px solid color-mix(in srgb, var(--branch-color, transparent) 30%, transparent);
+  overflow: hidden;
+}
+/* Each branch gets its own ambient "light source" seated behind the capstone (now the topmost
+   node) instead of reading as one flat gray card repeated five times. */
+.branch-panel::before {
+  content: '';
+  position: absolute;
+  top: -44px;
+  left: 50%;
+  width: 220px;
+  height: 150px;
+  transform: translateX(-50%);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--branch-color, transparent) 24%, transparent), transparent 80%);
+  pointer-events: none;
 }
 .branch-panel-header {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .branch-panel-icon {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--branch-color, transparent) 20%, transparent);
 }
 .branch-panel-label {
   flex: 1;
@@ -2054,10 +2089,28 @@
   font-weight: 700;
   font-size: 10.5px;
   color: var(--palette-text-dim);
+  font-variant-numeric: tabular-nums;
+}
+/* Points-spent-in-branch IS the unlock currency (see TalentDefinition.ts's threshold model) -
+   a bar makes that read as visible progress toward the next tier instead of a bare fraction. */
+.branch-panel-progress {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 0 0 12px;
+  overflow: hidden;
+}
+.branch-panel-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--branch-color) 55%, transparent), var(--branch-color));
+  transition: width 0.5s cubic-bezier(0.34, 1, 0.64, 1);
 }
 /* DOM order is capstone -> gems -> tier grid (see BranchPanel.tsx) so the panel reads
    bottom-to-top: biggest payoff at the top, tier 1 at the very bottom. */
 .branch-capstone-row {
+  position: relative;
   display: flex;
   justify-content: center;
 }
@@ -2081,12 +2134,17 @@
   justify-content: center;
   padding: 10px 0 0;
 }
+/* Combos bridge two branches rather than belonging to either, so they get their own lavender
+   wash instead of the flat card every other node sits on - visually "this one's different". */
 .combo-row .talent-node {
   width: auto;
-  min-width: 140px;
+  min-width: 150px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--talent-color) 16%, var(--palette-panel)), var(--palette-panel));
+  border-color: color-mix(in srgb, var(--talent-color) 40%, transparent);
 }
 
 .talent-node {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -2098,9 +2156,15 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   cursor: pointer;
   text-align: center;
+  transition:
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.3s ease,
+    background 0.3s ease,
+    border-color 0.3s ease;
 }
 .talent-node:active {
-  transform: scale(0.95);
+  transform: scale(0.93);
+  transition-duration: 0.07s;
 }
 .talent-node.is-owned {
   border-color: color-mix(in srgb, var(--talent-color, var(--palette-success)) 45%, transparent);
@@ -2109,14 +2173,61 @@
   background: color-mix(in srgb, var(--talent-color, var(--palette-success)) 16%, var(--palette-panel));
 }
 .talent-node.is-locked {
-  opacity: 0.55;
+  opacity: 0.5;
+  filter: saturate(0.4);
+}
+/* Buyable right now - unlocked, not maxed, and there's a point to spend on it. The tree should
+   always be able to point at "tap here next" the way .combat-tap-upgrade.affordable does. */
+.talent-node--affordable {
+  animation: talent-node-breathe 2.4s ease-in-out infinite;
+}
+@keyframes talent-node-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba(0, 0, 0, 0);
+  }
+  50% {
+    box-shadow: 0 0 14px color-mix(in srgb, var(--talent-color) 55%, transparent);
+  }
+}
+/* One-shot purchase flash, fired from TalentNode.tsx on every successful buy - same "bright pop
+   then settle" language as .shop-row--celebrate, tinted to this node's own color. */
+.talent-node--celebrate {
+  animation: talent-node-celebrate 0.7s ease-out;
+}
+@keyframes talent-node-celebrate {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+  }
+  25% {
+    box-shadow: 0 0 26px color-mix(in srgb, var(--talent-color) 75%, transparent);
+    transform: scale(1.08);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 255, 255, 0);
+    transform: scale(1);
+  }
 }
 .talent-node--capstone {
   width: auto;
   min-width: 160px;
-  padding: 12px 18px;
+  padding: 14px 20px;
   background: none;
   border: none;
+}
+/* The branch's biggest payoff gets a slow persistent aura once owned, instead of blending back
+   into the same flat treatment as every tier node below it. */
+.talent-node--capstone.is-owned {
+  animation: talent-capstone-aura 3s ease-in-out infinite;
+}
+@keyframes talent-capstone-aura {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 6px color-mix(in srgb, var(--talent-color) 35%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 16px color-mix(in srgb, var(--talent-color) 60%, transparent));
+  }
 }
 .talent-node-icon {
   width: 34px;
@@ -2128,8 +2239,9 @@
   background: color-mix(in srgb, var(--talent-color, var(--palette-text-dim)) 16%, transparent);
 }
 .talent-node--capstone .talent-node-icon {
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--talent-color) 34%, transparent), color-mix(in srgb, var(--talent-color) 10%, transparent));
 }
 .talent-node-level {
   font-family: var(--font-display);
@@ -2137,6 +2249,7 @@
   font-size: 10px;
   color: var(--palette-text-dimmer);
   margin-top: 2px;
+  font-variant-numeric: tabular-nums;
 }
 .talent-node.is-owned .talent-node-level {
   color: var(--talent-color, var(--palette-success));
@@ -2159,13 +2272,28 @@
   color: var(--palette-success);
 }
 .talent-node--gem.is-owned {
-  border-color: color-mix(in srgb, #d6a8ff 45%, transparent);
+  border-color: color-mix(in srgb, var(--talent-color, #d6a8ff) 45%, transparent);
 }
 .talent-node--gem.is-maxed {
-  background: color-mix(in srgb, #d6a8ff 16%, var(--palette-panel));
+  background: color-mix(in srgb, var(--talent-color, #d6a8ff) 16%, var(--palette-panel));
+}
+/* Slot bought but empty - a dashed ring that gently pulses invites a tap to go fill it, a
+   different visual verb than the solid affordable-breathe glow used for "spend a point here". */
+.talent-node--gem.is-owned:not(.talent-node--gem-filled) {
+  border-style: dashed;
+  animation: talent-gem-empty-pulse 2.6s ease-in-out infinite;
+}
+@keyframes talent-gem-empty-pulse {
+  0%,
+  100% {
+    border-color: color-mix(in srgb, #d6a8ff 40%, transparent);
+  }
+  50% {
+    border-color: color-mix(in srgb, #d6a8ff 85%, transparent);
+  }
 }
 .talent-node-gem-fill {
-  color: #d6a8ff;
+  color: var(--talent-color, #d6a8ff);
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3531,7 +3659,12 @@
   .bottomnav-icon--pulse,
   .combat-tap-upgrade.affordable,
   .skill-slot--active,
-  .skill-slot.ready {
+  .skill-slot.ready,
+  .talent-tree-summary--spendable .talent-points-available,
+  .talent-node--affordable,
+  .talent-node--celebrate,
+  .talent-node--capstone.is-owned,
+  .talent-node--gem.is-owned:not(.talent-node--gem-filled) {
     animation: none;
   }
   .topbar-icon-btn,
@@ -3542,7 +3675,8 @@
   .bottomnav-tab,
   .mission-claim.claimable,
   .offline-collect-button,
-  .prestige-gradient-btn {
+  .prestige-gradient-btn,
+  .talent-node {
     transition: none;
   }
 }

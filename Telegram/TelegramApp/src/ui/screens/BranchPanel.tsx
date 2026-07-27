@@ -46,6 +46,9 @@ export function BranchPanel({ session: s, branch, nodeIndices, onToast, onOpenSo
           {pointsSpent}/{maxPoints}
         </span>
       </div>
+      <div className="branch-panel-progress">
+        <div className="branch-panel-progress-fill" style={{ width: `${maxPoints > 0 ? Math.min(100, (pointsSpent / maxPoints) * 100) : 0}%` }} />
+      </div>
       <div className="branch-capstone-row">
         <TalentNode session={s} index={capstoneIndex} onToast={onToast} onOpenSocket={onOpenSocket} />
       </div>

@@ -29,7 +29,7 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
         <div className="screen-subtitle">PERMANENT BONUSES FROM COMBAT XP</div>
       </div>
 
-      <div className="talent-tree-summary">
+      <div className={`talent-tree-summary ${t.unspentPoints > 0 ? 'talent-tree-summary--spendable' : ''}`}>
         <LevelBadge level={t.level} xp={t.xp} xpToNextLevel={t.xpToNextLevel()} size="large" />
         <div className="talent-points-available">
           {t.unspentPoints} POINT{t.unspentPoints === 1 ? '' : 'S'} AVAILABLE
