@@ -47,10 +47,15 @@ export const SHOP_ITEMS = [
   },
   // "buy_pack_<type>" - the <type> suffix must be a real cards.mjs PACK_TYPES key; db.mjs's
   // claimPurchases mints the pack itself, see its BUY_PACK_PREFIX comment.
+  //
+  // Description wording is deliberately precise about WHAT is guaranteed: "at least one X or
+  // better" for the 4 standard packs (only slot 0 carries the floor, see cards.mjs), vs. "every
+  // single one" / "the rest" for the 3 Stars-only vault packs below (allSlotsFloor covers every
+  // slot) - the two mechanics are genuinely different and the copy shouldn't blur them.
   {
     id: 'buy_pack_meteor',
     title: 'Meteor Pack',
-    description: '3 cards, uncommon or better guaranteed.',
+    description: 'Mostly 1 card, sometimes a bonus haul of up to 5. At least one uncommon or better.',
     priceStars: 20,
     kind: 'cards',
     oneTime: false,
@@ -58,7 +63,7 @@ export const SHOP_ITEMS = [
   {
     id: 'buy_pack_stellar',
     title: 'Stellar Pack',
-    description: '4 cards, rare or better guaranteed.',
+    description: '4 cards. At least one rare or better.',
     priceStars: 45,
     kind: 'cards',
     oneTime: false,
@@ -66,18 +71,45 @@ export const SHOP_ITEMS = [
   {
     id: 'buy_pack_deepsky',
     title: 'Deep Sky Pack',
-    description: '5 cards, epic or better guaranteed.',
+    description: '5 cards. At least one epic or better.',
     priceStars: 90,
     kind: 'cards',
     oneTime: false,
   },
   {
+    id: 'buy_pack_nebula',
+    title: 'Nebula Bundle',
+    description: '8 cards. At least one rare or better - the biggest haul in the shop.',
+    priceStars: 140,
+    kind: 'cards',
+    oneTime: false,
+    tag: 'NEW',
+  },
+  {
+    id: 'buy_pack_epicvault',
+    title: 'Epic Vault',
+    description: '3 cards, every single one epic or better. No commons, ever.',
+    priceStars: 150,
+    kind: 'cards',
+    oneTime: false,
+    tag: 'NEW',
+  },
+  {
     id: 'buy_pack_singularity',
     title: 'Singularity Pack',
-    description: '5 cards, legendary or better guaranteed.',
+    description: '5 cards. At least one legendary or better.',
     priceStars: 200,
     kind: 'cards',
     oneTime: false,
+  },
+  {
+    id: 'buy_pack_legendarycache',
+    title: 'Legendary Cache',
+    description: '4 cards: 1 guaranteed legendary, the rest epic or better. The rarest offer in the shop.',
+    priceStars: 260,
+    kind: 'cards',
+    oneTime: false,
+    tag: 'NEW',
   },
   {
     id: 'offline_cap_boost',

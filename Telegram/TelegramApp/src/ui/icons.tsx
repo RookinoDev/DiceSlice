@@ -52,6 +52,16 @@ export function DailyGiftIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
   )
 }
 
+export function PackCrateIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 8l8-4 8 4-8 4-8-4z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M4 8v8l8 4 8-4V8" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 12v8" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function AchievementsIcon({ color = '#C7CCDC', size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

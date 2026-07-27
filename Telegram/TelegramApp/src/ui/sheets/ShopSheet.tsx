@@ -6,10 +6,9 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react'
 import { createShopInvoice, fetchShopCatalog, type ShopItem } from '../../game/monetization/shopApi'
 import { hapticAction, hapticSuccess, openInvoice } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
-import type { CardRarity } from '../../game/cards/catalog'
-import type { PackType } from '../../game/cards/cardsApi'
-import { RARITY_COLOR, RARITY_GEM } from '../cards/cardTheme'
-import { CrownIcon, DailyGiftIcon, GoldIcon, HourglassIcon } from '../icons'
+import { PACK_CARD_COUNT_LABEL, type PackType } from '../../game/cards/cardsApi'
+import { RARITY_COLOR, RARITY_GEM, PACK_TIER_RARITY } from '../cards/cardTheme'
+import { CrownIcon, DailyGiftIcon, GoldIcon, HourglassIcon, PackCrateIcon } from '../icons'
 import { Sheet } from '../Sheet'
 
 interface ShopSheetProps {
@@ -30,6 +29,7 @@ interface ShopSheetProps {
 }
 
 // Starter Pack renders separately as a featured hero card up top - not in this grouped list.
+// Card Packs render as their own tile grid (renderPackTile), not the generic row list.
 const CATEGORY_ORDER: Array<{ kind: string; label: string }> = [
   { kind: 'currency', label: 'STARDUST' },
   { kind: 'cards', label: 'CARD PACKS' },
@@ -37,7 +37,12 @@ const CATEGORY_ORDER: Array<{ kind: string; label: string }> = [
   { kind: 'vip', label: 'VIP' },
 ]
 
-const PACK_TIER_RARITY: Record<PackType, CardRarity> = { meteor: 'uncommon', stellar: 'rare', deepsky: 'epic', singularity: 'legendary' }
+const CATEGORY_ICON: Record<string, ReactNode> = {
+  currency: <GoldIcon size={12} />,
+  cards: <PackCrateIcon size={12} />,
+  boost: <HourglassIcon size={12} />,
+  vip: <CrownIcon size={12} />,
+}
 
 // Real Stardust-per-Star rate of each bundle vs the Small pack (see TelegramBot/shop.mjs's
 // actual listed amounts/prices: 500/25, 1500/60, 5000/175) - not made-up marketing numbers.
@@ -54,20 +59,7 @@ function iconForItem(item: ShopItem): ReactNode {
   if (item.id === 'starter_pack') return <DailyGiftIcon color="#FFD873" size={28} />
   if (item.id === 'offline_cap_boost') return <HourglassIcon size={28} />
   if (item.id === 'vip_pass_30d') return <CrownIcon size={28} />
-  const packType = packTypeOf(item)
-  if (packType) return <img src={RARITY_GEM[PACK_TIER_RARITY[packType]]} alt="" className="shop-row-gem" />
   return <GoldIcon size={26} />
-}
-
-/** Accent color used for the row's icon-well glow and border - reuses the same rarity palette
- *  card packs already use elsewhere, so a Deep Sky pack reads "epic" here too. */
-function glowColorForItem(item: ShopItem): string {
-  if (item.id === 'starter_pack') return '#FFD873'
-  if (item.id === 'offline_cap_boost') return '#43DDEE'
-  if (item.id === 'vip_pass_30d') return '#FFB238'
-  const packType = packTypeOf(item)
-  if (packType) return RARITY_COLOR[PACK_TIER_RARITY[packType]]
-  return '#FFB238'
 }
 
 export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refreshCards, dailyClaimable, onOpenDaily }: ShopSheetProps) {
@@ -133,7 +125,9 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
     const buying = buyingId === item.id
     const justBought = justBoughtId === item.id
     const bonus = STARDUST_BONUS_PERCENT[item.id]
-    const glow = glowColorForItem(item)
+    // Every remaining row category (starter, stardust bundles, VIP) reads gold; only the cyan
+    // offline-cap boost differs - card packs no longer route through here at all (see renderPackTile).
+    const glow = item.id === 'offline_cap_boost' ? '#43DDEE' : '#FFB238'
     return (
       <div
         key={item.id}
@@ -141,6 +135,7 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
         style={{ '--shop-glow': glow } as CSSProperties}
       >
         {featured && <div className="shop-featured-ribbon">BEST VALUE</div>}
+        {!featured && item.tag && <div className="shop-tag-badge">{item.tag}</div>}
         <div key={justBought ? celebrateKey : 'idle'} className="shop-row-icon-well">
           {iconForItem(item)}
         </div>
@@ -155,6 +150,42 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
           {owned ? (
             'OWNED'
           ) : buying ? (
+            '…'
+          ) : (
+            <>
+              <span className="shop-row-price-star">★</span>
+              {item.priceStars}
+            </>
+          )}
+        </button>
+      </div>
+    )
+  }
+
+  // Card Packs get their own tile grid instead of the generic list row - the closest thing this
+  // shop sells to a Clash Royale-style "chest", so they earn a bigger, more collectible-feeling
+  // presentation: large rarity-tinted gem, a card-count + tier pill, price pinned to the bottom.
+  const renderPackTile = (item: ShopItem) => {
+    const packType = packTypeOf(item)
+    if (!packType) return null
+    const rarity = PACK_TIER_RARITY[packType]
+    const color = RARITY_COLOR[rarity]
+    const buying = buyingId === item.id
+    const justBought = justBoughtId === item.id
+    return (
+      <div key={item.id} className={`shop-pack-tile ${justBought ? 'shop-pack-tile--celebrate' : ''}`} style={{ '--pack-color': color } as CSSProperties}>
+        {item.tag && <div className="shop-tag-badge">{item.tag}</div>}
+        <div key={justBought ? celebrateKey : 'idle'} className="shop-pack-icon-well">
+          <img src={RARITY_GEM[rarity]} alt="" className="shop-pack-gem" />
+        </div>
+        <div className="shop-pack-title">{item.title}</div>
+        <div className="shop-pack-meta">
+          <span className="shop-pack-count">{PACK_CARD_COUNT_LABEL[packType]}</span>
+          <span className="shop-pack-rarity-pill">{rarity.toUpperCase()}</span>
+        </div>
+        <div className="shop-pack-desc">{item.description}</div>
+        <button className="shop-pack-buy" disabled={buying} onClick={() => handleBuy(item)}>
+          {buying ? (
             '…'
           ) : (
             <>
@@ -197,8 +228,11 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
           {starterItem && !starterOwned && renderRow(starterItem, true)}
           {groups.map((g) => (
             <div key={g.kind}>
-              <div className="shop-category-header">{g.label}</div>
-              {g.rows.map((item) => renderRow(item, false))}
+              <div className="shop-category-header">
+                <span className="shop-category-icon">{CATEGORY_ICON[g.kind]}</span>
+                {g.label}
+              </div>
+              {g.kind === 'cards' ? <div className="shop-pack-grid">{g.rows.map((item) => renderPackTile(item))}</div> : g.rows.map((item) => renderRow(item, false))}
             </div>
           ))}
         </div>

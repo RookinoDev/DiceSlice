@@ -41,6 +41,34 @@ test('every pack honors its guaranteed rarity floor', () => {
   }
 })
 
+test('epicvault and legendarycache guarantee their floor on EVERY slot, not just slot 0', () => {
+  for (const type of ['epicvault', 'legendarycache']) {
+    const spec = PACK_TYPES[type]
+    assert.ok(spec.allSlotsFloor, `${type} should set allSlotsFloor`)
+    for (let trial = 0; trial < 200; trial++) {
+      const { cards } = rollPack(type, freshPity())
+      for (const c of cards) {
+        assert.ok(rank(c.rarity) >= rank(spec.allSlotsFloor), `${type} rolled a ${c.rarity} card below its ${spec.allSlotsFloor} floor`)
+      }
+    }
+  }
+})
+
+test('standard packs (no allSlotsFloor) can roll below-floor cards outside slot 0', () => {
+  // Sanity check for the opposite invariant - a pack WITHOUT allSlotsFloor should not
+  // accidentally also guarantee every slot (that would silently make e.g. Stellar Packs as
+  // strong as Epic Vault). Rolling enough trials should turn up at least one common/uncommon
+  // card outside slot 0 for a pack type with no allSlotsFloor set.
+  const spec = PACK_TYPES.stellar
+  assert.ok(!spec.allSlotsFloor)
+  let sawBelowFloor = false
+  for (let trial = 0; trial < 300 && !sawBelowFloor; trial++) {
+    const { cards } = rollPack('stellar', freshPity())
+    if (cards.slice(1).some((c) => rank(c.rarity) < rank(spec.floor))) sawBelowFloor = true
+  }
+  assert.ok(sawBelowFloor, 'expected at least one below-floor card outside slot 0 across 300 stellar packs')
+})
+
 test('meteor card count follows its published odds (95/4/0.9/0.1 for 1/2/3/5 cards)', () => {
   const counts = { 1: 0, 2: 0, 3: 0, 5: 0 }
   const trials = 20000

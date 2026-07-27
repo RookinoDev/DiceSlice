@@ -32,12 +32,20 @@ export const METEOR_CARD_COUNT_WEIGHTS = { 1: 95, 2: 4, 3: 0.9, 5: 0.1 }
 
 /** Pack types. floor = slot-0 guaranteed minimum rarity; variantChance = per-card upgrade roll.
  *  cards = fixed card count; cardCountWeights = rolled count instead (see rollCardCount) - a
- *  type has exactly one of the two. */
+ *  type has exactly one of the two. allSlotsFloor, if set, applies floor's own rarity check to
+ *  EVERY slot instead of just slot 0 (see rollPack) - used by the Stars-only "vault" packs below
+ *  to make a genuine "no chaff" guarantee, not just a floor on the first card. */
 export const PACK_TYPES = {
   meteor: { cardCountWeights: METEOR_CARD_COUNT_WEIGHTS, floor: 'uncommon', variantChance: 0.06 },
   stellar: { cards: 4, floor: 'rare', variantChance: 0.08 },
   deepsky: { cards: 5, floor: 'epic', variantChance: 0.1 },
   singularity: { cards: 5, floor: 'legendary', variantChance: 0.18 },
+  // Stars-only premium SKUs (Shop only - never a boss/daily drop, see packTypeForBossStage and
+  // DAILY_PACK_DAYS, neither of which reference these keys). Never guarantee 'ultra' - see
+  // docs/CARD_SYSTEM_PLAN.md: "monetize access and cadence, not outcomes."
+  nebula: { cards: 8, floor: 'rare', variantChance: 0.09 },
+  epicvault: { cards: 3, floor: 'epic', allSlotsFloor: 'epic', variantChance: 0.12 },
+  legendarycache: { cards: 4, floor: 'legendary', allSlotsFloor: 'epic', variantChance: 0.22 },
 }
 
 /** Pity: a forced floor after this many packs without hitting the tier naturally. */
@@ -160,9 +168,11 @@ export function rollPack(packType, pity, ownedIds = new Set(), quality = 0, rng 
 
   const cards = []
   const packIds = new Set()
-  // Slot 0 carries the pack's guaranteed floor; the rest roll the open table.
+  // Slot 0 always carries the pack's guaranteed floor; the rest roll the open table UNLESS
+  // allSlotsFloor is set, in which case every slot shares that same floor (a "vault"-style pack).
   for (let i = 0; i < count; i++) {
-    const rarity = rollRarity(rng, i === 0 ? spec.floor : 'common', quality)
+    const minRarity = i === 0 ? spec.floor : (spec.allSlotsFloor ?? 'common')
+    const rarity = rollRarity(rng, minRarity, quality)
     const card = pickCard(rng, rarity, ownedIds, packIds)
     packIds.add(card.id)
     cards.push({ cardId: card.id, rarity, variant: rollVariant(rng, spec.variantChance) })

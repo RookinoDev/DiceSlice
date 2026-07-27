@@ -7,7 +7,7 @@ import type { CardVariant } from './variants'
 
 const FETCH_TIMEOUT_MS = 6000
 
-export type PackType = 'meteor' | 'stellar' | 'deepsky' | 'singularity'
+export type PackType = 'meteor' | 'stellar' | 'deepsky' | 'singularity' | 'nebula' | 'epicvault' | 'legendarycache'
 
 export interface PendingPack {
   id: number
@@ -141,4 +141,20 @@ export const PACK_LABEL: Record<PackType, string> = {
   stellar: 'STELLAR PACK',
   deepsky: 'DEEP SKY PACK',
   singularity: 'SINGULARITY PACK',
+  nebula: 'NEBULA BUNDLE',
+  epicvault: 'EPIC VAULT',
+  legendarycache: 'LEGENDARY CACHE',
+}
+
+/** Shop-tile card-count display only (not re-derived from server truth) - meteor's real count is
+ *  a server-side roll (see TelegramBot/cards.mjs's METEOR_CARD_COUNT_WEIGHTS), so this shows its
+ *  published range rather than a single number. */
+export const PACK_CARD_COUNT_LABEL: Record<PackType, string> = {
+  meteor: '1-5 CARDS',
+  stellar: '4 CARDS',
+  deepsky: '5 CARDS',
+  singularity: '5 CARDS',
+  nebula: '8 CARDS',
+  epicvault: '3 CARDS',
+  legendarycache: '4 CARDS',
 }

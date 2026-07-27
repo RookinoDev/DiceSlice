@@ -11,6 +11,8 @@ export interface ShopItem {
   priceStars: number
   kind: string
   oneTime: boolean
+  /** Optional short marketing badge, e.g. "NEW" - server-driven so promo tags never need a client release. */
+  tag?: string
 }
 
 export interface ShopCatalog {
@@ -19,7 +21,14 @@ export interface ShopCatalog {
   purchased: string[]
 }
 
+/** True in dev-preview outside Telegram: no initData means no real API - serve the DEV mock
+ *  (see cardsApi.ts's identically-named check, duplicated here since this is a separate module). */
+function useDevMock(): boolean {
+  return import.meta.env.DEV && !getInitData()
+}
+
 export async function fetchShopCatalog(apiBaseUrl: string | undefined): Promise<ShopCatalog | null> {
+  if (useDevMock()) return (await import('../cards/devMock')).mockShopCatalog()
   const initData = getInitData()
   if (!apiBaseUrl || !initData) return null
   try {

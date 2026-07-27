@@ -10,7 +10,7 @@
 // recap (best pull enthroned). CONTINUE loops to the next pack without leaving the overlay.
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { CardArt } from './CardArt'
-import { RARITY_COLOR } from './cardTheme'
+import { RARITY_COLOR, PACK_TIER_RARITY } from './cardTheme'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticSuccess, hapticTap } from '../../telegram'
 import { RARITY_LABEL, type CardRarity } from '../../game/cards/catalog'
@@ -30,10 +30,17 @@ const RARITY_RANK: Record<CardRarity, number> = { common: 0, uncommon: 1, rare: 
 const TEAR_HOLD_MS = 900
 const DEAL_STAGGER_MS = 110
 
-// A pack's premium color/weight, keyed to its guaranteed floor rarity - reused for the
-// wrapper glow, the tear-open burst, and (via --burst-scale) how big that burst reads.
-const PACK_TIER_RARITY: Record<PackType, CardRarity> = { meteor: 'uncommon', stellar: 'rare', deepsky: 'epic', singularity: 'legendary' }
-const PACK_TIER_BURST_SCALE: Record<PackType, number> = { meteor: 1, stellar: 1.15, deepsky: 1.35, singularity: 1.6 }
+// A pack's premium weight (via --burst-scale) - how big its tear-open burst reads. PACK_TIER_RARITY
+// itself (color) is shared with ShopSheet.tsx, see cardTheme.ts.
+const PACK_TIER_BURST_SCALE: Record<PackType, number> = {
+  meteor: 1,
+  stellar: 1.15,
+  deepsky: 1.35,
+  singularity: 1.6,
+  nebula: 1.2,
+  epicvault: 1.4,
+  legendarycache: 1.7,
+}
 
 type Phase =
   | { kind: 'pack' }
