@@ -55,14 +55,16 @@ export interface TalentDefinition {
 }
 
 /** Per-node-role bonus formula: a root is a cheap, weak opener (the trunk); a fork is the main
- *  per-level pace (every regular climbing node); a merge rewards successfully converging two
- *  paths back into one with a stronger multi-level bonus; a keystone is one big single-level
- *  spike (used both for the top of a long climb AND for a short dead-end's own payoff - see
- *  buildDefaultTalents); a gem carries no bonus of its own - its "level" (0 or 1) only tracks
- *  whether the slot is unlocked. */
+ *  per-level pace (most regular climbing nodes); a spike is a cheap one-off milestone dropped
+ *  partway up a long climb - a single bigger jolt breaking up the steady fork/fork/fork rhythm;
+ *  a merge rewards successfully converging two paths back into one with a stronger multi-level
+ *  bonus; a keystone is the biggest single-level spike (used both for the top of a long climb
+ *  AND for a short dead-end's own payoff - see buildDefaultTalents); a gem carries no bonus of
+ *  its own - its "level" (0 or 1) only tracks whether the slot is unlocked. */
 const ROLE_FORMULA = {
   root: { firstLevelBonus: 0.03, bonusPerLevel: 0.015, maxLevel: 4 },
   fork: { firstLevelBonus: 0.04, bonusPerLevel: 0.02, maxLevel: 5 },
+  spike: { firstLevelBonus: 0.09, bonusPerLevel: 0, maxLevel: 1 },
   merge: { firstLevelBonus: 0.07, bonusPerLevel: 0.03, maxLevel: 5 },
   keystone: { firstLevelBonus: 0.12, bonusPerLevel: 0, maxLevel: 1 },
   gem: { firstLevelBonus: 0, bonusPerLevel: 0, maxLevel: 1 },
@@ -101,14 +103,17 @@ function node(id: string, branch: string, prerequisites: string[], pos: { col: n
   return { id, branch, prerequisites, pos, effect, displayName: EFFECT_LABEL[effect], description: EFFECT_DESCRIPTION[effect], ...ROLE_FORMULA[role] }
 }
 
-type Step = { effect: TalentEffect } | { gem: true }
+type Step = { effect: TalentEffect; role?: NodeRole } | { gem: true }
 
-/** Alternates between two effects for `count` point nodes, dropping a Gem Socket in right after
- *  the point node at each index listed in `gemAfter` (1-based). */
-function alternatingSteps(a: TalentEffect, b: TalentEffect, count: number, gemAfter: number[] = []): Step[] {
+/** Cycles through `effects` (in order, wrapping around) for `count` point nodes - not just
+ *  alternating between two, so a long climb doesn't read as the same 2 things over and over.
+ *  Drops a Gem Socket right after the point node at each index listed in `gemAfter` (1-based),
+ *  and tags the point node at each index in `spikeAt` (1-based) with the 'spike' role instead of
+ *  the run's default, for an occasional bigger one-off jolt mid-climb. */
+function cyclingSteps(effects: TalentEffect[], count: number, gemAfter: number[] = [], spikeAt: number[] = []): Step[] {
   const steps: Step[] = []
   for (let i = 1; i <= count; i++) {
-    steps.push({ effect: i % 2 === 1 ? a : b })
+    steps.push({ effect: effects[(i - 1) % effects.length], role: spikeAt.includes(i) ? 'spike' : undefined })
     if (gemAfter.includes(i)) steps.push({ gem: true })
   }
   return steps
@@ -118,7 +123,7 @@ function alternatingSteps(a: TalentEffect, b: TalentEffect, count: number, gemAf
  *  for the first one), climbing one row per step. Returns the last node's id and the next free
  *  row so callers can continue the chain (a fork, a merge, another run) without hand-computing
  *  row numbers. */
-function buildRun(idPrefix: string, branch: string, col: number, prereq: string, startRow: number, steps: Step[], role: NodeRole = 'fork'): { defs: TalentDefinition[]; lastId: string; nextRow: number } {
+function buildRun(idPrefix: string, branch: string, col: number, prereq: string, startRow: number, steps: Step[], defaultRole: NodeRole = 'fork'): { defs: TalentDefinition[]; lastId: string; nextRow: number } {
   const defs: TalentDefinition[] = []
   let prev = prereq
   let row = startRow
@@ -133,7 +138,7 @@ function buildRun(idPrefix: string, branch: string, col: number, prereq: string,
     } else {
       pointCount++
       const id = `${idPrefix}-${pointCount}`
-      defs.push(node(id, branch, [prev], { col, row }, step.effect, role))
+      defs.push(node(id, branch, [prev], { col, row }, step.effect, step.role ?? defaultRole))
       prev = id
     }
     row--
@@ -175,6 +180,13 @@ function buildRun(idPrefix: string, branch: string, col: number, prereq: string,
  * live path, one of which - a-dead - terminates almost immediately) -> 1 (core-merge, a real
  * reconvergence, not just more forking) -> 3 again (final-a, final-b, and merge-dead, which also
  * terminates immediately) -> 2 (only final-a/final-b continue) -> 1 (nexus).
+ *
+ * Every long climb (Lane A/B, final-A/B) cycles through 4 effects, not just 2 - see the
+ * LANE_A_EFFECTS/LANE_B_EFFECTS/FINAL_A_EFFECTS/FINAL_B_EFFECTS arrays below - so no stretch of
+ * the tree reads as "the same two things back and forth." Post-merge climbs deliberately mix
+ * both pre-merge themes rather than continuing just one. A handful of nodes partway up each long
+ * climb use the 'spike' role (a cheap one-off bigger jolt) instead of the steady 'fork' pace, for
+ * rhythm - not every node should feel like the same weight of investment.
  */
 export function buildDefaultTalents(): TalentDefinition[] {
   const defs: TalentDefinition[] = []
@@ -190,18 +202,24 @@ export function buildDefaultTalents(): TalentDefinition[] {
   defs.push(node('wing-a', 'trunk', ['trunk-5'], { col: 1.5, row: 25 }, TalentEffect.Capstone, 'fork'))
   defs.push(node('wing-b', 'trunk', ['trunk-5'], { col: 4.5, row: 25 }, TalentEffect.Capstone, 'fork'))
 
+  // Lane A cycles 4 effects (not just 2) so an 8-node climb never reads as "the same two things
+  // over and over": TapDamage, Dps, TapCritChance, ShipCritChance - an "offense" theme.
+  const LANE_A_EFFECTS = [TalentEffect.TapDamage, TalentEffect.Dps, TalentEffect.TapCritChance, TalentEffect.ShipCritChance]
   // Lane A: 3 shared nodes, THEN its own early fork into [continue, 5 more] + [a short dead
-  // end, 2 nodes, terminal - a real "just take this one path and stop" option].
-  const a1 = buildRun('a1', 'a', 1.5, 'wing-a', 24, alternatingSteps(TalentEffect.TapDamage, TalentEffect.TapCritChance, 3))
+  // end, 2 nodes, terminal - a real "just take this one path and stop" option, ending on a
+  // deliberately different payoff (RelicGain) than the offense theme it branched off of].
+  const a1 = buildRun('a1', 'a', 1.5, 'wing-a', 24, cyclingSteps(LANE_A_EFFECTS, 3))
   defs.push(...a1.defs)
-  const a2 = buildRun('a2', 'a', 0.8, a1.lastId, a1.nextRow, alternatingSteps(TalentEffect.TapCritChance, TalentEffect.TapDamage, 5))
+  const a2 = buildRun('a2', 'a', 0.8, a1.lastId, a1.nextRow, cyclingSteps(LANE_A_EFFECTS, 5, [], [4]))
   defs.push(...a2.defs)
-  const aDead = buildRun('a-dead', 'a-dead', 2.3, a1.lastId, a1.nextRow, [{ effect: TalentEffect.ShipCritChance }], 'fork')
+  const aDead = buildRun('a-dead', 'a-dead', 2.3, a1.lastId, a1.nextRow, [{ effect: TalentEffect.TapCritChance }], 'fork')
   defs.push(...aDead.defs)
-  defs.push(node('a-dead-2', 'a-dead', [aDead.lastId], { col: 2.3, row: aDead.nextRow }, TalentEffect.ShipCritChance, 'keystone'))
+  defs.push(node('a-dead-2', 'a-dead', [aDead.lastId], { col: 2.3, row: aDead.nextRow }, TalentEffect.RelicGain, 'keystone'))
 
-  // Lane B: straight, no internal fork - the asymmetry with Lane A is deliberate.
-  const b = buildRun('b', 'b', 4.5, 'wing-b', 24, alternatingSteps(TalentEffect.Gold, TalentEffect.XpGain, 8))
+  // Lane B cycles a different 4-effect set - "economy/endurance" - straight, no internal fork
+  // (the asymmetry with Lane A is deliberate).
+  const LANE_B_EFFECTS = [TalentEffect.Gold, TalentEffect.XpGain, TalentEffect.OfflineReward, TalentEffect.RelicGain]
+  const b = buildRun('b', 'b', 4.5, 'wing-b', 24, cyclingSteps(LANE_B_EFFECTS, 8, [], [5]))
   defs.push(...b.defs)
 
   // Reconvergence: branch count drops from 2 live paths (a2, b) back to 1. A real merge, not
@@ -209,16 +227,21 @@ export function buildDefaultTalents(): TalentDefinition[] {
   defs.push(node('core-merge', 'merge', [a2.lastId, b.lastId], { col: 2.65, row: b.nextRow - 1 }, TalentEffect.Capstone, 'merge'))
   const afterMergeRow = b.nextRow - 2
 
-  // Second fork, into 3: two long final climbs, plus another short dead end right off the merge.
-  defs.push(node('merge-dead', 'merge-dead', ['core-merge'], { col: 2.65, row: afterMergeRow }, TalentEffect.OfflineReward, 'keystone'))
+  // Second fork, into 3: two long final climbs, plus another short dead end right off the merge
+  // (a standalone Gold payoff - the smallest possible "take just this one talent and stop").
+  defs.push(node('merge-dead', 'merge-dead', ['core-merge'], { col: 2.65, row: afterMergeRow }, TalentEffect.Gold, 'keystone'))
 
-  const finalA = buildRun('final-a', 'final-a', 1.2, 'core-merge', afterMergeRow, alternatingSteps(TalentEffect.Dps, TalentEffect.OfflineReward, 12, [2, 5]))
+  // Final climbs deliberately blend the two pre-merge themes rather than picking just one - the
+  // two paths' influence mixes now that they've converged.
+  const FINAL_A_EFFECTS = [TalentEffect.Dps, TalentEffect.RelicGain, TalentEffect.TapDamage, TalentEffect.OfflineReward]
+  const finalA = buildRun('final-a', 'final-a', 1.2, 'core-merge', afterMergeRow, cyclingSteps(FINAL_A_EFFECTS, 12, [2, 5], [9]))
   defs.push(...finalA.defs)
-  defs.push(node('final-a-keystone', 'final-a', [finalA.lastId], { col: 1.2, row: finalA.nextRow }, TalentEffect.Dps, 'keystone'))
+  defs.push(node('final-a-keystone', 'final-a', [finalA.lastId], { col: 1.2, row: finalA.nextRow }, FINAL_A_EFFECTS[12 % FINAL_A_EFFECTS.length], 'keystone'))
 
-  const finalB = buildRun('final-b', 'final-b', 4.1, 'core-merge', afterMergeRow, alternatingSteps(TalentEffect.RelicGain, TalentEffect.XpGain, 12, [2, 5]))
+  const FINAL_B_EFFECTS = [TalentEffect.XpGain, TalentEffect.TapCritChance, TalentEffect.Gold, TalentEffect.ShipCritChance]
+  const finalB = buildRun('final-b', 'final-b', 4.1, 'core-merge', afterMergeRow, cyclingSteps(FINAL_B_EFFECTS, 12, [2, 5], [9]))
   defs.push(...finalB.defs)
-  defs.push(node('final-b-keystone', 'final-b', [finalB.lastId], { col: 4.1, row: finalB.nextRow }, TalentEffect.RelicGain, 'keystone'))
+  defs.push(node('final-b-keystone', 'final-b', [finalB.lastId], { col: 4.1, row: finalB.nextRow }, FINAL_B_EFFECTS[12 % FINAL_B_EFFECTS.length], 'keystone'))
 
   const nexusRow = Math.min(finalA.nextRow, finalB.nextRow) - 1
   defs.push({

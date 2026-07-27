@@ -77,17 +77,26 @@ describe('talent tree node catalog', () => {
     }
   })
 
-  it('final-A alternates Dps/OfflineReward and final-B alternates RelicGain/XpGain, each with 2 gem sockets', () => {
+  it('each long climb cycles through 4 distinct effects (not just 2), each with 2 gem sockets', () => {
     const defs = buildDefaultTalents()
-    const aEffects = new Set(defs.filter((d) => d.branch === 'final-a' && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
-    expect(aEffects).toEqual(new Set([TalentEffect.Dps, TalentEffect.OfflineReward]))
-    const aGems = defs.filter((d) => d.branch === 'final-a' && d.effect === TalentEffect.GemSocket)
-    expect(aGems.length).toBe(2)
+    const effectsOf = (branch: string) => new Set(defs.filter((d) => d.branch === branch && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
+    const gemsOf = (branch: string) => defs.filter((d) => d.branch === branch && d.effect === TalentEffect.GemSocket)
 
-    const bEffects = new Set(defs.filter((d) => d.branch === 'final-b' && d.effect !== TalentEffect.GemSocket).map((d) => d.effect))
-    expect(bEffects).toEqual(new Set([TalentEffect.RelicGain, TalentEffect.XpGain]))
-    const bGems = defs.filter((d) => d.branch === 'final-b' && d.effect === TalentEffect.GemSocket)
-    expect(bGems.length).toBe(2)
+    expect(effectsOf('final-a')).toEqual(new Set([TalentEffect.Dps, TalentEffect.RelicGain, TalentEffect.TapDamage, TalentEffect.OfflineReward]))
+    expect(gemsOf('final-a').length).toBe(2)
+
+    expect(effectsOf('final-b')).toEqual(new Set([TalentEffect.XpGain, TalentEffect.TapCritChance, TalentEffect.Gold, TalentEffect.ShipCritChance]))
+    expect(gemsOf('final-b').length).toBe(2)
+
+    // Lane A/B (pre-merge) also cycle 4 effects each - no gems there, those only start post-merge.
+    expect(effectsOf('a')).toEqual(new Set([TalentEffect.TapDamage, TalentEffect.Dps, TalentEffect.TapCritChance, TalentEffect.ShipCritChance]))
+    expect(effectsOf('b')).toEqual(new Set([TalentEffect.Gold, TalentEffect.XpGain, TalentEffect.OfflineReward, TalentEffect.RelicGain]))
+  })
+
+  it('a handful of nodes partway up each long climb use a cheaper single-level spike instead of the steady multi-level pace', () => {
+    const defs = buildDefaultTalents()
+    const spikes = defs.filter((d) => d.maxLevel === 1 && d.bonusPerLevel === 0 && d.firstLevelBonus === 0.09)
+    expect(spikes.length).toBeGreaterThanOrEqual(4) // at least one per long climb (a2, b, final-a, final-b)
   })
 
   it('every node label is derived from what it does, not a flavor name', () => {

@@ -200,8 +200,8 @@ export const defaultBalanceConfig: BalanceConfig = {
   midasGoldBase: 10,
 
   // Talent tree. talentXpCurveBase/Power (12/1, a linear per-level cost) lands full completion
-  // of the current 58-node/249-point tree (see TalentDefinition.ts's buildDefaultTalents) around
-  // 374K cumulative XP - the per-level cost tops out around 3K near the final level, keeping
+  // of the current 58-node/233-point tree (see TalentDefinition.ts's buildDefaultTalents) around
+  // 327K cumulative XP - the per-level cost tops out around 2.8K near the final level, keeping
   // the endgame grind reasonable rather than exploding the way the original 40/1.5 pairing
   // (tuned for a much smaller 25-point tree) would have on a bigger one.
   talentXpBase: 3,

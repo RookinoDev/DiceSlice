@@ -173,31 +173,30 @@ describe('TalentService', () => {
     t.grantXp(100_000)
     expect(t.tapCritChance()).toBe(0)
     expect(t.shipCritChance()).toBe(0)
-    unlockPathTo(t, 'a-dead-1') // Lane A's short dead-end spur (ShipCritChance)
-    t.buyNode(indexOf(t, 'a1-2')) // TapCritChance, on Lane A's main climb
-    t.buyNode(indexOf(t, 'a-dead-1')) // ShipCritChance
+    unlockPathTo(t, 'a2-4') // Lane A's main climb, 4 nodes up (ShipCritChance, a spike node)
+    t.buyNode(indexOf(t, 'a1-3')) // TapCritChance, on Lane A's main climb
+    t.buyNode(indexOf(t, 'a2-4')) // ShipCritChance
     expect(t.tapCritChance()).toBeGreaterThan(0)
     expect(t.shipCritChance()).toBeGreaterThan(0)
     expect(t.tapCritChance()).toBeLessThan(1)
     expect(t.shipCritChance()).toBeLessThan(1)
   })
 
-  it('relicGainMultiplier only reflects RelicGain-tagged nodes, not XpGain', () => {
+  it('relicGainMultiplier only reflects RelicGain-tagged nodes, not OfflineReward', () => {
     const t = freshService()
     t.grantXp(100_000)
     expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(1, 6)
     // Seeds the shared trunk (Capstone-tagged, which DOES buff RelicGain - see CAPSTONE_EFFECTS)
     // as owned, so the baseline to compare against is whatever the trunk alone contributes, not 1.
-    unlockPathTo(t, 'final-b-2')
+    unlockPathTo(t, 'b-4')
     const baseline = t.relicGainMultiplier().toNumber()
     expect(baseline).toBeGreaterThan(1) // trunk's Capstone bonus alone already moved this
 
-    t.buyNode(indexOf(t, 'final-b-1')) // RelicGain
-    expect(t.relicGainMultiplier().toNumber()).toBeGreaterThan(baseline)
+    t.buyNode(indexOf(t, 'b-3')) // OfflineReward
+    expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(baseline, 6) // unaffected - wrong effect
 
-    const afterRelicGain = t.relicGainMultiplier().toNumber()
-    t.buyNode(indexOf(t, 'final-b-2')) // XpGain - shouldn't move relicGainMultiplier further
-    expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(afterRelicGain, 6)
+    t.buyNode(indexOf(t, 'b-4')) // RelicGain
+    expect(t.relicGainMultiplier().toNumber()).toBeGreaterThan(baseline)
   })
 
   it('trunk Capstone nodes each add their own bonus to CAPSTONE_EFFECTS stats, not just one', () => {
