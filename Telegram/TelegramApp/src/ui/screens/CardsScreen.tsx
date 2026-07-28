@@ -16,6 +16,7 @@ import type { OwnedCard } from '../../game/cards/cardsApi'
 import { summarizeCollection, type OwnedSummary } from '../../game/cards/collectionSummary'
 import { loadFavorites, loadRecentViews } from '../../game/cards/cardPrefs'
 import { CardGridItem } from '../cards/CardGridItem'
+import { registerLandmark } from '../combatFx/landmarks'
 
 const COLUMNS = 3
 /** Must match .card-grid-row height (cell + gap) in ui.css. */
@@ -142,6 +143,9 @@ export const CardsScreen = memo(function CardsScreen({ ownedCards, dust, pending
           className={`cards-open-packs-btn ${pendingPackCount === 0 ? 'cards-open-packs-btn--disabled' : ''}`}
           disabled={pendingPackCount === 0}
           onClick={onOpenPacks}
+          // See TutorialSteps.ts's 'first-pack-open' step, the in-screen half of the pack
+          // tutorial (nav-cards in BottomNav.tsx is the other half).
+          ref={(el) => registerLandmark('cards-open-packs', el)}
         >
           OPEN PACKS <span className="cards-open-packs-count">{pendingPackCount}</span>
         </button>

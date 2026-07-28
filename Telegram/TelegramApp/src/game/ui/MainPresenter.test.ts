@@ -8,7 +8,7 @@ describe('showFleet', () => {
     expect(buildMainViewModel(session).showFleet).toBe(false)
   })
 
-  it('turns on after the first kill (the reward floor guarantees the ship is affordable then)', () => {
+  it('turns on after the first kill (the sticky planetsDestroyed flag, not a live affordability check)', () => {
     const session = createGameSession()
     session.begin()
     let kills = 0
@@ -16,7 +16,10 @@ describe('showFleet', () => {
     for (let i = 0; i < 100_000 && kills === 0; i++) session.tap()
 
     expect(kills).toBeGreaterThan(0)
-    expect(session.wallet.balance.gte(session.ships.nextCost(0))).toBe(true)
+    // The ship's full cost isn't guaranteed yet after just one kill (see GameSession's reward
+    // floor, which deliberately reserves the first kill for the Tap Damage upgrade) - showFleet
+    // still turns on regardless, since it's a "you've made real progress" signal, not a
+    // "you can afford it right now" one.
     expect(buildMainViewModel(session).showFleet).toBe(true)
   })
 
@@ -29,9 +32,8 @@ describe('showFleet', () => {
     expect(buildMainViewModel(session).showFleet).toBe(true)
 
     // Spend the kill's reward on something else (the tap-upgrade tutorial step's own action) -
-    // the wallet now sits below the ship's cost again.
-    expect(session.upgradeTapDamage()).toBe(true)
-    expect(session.wallet.balance.lt(session.ships.nextCost(0))).toBe(true)
+    // the wallet may now sit below the ship's cost, but showFleet must not flicker away for it.
+    session.upgradeTapDamage()
     expect(buildMainViewModel(session).showFleet).toBe(true)
   })
 })

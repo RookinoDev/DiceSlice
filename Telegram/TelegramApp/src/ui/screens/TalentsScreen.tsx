@@ -8,6 +8,7 @@ import { BRANCH_ORDER, type TalentBranch } from '../../game/config/TalentDefinit
 import { LevelBadge } from '../LevelBadge'
 import { BranchPanel } from './BranchPanel'
 import { TalentNode } from './TalentNode'
+import { registerLandmark } from '../combatFx/landmarks'
 
 interface TalentsScreenProps {
   session: GameSession
@@ -29,7 +30,14 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
         <div className="screen-subtitle">PERMANENT BONUSES FROM COMBAT XP</div>
       </div>
 
-      <div className={`talent-tree-summary ${t.unspentPoints > 0 ? 'talent-tree-summary--spendable' : ''}`}>
+      <div
+        className={`talent-tree-summary ${t.unspentPoints > 0 ? 'talent-tree-summary--spendable' : ''}`}
+        // See TutorialSteps.ts's 'talents-spend' step, the in-screen half of the Talent Tree
+        // tutorial (nav-talents in BottomNav.tsx is the other half). Points at this summary
+        // strip rather than any specific node - which node to spend on first is the player's
+        // own call, not something the tutorial should imply an answer to.
+        ref={(el) => registerLandmark('talents-summary', el)}
+      >
         <LevelBadge level={t.level} xp={t.xp} xpToNextLevel={t.xpToNextLevel()} size="large" />
         <div className="talent-points-available">
           {t.unspentPoints} POINT{t.unspentPoints === 1 ? '' : 'S'} AVAILABLE

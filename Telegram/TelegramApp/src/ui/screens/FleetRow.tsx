@@ -8,6 +8,7 @@ import { hapticAction } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
 import { shipTierVisualForIndex } from '../shipTierVisuals'
 import { BigNumber } from '../../game/core/BigNumber'
+import { registerLandmark } from '../combatFx/landmarks'
 
 interface FleetRowProps {
   session: GameSession
@@ -39,6 +40,9 @@ export function FleetRow({ session: s, index, onToast }: FleetRowProps) {
       </div>
       <button
         className={`row-action ${afford ? 'affordable' : ''}`}
+        // Only ship 0's row registers this - see TutorialSteps.ts's 'fleet-buy' step, the
+        // in-screen half of the Fleet tutorial (nav-fleet in BottomNav.tsx is the other half).
+        ref={index === 0 ? (el) => registerLandmark('fleet-buy-0', el) : undefined}
         onClick={() => {
           if (s.buyShip(index)) {
             hapticAction()

@@ -42,14 +42,32 @@ describe('GameSession integration', () => {
     expect(session.upgradeTapDamage()).toBe(true)
   })
 
-  it('early kills guarantee enough Stardust for the first ship until it is bought (tutorial flow)', () => {
+  it('the first kill does not also force the full ship cost (that belongs to Tap Damage first)', () => {
     const session = createGameSession()
     session.begin()
     let kills = 0
     session.onReward.on(() => kills++)
     for (let i = 0; i < 100_000 && kills === 0; i++) session.tap()
 
-    expect(kills).toBeGreaterThan(0)
+    expect(kills).toBe(1)
+    // Still guarantees the tap-upgrade floor (see the test above) - just not the larger ship
+    // cost yet, so a new player naturally spends the first kill's reward there, as intended.
+    expect(session.wallet.balance.gte(session.tapUpgrade.nextCost)).toBe(true)
+  })
+
+  it('from the second kill onward, Stardust is guaranteed to cover the first ship - even after spending some of the first kill on Tap Damage (tutorial flow)', () => {
+    const session = createGameSession()
+    session.begin()
+    let kills = 0
+    session.onReward.on(() => kills++)
+    for (let i = 0; i < 100_000 && kills === 0; i++) session.tap()
+    expect(kills).toBe(1)
+
+    // Spend whatever the first kill granted, same as a real player following the tap-upgrade step.
+    expect(session.upgradeTapDamage()).toBe(true)
+
+    for (let i = 0; i < 100_000 && kills === 1; i++) session.tap()
+    expect(kills).toBe(2)
     expect(session.wallet.balance.gte(session.ships.nextCost(0))).toBe(true)
     expect(session.buyShip(0)).toBe(true)
   })

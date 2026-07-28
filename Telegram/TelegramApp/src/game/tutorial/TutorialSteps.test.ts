@@ -14,40 +14,61 @@ function step(id: string) {
   return s
 }
 
-describe('TUTORIAL_STEPS autoAdvanceOn - real completion, not just a tab visit', () => {
-  it('fleet: does not advance on merely opening the Fleet tab without owning a ship', () => {
+describe('Fleet, Cards, and Talents are each taught in a nav step + an in-screen action step', () => {
+  it('fleet-nav: advances the instant the Fleet tab is opened (it only points at the nav icon)', () => {
     const session = createGameSession()
-    expect(step('fleet').autoAdvanceOn?.(makeCtx(session, { tab: 'fleet' }))).toBe(false)
+    expect(step('fleet-nav').autoAdvanceOn?.(makeCtx(session, { tab: 'fleet' }))).toBe(true)
   })
 
-  it('fleet: advances once the first ship is actually recruited', () => {
+  it('fleet-buy: only triggers once actually on the Fleet tab, and does not advance without owning a ship', () => {
+    const session = createGameSession()
+    expect(step('fleet-buy').trigger(makeCtx(session, { tab: 'combat', vm: { ...buildMainViewModel(session), showFleet: true } }))).toBe(false)
+    expect(step('fleet-buy').trigger(makeCtx(session, { tab: 'fleet', vm: { ...buildMainViewModel(session), showFleet: true } }))).toBe(true)
+    expect(step('fleet-buy').autoAdvanceOn?.(makeCtx(session, { tab: 'fleet' }))).toBe(false)
+  })
+
+  it('fleet-buy: advances once the first ship is actually recruited', () => {
     const session = createGameSession()
     session.wallet.add(session.ships.nextCost(0))
     expect(session.buyShip(0)).toBe(true)
-    expect(step('fleet').autoAdvanceOn?.(makeCtx(session, { tab: 'fleet' }))).toBe(true)
+    expect(step('fleet-buy').autoAdvanceOn?.(makeCtx(session, { tab: 'fleet' }))).toBe(true)
   })
 
-  it('first-pack: does not advance on merely opening the Cards tab while a pack is still pending', () => {
+  it('first-pack-nav: advances the instant the Cards tab is opened', () => {
+    const session = createGameSession()
+    expect(step('first-pack-nav').autoAdvanceOn?.(makeCtx(session, { tab: 'cards' }))).toBe(true)
+  })
+
+  it('first-pack-open: only triggers once on the Cards tab with a pack pending, does not advance while one is still pending', () => {
     const session = createGameSession()
     const pending: PendingPack[] = [{ id: 1, type: 'meteor', createdAtMs: Date.now() }]
-    expect(step('first-pack').autoAdvanceOn?.(makeCtx(session, { tab: 'cards', pendingPacks: pending }))).toBe(false)
+    expect(step('first-pack-open').trigger(makeCtx(session, { tab: 'combat', pendingPacks: pending }))).toBe(false)
+    expect(step('first-pack-open').trigger(makeCtx(session, { tab: 'cards', pendingPacks: pending }))).toBe(true)
+    expect(step('first-pack-open').autoAdvanceOn?.(makeCtx(session, { tab: 'cards', pendingPacks: pending }))).toBe(false)
   })
 
-  it('first-pack: advances once no packs are left pending', () => {
+  it('first-pack-open: advances once no packs are left pending', () => {
     const session = createGameSession()
-    expect(step('first-pack').autoAdvanceOn?.(makeCtx(session, { tab: 'cards', pendingPacks: [] }))).toBe(true)
+    expect(step('first-pack-open').autoAdvanceOn?.(makeCtx(session, { tab: 'cards', pendingPacks: [] }))).toBe(true)
   })
 
-  it('talents: does not advance on merely opening the Talents tab without spending a point', () => {
+  it('talents-nav: advances the instant the Talents tab is opened', () => {
+    const session = createGameSession()
+    expect(step('talents-nav').autoAdvanceOn?.(makeCtx(session, { tab: 'talents' }))).toBe(true)
+  })
+
+  it('talents-spend: only triggers once on the Talents tab, does not advance without spending a point', () => {
     const session = createGameSession()
     session.talents.grantXp(1_000_000)
-    expect(step('talents').autoAdvanceOn?.(makeCtx(session, { tab: 'talents' }))).toBe(false)
+    expect(step('talents-spend').trigger(makeCtx(session, { tab: 'combat' }))).toBe(false)
+    expect(step('talents-spend').trigger(makeCtx(session, { tab: 'talents' }))).toBe(true)
+    expect(step('talents-spend').autoAdvanceOn?.(makeCtx(session, { tab: 'talents' }))).toBe(false)
   })
 
-  it('talents: advances once at least one Talent node has been bought', () => {
+  it('talents-spend: advances once at least one Talent node has been bought', () => {
     const session = createGameSession()
     session.talents.grantXp(1_000_000)
     expect(session.talents.buyNode(0)).toBe(true)
-    expect(step('talents').autoAdvanceOn?.(makeCtx(session, { tab: 'talents' }))).toBe(true)
+    expect(step('talents-spend').autoAdvanceOn?.(makeCtx(session, { tab: 'talents' }))).toBe(true)
   })
 })

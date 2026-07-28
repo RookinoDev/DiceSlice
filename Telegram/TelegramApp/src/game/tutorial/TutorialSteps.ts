@@ -57,15 +57,27 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     trigger: (ctx) => ctx.vm.showUpgradeTap,
     autoAdvanceOn: (ctx) => ctx.session.tapUpgrade.level > 1,
   },
+  // Fleet is taught in two steps, not one: 'fleet-nav' points at the bottom-nav icon until the
+  // player opens the tab, then 'fleet-buy' points at the actual BUY button inside FleetScreen
+  // until they actually recruit ship 0. A single step can't do both - its landmark would either
+  // stay stuck on the (now pointless) nav icon after they've already navigated in, or vanish
+  // outright once the player leaves the screen the button lives on. See GameSession's kill
+  // reward floor for why the wallet is guaranteed to cover ships.nextCost(0) by the time
+  // 'fleet-buy' can trigger.
   {
-    id: 'fleet',
+    id: 'fleet-nav',
     landmark: 'nav-fleet',
     title: 'Your Fleet',
-    body: "Your Fleet fights for you automatically, even when you're not tapping. Recruit your first ship!",
+    body: "Your Fleet fights for you automatically, even when you're not tapping. Open the Fleet tab to recruit your first ship!",
     trigger: (ctx) => ctx.vm.showFleet,
-    // Dismisses on actually recruiting the ship, not just opening the tab (see GameSession's
-    // reward floor + MainPresenter's showFleet - the wallet is guaranteed to cover this by the
-    // time the step can even trigger).
+    autoAdvanceOn: (ctx) => ctx.tab === 'fleet',
+  },
+  {
+    id: 'fleet-buy',
+    landmark: 'fleet-buy-0',
+    title: 'Recruit Your Fleet',
+    body: "Tap BUY to recruit your first ship - it'll keep fighting for you, even while you're away.",
+    trigger: (ctx) => ctx.vm.showFleet && ctx.tab === 'fleet',
     autoAdvanceOn: (ctx) => ctx.session.ships.isOwned(0),
   },
   {
@@ -83,13 +95,22 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     trigger: (ctx) => ctx.vm.skills[0]?.unlocked === true,
     autoAdvanceOn: (ctx) => ctx.vm.skills[0]?.active === true,
   },
+  // Same nav+action split as Fleet above - 'first-pack-nav' points at the Cards tab icon,
+  // 'first-pack-open' points at the actual OPEN PACKS button once they're on that screen.
   {
-    id: 'first-pack',
+    id: 'first-pack-nav',
     landmark: 'nav-cards',
     title: 'Card Pack Earned!',
-    body: 'Open it in the Cards tab to collect real planets, moons, and stars.',
+    body: 'Open the Cards tab to collect it.',
     trigger: (ctx) => ctx.pendingPacks.length > 0,
-    // Dismisses once the pack is actually opened, not just on visiting the tab.
+    autoAdvanceOn: (ctx) => ctx.tab === 'cards',
+  },
+  {
+    id: 'first-pack-open',
+    landmark: 'cards-open-packs',
+    title: 'Open Your Pack',
+    body: 'Tap OPEN PACKS to reveal your cards - real planets, moons, and stars!',
+    trigger: (ctx) => ctx.pendingPacks.length > 0 && ctx.tab === 'cards',
     autoAdvanceOn: (ctx) => ctx.pendingPacks.length === 0,
   },
   {
@@ -107,13 +128,23 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Check Missions up top, and open the Shop down here for your free Daily Reward and other bonuses!',
     trigger: (ctx) => ctx.session.stats.bossesDefeated >= 1,
   },
+  // Same nav+action split again - 'talents-nav' points at the Talents tab icon, 'talents-spend'
+  // points at the points-available summary strip once they're on that screen (not any specific
+  // node - which branch to spend on first is the player's own call, not the tutorial's).
   {
-    id: 'talents',
+    id: 'talents-nav',
     landmark: 'nav-talents',
     title: 'Talent Tree',
-    body: 'Leveling up grants Talent Points - spend them on permanent bonuses in the Talent Tree!',
+    body: 'Leveling up grants Talent Points! Open the Talent Tree to spend them.',
     trigger: (ctx) => ctx.session.talents.level >= 2,
-    // Dismisses once a Talent Point is actually spent, not just on visiting the tab.
+    autoAdvanceOn: (ctx) => ctx.tab === 'talents',
+  },
+  {
+    id: 'talents-spend',
+    landmark: 'talents-summary',
+    title: 'Spend Your Points',
+    body: 'Tap any glowing node below to spend a Talent Point on a permanent bonus.',
+    trigger: (ctx) => ctx.session.talents.level >= 2 && ctx.tab === 'talents',
     autoAdvanceOn: (ctx) => anyTalentNodeBought(ctx.session),
   },
   {
@@ -126,7 +157,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
 ]
 
 /** Whether the player has spent at least one Talent Point (any node above level 0) - the real
- *  completion of the 'talents' step's "spend them" instruction, not just opening the tab. */
+ *  completion of the 'talents-spend' step's instruction. */
 function anyTalentNodeBought(session: GameSession): boolean {
   const t = session.talents
   for (let i = 0; i < t.count; i++) {
