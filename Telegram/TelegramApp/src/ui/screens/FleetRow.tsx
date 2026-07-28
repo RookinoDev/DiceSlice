@@ -6,7 +6,7 @@ import { useState } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import { hapticAction } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
-import { shipTierVisualForIndex } from '../shipTierVisuals'
+import { shipTierVisualForIndex, SHIP_ART } from '../shipTierVisuals'
 import { BigNumber } from '../../game/core/BigNumber'
 import { registerLandmark } from '../combatFx/landmarks'
 
@@ -22,12 +22,13 @@ export function FleetRow({ session: s, index, onToast }: FleetRowProps) {
   const owned = ships.isOwned(index)
   const afford = s.wallet.canAfford(ships.nextCost(index))
   const tier = shipTierVisualForIndex(index)
+  const art = SHIP_ART[index]
   const [popKey, setPopKey] = useState(0)
 
   return (
     <div className="fleet-row">
       <div key={popKey} className="row-icon-wrap row-icon-pop">
-        <div className="row-icon-shape" style={{ clipPath: tier.clipPath, background: tier.color }} />
+        {art ? <img src={art} alt="" className="row-icon-art" draggable={false} /> : <div className="row-icon-shape" style={{ clipPath: tier.clipPath, background: tier.color }} />}
       </div>
       <div className="row-info">
         <div className="row-name">{def.shipName}</div>

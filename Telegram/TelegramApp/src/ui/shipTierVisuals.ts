@@ -25,3 +25,16 @@ export function shipTierVisualForIndex(index: number): ShipTierVisual {
   const tier = TIER_BOUNDARIES.findIndex((upper) => index < upper)
   return TIERS[tier === -1 ? TIERS.length - 1 : tier]
 }
+
+/** Real ship art, keyed by ship index - only ships with an entry here render their actual
+ *  sprite (FleetRow's list icon, ShipUnlockToast's celebration, and FleetSiegeOrbit's in-combat
+ *  sprite all read this same map); everything else still falls back to the tier clip-path
+ *  silhouette above. Source art must face "up" (nose at the top of the image) - that's the 0deg
+ *  convention useFleetSiegeOrbit's facingDeg math assumes, matching the placeholder triangles'
+ *  point-up shape. Files live in public/ships/ (served as-is, not Vite-bundled). */
+export const SHIP_ART: Partial<Record<number, string>> = {
+  0: '/ships/interceptor-01.png',
+  1: '/ships/interceptor-02.png',
+  2: '/ships/interceptor-03.png',
+  3: '/ships/interceptor-04.png',
+}

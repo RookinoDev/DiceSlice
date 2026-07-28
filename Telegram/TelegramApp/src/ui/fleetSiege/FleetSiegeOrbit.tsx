@@ -6,7 +6,7 @@
 import { memo, useMemo, type RefObject } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import type { PlanetImpulseApi } from '../../planet/PlanetCanvas'
-import { shipTierVisualForIndex } from '../shipTierVisuals'
+import { shipTierVisualForIndex, SHIP_ART } from '../shipTierVisuals'
 import { ParticleLayer } from '../combatFx/ParticleLayer'
 import { useFleetSiegeOrbit } from './useFleetSiegeOrbit'
 
@@ -23,14 +23,6 @@ interface FleetSiegeOrbitProps {
 /** Sprite footprint before the per-frame depth scale is applied - later/heavier ships read a touch bigger. */
 function spriteSizePx(index: number): number {
   return 15 + Math.min(13, index * 0.65)
-}
-
-// Real ship art, keyed by ship index - only ships with an entry here render their actual
-// sprite; everything else still falls back to the tier clip-path silhouette. Source art must
-// face "up" (nose at the top of the image) - that's the 0deg convention useFleetSiegeOrbit's
-// facingDeg math already assumes (matches the placeholder triangles' point-up shape).
-const SHIP_ART: Partial<Record<number, string>> = {
-  0: '/ships/interceptor-01.png',
 }
 
 function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, bossActive, bossSecondsLeft, bossTimerSeconds }: FleetSiegeOrbitProps) {
