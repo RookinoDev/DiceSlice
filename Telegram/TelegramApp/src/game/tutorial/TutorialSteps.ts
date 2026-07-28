@@ -63,7 +63,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: 'Your Fleet',
     body: "Your Fleet fights for you automatically, even when you're not tapping. Recruit your first ship!",
     trigger: (ctx) => ctx.vm.showFleet,
-    autoAdvanceOn: (ctx) => ctx.tab === 'fleet',
+    // Dismisses on actually recruiting the ship, not just opening the tab (see GameSession's
+    // reward floor + MainPresenter's showFleet - the wallet is guaranteed to cover this by the
+    // time the step can even trigger).
+    autoAdvanceOn: (ctx) => ctx.session.ships.isOwned(0),
   },
   {
     id: 'first-boss',
@@ -86,7 +89,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: 'Card Pack Earned!',
     body: 'Open it in the Cards tab to collect real planets, moons, and stars.',
     trigger: (ctx) => ctx.pendingPacks.length > 0,
-    autoAdvanceOn: (ctx) => ctx.tab === 'cards',
+    // Dismisses once the pack is actually opened, not just on visiting the tab.
+    autoAdvanceOn: (ctx) => ctx.pendingPacks.length === 0,
   },
   {
     id: 'artifacts-prestige',
@@ -109,7 +113,8 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: 'Talent Tree',
     body: 'Leveling up grants Talent Points - spend them on permanent bonuses in the Talent Tree!',
     trigger: (ctx) => ctx.session.talents.level >= 2,
-    autoAdvanceOn: (ctx) => ctx.tab === 'talents',
+    // Dismisses once a Talent Point is actually spent, not just on visiting the tab.
+    autoAdvanceOn: (ctx) => anyTalentNodeBought(ctx.session),
   },
   {
     id: 'gem-socket',
@@ -119,6 +124,16 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     trigger: (ctx) => anyGemSocketUnlocked(ctx.session),
   },
 ]
+
+/** Whether the player has spent at least one Talent Point (any node above level 0) - the real
+ *  completion of the 'talents' step's "spend them" instruction, not just opening the tab. */
+function anyTalentNodeBought(session: GameSession): boolean {
+  const t = session.talents
+  for (let i = 0; i < t.count; i++) {
+    if (t.levelOf(i) > 0) return true
+  }
+  return false
+}
 
 /** Whether the player has unlocked at least one Gem Socket node in any branch - the moment
  *  Gem Sockets first become relevant (see gameplay/GemSocketService.ts for what socketing a

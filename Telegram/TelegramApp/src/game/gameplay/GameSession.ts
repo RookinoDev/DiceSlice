@@ -331,6 +331,18 @@ export class GameSession {
     // stats.planetsDestroyed++ is a separate onPlanetKilled listener registered AFTER this one,
     // so it's still 0 here on the first kill.
     if (this.stats.planetsDestroyed === 0) gold = gold.max(new BigNumber(this.cfg.tapUpgradeBaseCost))
+    // Every kill before the first ship purchase floors the total balance up to the first ship's
+    // cost (see TutorialSteps.ts's 'fleet' step, "Recruit your first ship!", and
+    // MainPresenter.ts's showFleet). A one-shot floor like the tap-upgrade one above isn't
+    // enough here: the player may spend some of an earlier top-up on the tap-upgrade step before
+    // ever reaching this one, so this re-asserts on every kill until ship 0 is actually owned
+    // (ships.count is the fixed ship ROSTER length, always > 0 - isOwned(0) is the real "have
+    // they bought it yet" check), at which point it stops applying on its own.
+    if (!this.ships.isOwned(0)) {
+      const firstShipCost = this.ships.nextCost(0)
+      const projected = this.wallet.balance.add(gold)
+      if (projected.lt(firstShipCost)) gold = gold.add(firstShipCost.sub(projected))
+    }
     this.wallet.add(gold)
     this.onReward.emit({ planet, gold, overkill })
   }

@@ -42,6 +42,18 @@ describe('GameSession integration', () => {
     expect(session.upgradeTapDamage()).toBe(true)
   })
 
+  it('early kills guarantee enough Stardust for the first ship until it is bought (tutorial flow)', () => {
+    const session = createGameSession()
+    session.begin()
+    let kills = 0
+    session.onReward.on(() => kills++)
+    for (let i = 0; i < 100_000 && kills === 0; i++) session.tap()
+
+    expect(kills).toBeGreaterThan(0)
+    expect(session.wallet.balance.gte(session.ships.nextCost(0))).toBe(true)
+    expect(session.buyShip(0)).toBe(true)
+  })
+
   it('cannot afford a ship with zero Stardust', () => {
     const session = createGameSession()
     expect(session.wallet.balance.eq(BigNumber.Zero)).toBe(true)

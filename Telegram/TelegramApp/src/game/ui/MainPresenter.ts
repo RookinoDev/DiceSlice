@@ -111,9 +111,13 @@ export function buildMainViewModel(s: GameSession): MainViewModel {
 
   const progressed = s.tapUpgrade.level > 1 || s.stage.currentStage > 1 || s.stage.highestStage > 1 || s.wallet.balance.gt(BigNumber.Zero)
 
-  const anyShipOwned = ships.count > 0 && ships.fleetDps().gt(BigNumber.Zero)
-  const shipClose = ships.count > 0 && s.wallet.balance.mul(new BigNumber(2)).gte(ships.nextCost(0)) // >=50% of first cost
-  const showFleet = anyShipOwned || shipClose
+  const anyShipOwned = ships.fleetDps().gt(BigNumber.Zero)
+  // Full cost, not a "getting close" preview - the Fleet tab/tutorial callout ("Recruit your
+  // first ship!") shouldn't appear promising a purchase the player can't actually make yet (see
+  // GameSession.handleKill's matching reward floor, which guarantees the wallet reaches this
+  // exact amount before a ship is owned).
+  const canAffordFirstShip = s.wallet.balance.gte(ships.nextCost(0))
+  const showFleet = anyShipOwned || canAffordFirstShip
 
   const anyArtifactOwned = Array.from({ length: arts.count }, (_, i) => arts.levelOf(i) > 0).some(Boolean)
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero)
