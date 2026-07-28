@@ -112,12 +112,14 @@ export function buildMainViewModel(s: GameSession): MainViewModel {
   const progressed = s.tapUpgrade.level > 1 || s.stage.currentStage > 1 || s.stage.highestStage > 1 || s.wallet.balance.gt(BigNumber.Zero)
 
   const anyShipOwned = ships.fleetDps().gt(BigNumber.Zero)
-  // Full cost, not a "getting close" preview - the Fleet tab/tutorial callout ("Recruit your
-  // first ship!") shouldn't appear promising a purchase the player can't actually make yet (see
-  // GameSession.handleKill's matching reward floor, which guarantees the wallet reaches this
-  // exact amount before a ship is owned).
-  const canAffordFirstShip = s.wallet.balance.gte(ships.nextCost(0))
-  const showFleet = anyShipOwned || canAffordFirstShip
+  // Sticky, not a live "can afford it right now" check - GameSession.handleKill's reward floor
+  // guarantees the wallet already covers the first ship's cost by the end of the very first
+  // kill, but a player can spend some of that on the tap-upgrade step before ever opening Fleet.
+  // A live balance>=cost check would then make the Fleet tab/tutorial callout flicker away again
+  // until the next kill re-floors it - reusing planetsDestroyed (monotonic, never decreases)
+  // instead means once Fleet has legitimately been affordable once, it stays revealed, even
+  // during the gap before the next kill restores full affordability.
+  const showFleet = anyShipOwned || s.stats.planetsDestroyed >= 1
 
   const anyArtifactOwned = Array.from({ length: arts.count }, (_, i) => arts.levelOf(i) > 0).some(Boolean)
   const hasRelics = s.prestige.relics.balance.gt(BigNumber.Zero)
