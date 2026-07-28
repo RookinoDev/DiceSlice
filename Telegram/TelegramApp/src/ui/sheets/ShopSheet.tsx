@@ -7,7 +7,8 @@ import { createShopInvoice, fetchShopCatalog, type ShopItem } from '../../game/m
 import { hapticAction, hapticSuccess, openInvoice } from '../../telegram'
 import { audio } from '../../game/audio/AudioManager'
 import { PACK_CARD_COUNT_LABEL, type PackType } from '../../game/cards/cardsApi'
-import { RARITY_COLOR, RARITY_GEM, PACK_TIER_RARITY } from '../cards/cardTheme'
+import { RARITY_COLOR, PACK_TIER_RARITY } from '../cards/cardTheme'
+import { PACK_ICON } from '../cards/packIcons'
 import { CrownIcon, DailyGiftIcon, GoldIcon, HourglassIcon, PackCrateIcon } from '../icons'
 import { Sheet } from '../Sheet'
 
@@ -172,11 +173,12 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
     const color = RARITY_COLOR[rarity]
     const buying = buyingId === item.id
     const justBought = justBoughtId === item.id
+    const PackIcon = PACK_ICON[packType]
     return (
       <div key={item.id} className={`shop-pack-tile ${justBought ? 'shop-pack-tile--celebrate' : ''}`} style={{ '--pack-color': color } as CSSProperties}>
         {item.tag && <div className="shop-tag-badge">{item.tag}</div>}
         <div key={justBought ? celebrateKey : 'idle'} className="shop-pack-icon-well">
-          <img src={RARITY_GEM[rarity]} alt="" className="shop-pack-gem" />
+          <PackIcon color={color} size={32} />
         </div>
         <div className="shop-pack-title">{item.title}</div>
         <div className="shop-pack-meta">

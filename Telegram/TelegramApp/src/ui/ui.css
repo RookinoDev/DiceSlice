@@ -3001,12 +3001,6 @@
   margin-bottom: 8px;
   animation: sb-pop-in 0.32s ease-out;
 }
-.shop-pack-gem {
-  width: 34px;
-  height: 34px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 6px color-mix(in srgb, var(--pack-color, transparent) 60%, transparent));
-}
 .shop-pack-title {
   font-family: var(--font-display);
   font-weight: 700;

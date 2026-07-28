@@ -11,6 +11,7 @@
 import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, PACK_TIER_RARITY } from './cardTheme'
+import { PACK_ICON } from './packIcons'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticSuccess, hapticTap } from '../../telegram'
 import { RARITY_LABEL, type CardRarity } from '../../game/cards/catalog'
@@ -252,7 +253,12 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
             >
               <div className="pack-wrapper-body">
                 <div className="pack-wrapper-seam" />
-                <div className="pack-wrapper-emblem">✦</div>
+                <div className="pack-wrapper-emblem">
+                  {(() => {
+                    const PackIcon = PACK_ICON[currentPack.type]
+                    return <PackIcon color="#fff" size={30} />
+                  })()}
+                </div>
                 <div className="pack-wrapper-label">{PACK_LABEL[currentPack.type]}</div>
               </div>
             </button>

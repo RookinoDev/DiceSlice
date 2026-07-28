@@ -341,6 +341,82 @@ export function CrownIcon({ size = 24 }: IconProps) {
   )
 }
 
+// -- Card Pack glyphs (Shop tiles + pack-opening ceremony wrapper) -- one distinct silhouette
+// per PackType (see game/cards/cardsApi.ts), replacing the generic rarity gem / "✦" placeholder
+// both used before. Stroke-based and `color`-tintable (unlike the fixed-palette Shop glyphs
+// above) so the same icon reads correctly tinted to its tier color on a Shop tile, or in white
+// sitting on the pack-opening ceremony's own glowing orb - see ui/cards/packIcons.tsx.
+export function MeteorPackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <circle cx="14" cy="14" r="5" stroke={color} strokeWidth="1.8" />
+      <circle cx="12.3" cy="12.2" r="1" fill={color} />
+      <circle cx="15.6" cy="15.4" r="0.8" fill={color} />
+      <path d="M4 4l4 4M2 9.5l3.2 3.2M7.5 3l2.3 2.3" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export function StellarPackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 2l1.8 6.2L20 10l-6.2 1.8L12 18l-1.8-6.2L4 10l6.2-1.8z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="19" cy="5" r="1.2" fill={color} />
+    </svg>
+  )
+}
+
+export function DeepSkyPackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M12 4a8 8 0 100 16 6 6 0 100-12 4 4 0 100 8" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="1.3" fill={color} />
+    </svg>
+  )
+}
+
+export function NebulaPackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M5 15.5a4 4 0 014-4 5 5 0 019.4-1.6A3.5 3.5 0 0117.5 17H7.5a3 3 0 01-2.5-1.5z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <circle cx="9" cy="7.5" r="0.8" fill={color} />
+      <circle cx="15" cy="6" r="0.6" fill={color} />
+    </svg>
+  )
+}
+
+export function EpicVaultPackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <rect x="4" y="4" width="16" height="16" rx="3" stroke={color} strokeWidth="1.8" />
+      <circle cx="12" cy="12" r="4" stroke={color} strokeWidth="1.6" />
+      <path d="M12 12l2.6-1.4" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="0.9" fill={color} />
+    </svg>
+  )
+}
+
+export function SingularityPackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <ellipse cx="12" cy="12" rx="9.2" ry="3.2" stroke={color} strokeWidth="1.5" />
+      <ellipse cx="12" cy="12" rx="9.2" ry="3.2" stroke={color} strokeWidth="1.5" opacity="0.5" transform="rotate(60 12 12)" />
+      <circle cx="12" cy="12" r="3" fill={color} />
+    </svg>
+  )
+}
+
+export function LegendaryCachePackIcon({ color = '#C7CCDC', size = 24 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <path d="M4 10a2 2 0 012-2h12a2 2 0 012 2v7a2 2 0 01-2 2H6a2 2 0 01-2-2v-7z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M4 10c0-3.5 3-6 8-6s8 2.5 8 6" stroke={color} strokeWidth="1.8" />
+      <path d="M4 13h16" stroke={color} strokeWidth="1.4" />
+      <circle cx="12" cy="13" r="1.3" fill={color} />
+    </svg>
+  )
+}
+
 // -- Talent tree --
 export function NavTalentsIcon({ color, size = 20 }: IconProps) {
   return (
