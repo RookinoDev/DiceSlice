@@ -7,6 +7,7 @@ import { ArtifactRow } from './ArtifactRow'
 import { effectLabel } from './artifactEffectMeta'
 import { LockedArtifactRow } from './LockedArtifactRow'
 import { ArtifactPhoenixIcon, ArtifactVoidglassIcon, ArtifactBeaconIcon } from '../icons'
+import { registerLandmark } from '../combatFx/landmarks'
 
 interface ArtifactsScreenProps {
   session: GameSession
@@ -23,7 +24,7 @@ export function ArtifactsScreen({ session: s, onToast }: ArtifactsScreenProps) {
         <div className="screen-title">ARTIFACTS</div>
         <div className="screen-subtitle">PERMANENT BONUSES</div>
       </div>
-      <div className="artifact-list">
+      <div className="artifact-list" ref={(el) => registerLandmark('artifacts-list', el)}>
         {Array.from({ length: s.artifacts.count }, (_, i) => {
           if (s.isArtifactUnlocked(i)) return <ArtifactRow key={i} session={s} index={i} onToast={onToast} />
           const def = s.artifacts.def(i)

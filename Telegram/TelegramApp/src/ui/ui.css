@@ -445,6 +445,54 @@
     box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78), 0 0 16px rgba(255, 178, 56, 0.7);
   }
 }
+/* "Tap here" indicator, centered on the same point the cutout spotlights - an expanding ripple
+   ring (like a tap's own ripple) plus a cursor icon that bounces toward the center on a beat,
+   simulating a repeated tap. Purely additional emphasis on top of the cutout, never the only
+   cue - the callout text still says what to do in words. */
+.tutorial-pointer {
+  position: fixed;
+  width: 64px;
+  height: 64px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 201;
+}
+.tutorial-pointer-ripple {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--palette-gold-light);
+  animation: tutorial-pointer-ripple 1.6s ease-out infinite;
+}
+@keyframes tutorial-pointer-ripple {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.3);
+    opacity: 0;
+  }
+}
+.tutorial-pointer-icon {
+  position: absolute;
+  left: 52%;
+  top: 52%;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  animation: tutorial-pointer-tap 1.1s ease-in-out infinite;
+}
+@keyframes tutorial-pointer-tap {
+  0%,
+  100% {
+    transform: translate(-15%, -15%) scale(1);
+  }
+  35% {
+    transform: translate(0%, 0%) scale(0.88);
+  }
+  55% {
+    transform: translate(-15%, -15%) scale(1);
+  }
+}
 .tutorial-callout {
   position: fixed;
   pointer-events: auto;
@@ -514,7 +562,9 @@
   cursor: pointer;
 }
 @media (prefers-reduced-motion: reduce) {
-  .tutorial-cutout {
+  .tutorial-cutout,
+  .tutorial-pointer-ripple,
+  .tutorial-pointer-icon {
     animation: none;
   }
   .tutorial-callout,

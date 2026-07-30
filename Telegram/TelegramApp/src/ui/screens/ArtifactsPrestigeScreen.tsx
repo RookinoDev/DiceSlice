@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
 import { NavArtifactsIcon, NavPrestigeIcon } from '../icons'
+import { registerLandmark } from '../combatFx/landmarks'
 import { ArtifactsScreen } from './ArtifactsScreen'
 import { PrestigeScreen } from './PrestigeScreen'
 
@@ -25,7 +26,13 @@ export function ArtifactsPrestigeScreen({ session, onToast, onPrestigeRequested,
           <NavArtifactsIcon color={subTab === 'artifacts' ? '#F49CFF' : '#5C6480'} size={15} />
           ARTIFACTS
         </button>
-        <button className={`subtab-chip ${subTab === 'prestige' ? 'subtab-chip--active' : ''}`} onClick={() => setSubTab('prestige')}>
+        <button
+          className={`subtab-chip ${subTab === 'prestige' ? 'subtab-chip--active' : ''}`}
+          // See TutorialSteps.ts's 'prestige-explain' step - always mounted regardless of which
+          // sub-tab is currently showing, unlike anything inside PrestigeScreen itself.
+          ref={(el) => registerLandmark('prestige-subtab', el)}
+          onClick={() => setSubTab('prestige')}
+        >
           <NavPrestigeIcon color={subTab === 'prestige' ? '#E24FFF' : '#5C6480'} size={15} />
           <span className="subtab-label-wrap">
             PRESTIGE

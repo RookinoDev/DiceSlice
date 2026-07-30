@@ -50,8 +50,24 @@ describe('selectActiveStep', () => {
       for (const i of branchIndices) while (session.talents.buyNode(i)) {}
     }
     const seen = new Set(TUTORIAL_STEPS.map((s) => s.id).filter((id) => id !== 'gem-socket'))
-    const step = selectActiveStep(seen, makeCtx(session))
+    // gem-socket is screen-gated to 'talents' (it only makes sense while looking at the tree).
+    const step = selectActiveStep(seen, makeCtx(session, { tab: 'talents' }))
     expect(step?.id).toBe('gem-socket')
+  })
+
+  it('does not pick a screen-gated step while the player is on a different tab', () => {
+    const session = createGameSession()
+    session.talents.grantXp(1_000_000)
+    const branch = session.talents.def(0).branch
+    const branchIndices = Array.from({ length: session.talents.count }, (_, i) => i).filter((i) => session.talents.def(i).branch === branch)
+    for (let pass = 0; pass < 4; pass++) {
+      for (const i of branchIndices) while (session.talents.buyNode(i)) {}
+    }
+    const seen = new Set(TUTORIAL_STEPS.map((s) => s.id).filter((id) => id !== 'gem-socket'))
+    // Same eligible state as above, but the player is on Combat, not Talents - gem-socket's
+    // trigger is true, but its `screen: 'talents'` gate must still block it from activating.
+    const step = selectActiveStep(seen, makeCtx(session, { tab: 'combat' }))
+    expect(step?.id).not.toBe('gem-socket')
   })
 })
 

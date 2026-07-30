@@ -67,6 +67,8 @@ export function TopBar({ session: s, onSettingsClick, onProfileClick, onNotifica
         <div className="topbar-icon-group">
           <button
             className="topbar-icon-btn"
+            // See TutorialSteps.ts's 'missions-intro' step.
+            ref={(el) => registerLandmark('topbar-missions', el)}
             onClick={() => {
               audio.click()
               onNotificationClick()
@@ -78,6 +80,8 @@ export function TopBar({ session: s, onSettingsClick, onProfileClick, onNotifica
           </button>
           <button
             className="topbar-icon-btn"
+            // See TutorialSteps.ts's 'achievements-intro' step.
+            ref={(el) => registerLandmark('topbar-achievements', el)}
             onClick={() => {
               audio.click()
               onAchievementsClick()
@@ -88,6 +92,8 @@ export function TopBar({ session: s, onSettingsClick, onProfileClick, onNotifica
           </button>
           <button
             className="topbar-icon-btn"
+            // See TutorialSteps.ts's 'leaderboard-intro' step.
+            ref={(el) => registerLandmark('topbar-leaderboard', el)}
             onClick={() => {
               audio.click()
               onLeaderboardClick()

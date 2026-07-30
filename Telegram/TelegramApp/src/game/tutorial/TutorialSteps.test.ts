@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { BigNumber } from '../core/BigNumber'
 import { createGameSession } from '../createGameSession'
 import { buildMainViewModel } from '../ui/MainPresenter'
 import type { PendingPack } from '../cards/cardsApi'
+import { selectActiveStep } from '../../ui/useTutorial'
 import { TUTORIAL_STEPS, type TutorialContext } from './TutorialSteps'
 
 function makeCtx(session: ReturnType<typeof createGameSession>, overrides: Partial<TutorialContext> = {}): TutorialContext {
@@ -70,5 +72,84 @@ describe('Fleet, Cards, and Talents are each taught in a nav step + an in-screen
     session.talents.grantXp(1_000_000)
     expect(session.talents.buyNode(0)).toBe(true)
     expect(step('talents-spend').autoAdvanceOn?.(makeCtx(session, { tab: 'talents' }))).toBe(true)
+  })
+})
+
+describe('every step whose content only makes sense on one screen sets `screen`, so it can never spotlight nothing on the wrong tab', () => {
+  it.each(['welcome-tap', 'tap-upgrade', 'first-boss', 'first-skill'])('%s is gated to the combat screen', (id) => {
+    expect(step(id).screen).toBe('combat')
+  })
+  it('fleet-buy is gated to the fleet screen', () => {
+    expect(step('fleet-buy').screen).toBe('fleet')
+  })
+  it('first-pack-open is gated to the cards screen', () => {
+    expect(step('first-pack-open').screen).toBe('cards')
+  })
+  it.each(['talents-spend', 'gem-socket'])('%s is gated to the talents screen', (id) => {
+    expect(step(id).screen).toBe('talents')
+  })
+  it.each(['prestige-explain', 'artifact-spend'])('%s is gated to the artifacts screen', (id) => {
+    expect(step(id).screen).toBe('artifacts')
+  })
+  it.each(['fleet-nav', 'first-pack-nav', 'talents-nav', 'artifacts-nav', 'extras', 'first-stardust', 'missions-intro', 'achievements-intro', 'leaderboard-intro'])(
+    '%s has no screen gate (its landmark - a nav icon or Top Bar button - is always mounted)',
+    (id) => {
+      expect(step(id).screen).toBeUndefined()
+    },
+  )
+
+  it('a screen-gated step never activates while the player is on a different tab, even with its trigger true', () => {
+    const session = createGameSession()
+    session.wallet.add(new BigNumber(50)) // tap-upgrade's trigger (showUpgradeTap) is now true
+    const seen = new Set(TUTORIAL_STEPS.map((s) => s.id).filter((id) => id !== 'tap-upgrade'))
+    const onCombat = selectActiveStep(seen, makeCtx(session, { tab: 'combat' }))
+    const onCards = selectActiveStep(seen, makeCtx(session, { tab: 'cards' }))
+    expect(onCombat?.id).toBe('tap-upgrade')
+    expect(onCards?.id).not.toBe('tap-upgrade')
+  })
+})
+
+describe('Missions, Achievements, and Leaderboard get a lightweight Top Bar introduction', () => {
+  it('missions-intro triggers once the player has destroyed a few planets', () => {
+    const session = createGameSession()
+    expect(step('missions-intro').trigger(makeCtx(session))).toBe(false)
+    session.stats.planetsDestroyed = 3
+    expect(step('missions-intro').trigger(makeCtx(session))).toBe(true)
+  })
+
+  it('achievements-intro and leaderboard-intro trigger at their own boss-defeated milestones', () => {
+    const session = createGameSession()
+    expect(step('achievements-intro').trigger(makeCtx(session))).toBe(false)
+    expect(step('leaderboard-intro').trigger(makeCtx(session))).toBe(false)
+    session.stats.bossesDefeated = 2
+    expect(step('achievements-intro').trigger(makeCtx(session))).toBe(true)
+    expect(step('leaderboard-intro').trigger(makeCtx(session))).toBe(false)
+    session.stats.bossesDefeated = 3
+    expect(step('leaderboard-intro').trigger(makeCtx(session))).toBe(true)
+  })
+})
+
+describe('Artifacts & Prestige: a teaser, a real Prestige preview, then real Artifact spending once Relics exist', () => {
+  it('prestige-explain only triggers once actually able to prestige, and only on the artifacts tab', () => {
+    const session = createGameSession()
+    expect(step('prestige-explain').trigger(makeCtx(session, { tab: 'artifacts' }))).toBe(false)
+    const readyVm = { ...buildMainViewModel(session), canPrestige: true }
+    expect(step('prestige-explain').trigger(makeCtx(session, { tab: 'combat', vm: readyVm }))).toBe(false)
+    expect(step('prestige-explain').trigger(makeCtx(session, { tab: 'artifacts', vm: readyVm }))).toBe(true)
+  })
+
+  it('artifact-spend only triggers once Relics are actually owned, and does not advance before spending any', () => {
+    const session = createGameSession()
+    expect(step('artifact-spend').trigger(makeCtx(session, { tab: 'artifacts' }))).toBe(false)
+    session.prestige.relics.add(new BigNumber(1000))
+    expect(step('artifact-spend').trigger(makeCtx(session, { tab: 'artifacts' }))).toBe(true)
+    expect(step('artifact-spend').autoAdvanceOn?.(makeCtx(session, { tab: 'artifacts' }))).toBe(false)
+  })
+
+  it('artifact-spend advances once an artifact is actually bought', () => {
+    const session = createGameSession()
+    session.prestige.relics.add(new BigNumber(1_000_000))
+    expect(session.buyArtifact(0)).toBe(true)
+    expect(step('artifact-spend').autoAdvanceOn?.(makeCtx(session, { tab: 'artifacts' }))).toBe(true)
   })
 })

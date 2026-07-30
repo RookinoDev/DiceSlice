@@ -27,9 +27,17 @@ export interface TutorialStep {
   /** Dismiss automatically once the taught action happens - the real interaction, not a
    *  separate "got it" tap. Omit for purely informational steps with no single target action. */
   autoAdvanceOn?: (ctx: TutorialContext) => boolean
+  /** If set, this step can only ever become active while `ctx.tab` equals this value - checked
+   *  BEFORE `trigger`, centrally in useTutorial.ts's selectActiveStep, so it's structurally
+   *  impossible for a step whose landmark (or subject matter) only makes sense on one screen to
+   *  pop up spotlighting nothing while the player is looking at a different one. Omit for steps
+   *  whose landmark is screen-independent (the always-mounted bottom nav / top bar) or that are
+   *  meant to draw the player TOWARD a tab they haven't opened yet. */
+  screen?: NavTab
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
+  // -- Combat basics --
   {
     id: 'welcome-tap',
     landmark: 'planet',
@@ -41,6 +49,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
       const p = ctx.session.enemy.current
       return !!p && p.currentHp.lt(p.maxHp)
     },
+    screen: 'combat',
   },
   {
     id: 'first-stardust',
@@ -56,14 +65,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Upgrade your Tap Damage here to hit harder with every tap.',
     trigger: (ctx) => ctx.vm.showUpgradeTap,
     autoAdvanceOn: (ctx) => ctx.session.tapUpgrade.level > 1,
+    screen: 'combat',
   },
-  // Fleet is taught in two steps, not one: 'fleet-nav' points at the bottom-nav icon until the
-  // player opens the tab, then 'fleet-buy' points at the actual BUY button inside FleetScreen
-  // until they actually recruit ship 0. A single step can't do both - its landmark would either
-  // stay stuck on the (now pointless) nav icon after they've already navigated in, or vanish
-  // outright once the player leaves the screen the button lives on. See GameSession's kill
-  // reward floor for why the wallet is guaranteed to cover ships.nextCost(0) by the time
-  // 'fleet-buy' can trigger.
+
+  // -- Fleet: nav teaser, then the real in-screen action --
   {
     id: 'fleet-nav',
     landmark: 'nav-fleet',
@@ -79,13 +84,17 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: "Tap BUY to recruit your first ship - it'll keep fighting for you, even while you're away.",
     trigger: (ctx) => ctx.vm.showFleet && ctx.tab === 'fleet',
     autoAdvanceOn: (ctx) => ctx.session.ships.isOwned(0),
+    screen: 'fleet',
   },
+
+  // -- Boss / skills (combat-only, so they never pop up while the player's looking elsewhere) --
   {
     id: 'first-boss',
     landmark: null,
     title: 'Boss Incoming!',
     body: "Deal enough damage before the timer runs out, or you'll be sent back a sector.",
     trigger: (ctx) => ctx.vm.isBoss && ctx.vm.bossActive,
+    screen: 'combat',
   },
   {
     id: 'first-skill',
@@ -94,9 +103,10 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Activate it for a temporary combat boost.',
     trigger: (ctx) => ctx.vm.skills[0]?.unlocked === true,
     autoAdvanceOn: (ctx) => ctx.vm.skills[0]?.active === true,
+    screen: 'combat',
   },
-  // Same nav+action split as Fleet above - 'first-pack-nav' points at the Cards tab icon,
-  // 'first-pack-open' points at the actual OPEN PACKS button once they're on that screen.
+
+  // -- Cards: nav teaser, then the real in-screen action --
   {
     id: 'first-pack-nav',
     landmark: 'nav-cards',
@@ -112,9 +122,22 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Tap OPEN PACKS to reveal your cards - real planets, moons, and stars!',
     trigger: (ctx) => ctx.pendingPacks.length > 0 && ctx.tab === 'cards',
     autoAdvanceOn: (ctx) => ctx.pendingPacks.length === 0,
+    screen: 'cards',
   },
+
+  // -- Missions (Top Bar, always mounted regardless of tab) --
   {
-    id: 'artifacts-prestige',
+    id: 'missions-intro',
+    landmark: 'topbar-missions',
+    title: 'Missions',
+    body: 'Missions track goals as you play and pay out Stardust when complete. Tap the bell to check and claim them.',
+    trigger: (ctx) => ctx.session.stats.planetsDestroyed >= 3,
+  },
+
+  // -- Artifacts & Prestige: nav teaser, a Prestige preview, then real Artifact spending once
+  //    relics actually exist (an actual prestige is a big, deliberate choice - never forced). --
+  {
+    id: 'artifacts-nav',
     landmark: 'nav-artifacts',
     title: 'Artifacts & Ascension',
     body: 'Ascend here for permanent Relics, then spend them on Artifacts that boost your whole fleet forever - both live in this tab.',
@@ -122,15 +145,33 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     autoAdvanceOn: (ctx) => ctx.tab === 'artifacts',
   },
   {
+    id: 'prestige-explain',
+    landmark: 'prestige-subtab',
+    title: 'Ready to Ascend',
+    body: "You've reached the point where Prestige pays off. It resets your run for Relics that boost every future run - your Artifacts, Relics, and ships stay. Tap PRESTIGE to see what you'd gain, whenever you're ready.",
+    trigger: (ctx) => ctx.tab === 'artifacts' && ctx.vm.canPrestige,
+    screen: 'artifacts',
+  },
+  {
+    id: 'artifact-spend',
+    landmark: 'artifacts-list',
+    title: 'Spend Your Relics',
+    body: 'Artifacts are permanent, run-spanning upgrades - spend Relics here to boost your whole fleet forever.',
+    trigger: (ctx) => ctx.tab === 'artifacts' && ctx.session.prestige.relics.balance.gt(BigNumber.Zero),
+    autoAdvanceOn: (ctx) => Array.from({ length: ctx.session.artifacts.count }, (_, i) => ctx.session.artifacts.levelOf(i) > 0).some(Boolean),
+    screen: 'artifacts',
+  },
+
+  // -- Shop --
+  {
     id: 'extras',
     landmark: 'nav-shop',
     title: "Don't Miss Out",
-    body: 'Check Missions up top, and open the Shop down here for your free Daily Reward and other bonuses!',
+    body: 'Open the Shop down here for your free Daily Reward, card packs, and other bonuses!',
     trigger: (ctx) => ctx.session.stats.bossesDefeated >= 1,
   },
-  // Same nav+action split again - 'talents-nav' points at the Talents tab icon, 'talents-spend'
-  // points at the points-available summary strip once they're on that screen (not any specific
-  // node - which branch to spend on first is the player's own call, not the tutorial's).
+
+  // -- Talents: nav teaser, then the real in-screen action, then Gem Sockets --
   {
     id: 'talents-nav',
     landmark: 'nav-talents',
@@ -146,6 +187,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     body: 'Tap any glowing node below to spend a Talent Point on a permanent bonus.',
     trigger: (ctx) => ctx.session.talents.level >= 2 && ctx.tab === 'talents',
     autoAdvanceOn: (ctx) => anyTalentNodeBought(ctx.session),
+    screen: 'talents',
   },
   {
     id: 'gem-socket',
@@ -153,6 +195,23 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: 'Gem Sockets',
     body: 'Some Talent nodes are Gem Sockets - tap one to unlock it, then tap again to slot in an owned card for a bonus based on its rarity!',
     trigger: (ctx) => anyGemSocketUnlocked(ctx.session),
+    screen: 'talents',
+  },
+
+  // -- Achievements & Leaderboard (Top Bar, always mounted) - lightweight, discovery-only --
+  {
+    id: 'achievements-intro',
+    landmark: 'topbar-achievements',
+    title: 'Achievements',
+    body: 'Milestones you unlock as you play - tap the medal to see your collection.',
+    trigger: (ctx) => ctx.session.stats.bossesDefeated >= 2,
+  },
+  {
+    id: 'leaderboard-intro',
+    landmark: 'topbar-leaderboard',
+    title: 'Leaderboard',
+    body: "See how your fleet stacks up against other commanders' - tap here to check the ranks.",
+    trigger: (ctx) => ctx.session.stats.bossesDefeated >= 3,
   },
 ]
 

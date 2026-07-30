@@ -16,9 +16,12 @@ import type { NavTab } from './BottomNav'
 const STEP_GAP_MS = 3000
 
 /** The lowest-index step whose trigger is true and hasn't been dismissed yet - pure, no React,
- *  so it's directly testable without mounting the hook. */
+ *  so it's directly testable without mounting the hook. A step with a `screen` set is gated on
+ *  `ctx.tab` matching it BEFORE its own trigger even runs - this is what stops a step whose
+ *  landmark or subject only makes sense on one screen from ever activating (and darkening the
+ *  whole viewport with a spotlight pointing at nothing) while the player is looking elsewhere. */
 export function selectActiveStep(seen: ReadonlySet<string>, ctx: TutorialContext): TutorialStep | undefined {
-  return TUTORIAL_STEPS.find((step) => !seen.has(step.id) && step.trigger(ctx))
+  return TUTORIAL_STEPS.find((step) => !seen.has(step.id) && (!step.screen || step.screen === ctx.tab) && step.trigger(ctx))
 }
 
 /** True for a save with existing progress but an empty tutorialSeen - it predates this feature

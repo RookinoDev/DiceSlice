@@ -6,6 +6,16 @@ interface IconProps {
   size?: number
 }
 
+/** Tutorial "tap here" indicator - a simple cursor/pointer silhouette (see TutorialOverlay.tsx,
+ *  which animates it bouncing toward the spotlighted target inside a pulsing ripple ring). */
+export function TutorialPointerIcon({ color = '#FFD873', size = 34 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24">
+      <path d="M6 3l3.5 16.5 2-6.2 6.2-2z" fill={color} stroke="#2a1c04" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
 export function SettingsIcon({ color = '#C7CCDC', size = 17 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none">

@@ -12,6 +12,7 @@
 import { createPortal } from 'react-dom'
 import type { CSSProperties } from 'react'
 import { getLandmarkRect } from './combatFx/landmarks'
+import { TutorialPointerIcon } from './icons'
 import type { TutorialStep } from '../game/tutorial/TutorialSteps'
 
 interface TutorialOverlayProps {
@@ -46,6 +47,15 @@ export function TutorialOverlay({ step, isFirstStep, onDismiss, onSkip }: Tutori
               height: rect.height + CUTOUT_PAD * 2,
             }}
           />
+          {/* "Tap here" indicator, centered on the same target the cutout spotlights - a pulsing
+              ripple ring plus a bouncing pointer, so the target isn't just highlighted but
+              actively pointed at (user-requested: an animated marker showing where to tap). */}
+          <div className="tutorial-pointer" style={{ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }}>
+            <div className="tutorial-pointer-ripple" />
+            <div className="tutorial-pointer-icon">
+              <TutorialPointerIcon size={30} />
+            </div>
+          </div>
           <div className="tutorial-callout" style={calloutPosition(rect)}>
             <div className="tutorial-callout-title">{step.title}</div>
             <div className="tutorial-callout-body">{step.body}</div>
