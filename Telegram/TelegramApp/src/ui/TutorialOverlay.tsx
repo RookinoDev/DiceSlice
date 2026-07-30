@@ -49,13 +49,17 @@ export function TutorialOverlay({ step, isFirstStep, onDismiss, onSkip }: Tutori
           />
           {/* "Tap here" indicator, centered on the same target the cutout spotlights - a pulsing
               ripple ring plus a bouncing pointer, so the target isn't just highlighted but
-              actively pointed at (user-requested: an animated marker showing where to tap). */}
-          <div className="tutorial-pointer" style={{ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }}>
-            <div className="tutorial-pointer-ripple" />
-            <div className="tutorial-pointer-icon">
-              <TutorialPointerIcon size={30} />
+              actively pointed at (user-requested: an animated marker showing where to tap).
+              Skipped for noTapHint steps - the cutout still highlights a status pill or a
+              container of several real targets, but nothing there is itself a click target. */}
+          {!step.noTapHint && (
+            <div className="tutorial-pointer" style={{ left: rect.left + rect.width / 2, top: rect.top + rect.height / 2 }}>
+              <div className="tutorial-pointer-ripple" />
+              <div className="tutorial-pointer-icon">
+                <TutorialPointerIcon size={30} />
+              </div>
             </div>
-          </div>
+          )}
           <div className="tutorial-callout" style={calloutPosition(rect)}>
             <div className="tutorial-callout-title">{step.title}</div>
             <div className="tutorial-callout-body">{step.body}</div>

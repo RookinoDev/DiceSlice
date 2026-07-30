@@ -722,7 +722,14 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       />
       <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
       <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={handleClosePackSheet} />
-      <TutorialOverlay step={tutorial.step} isFirstStep={tutorial.isFirstStep} onDismiss={tutorial.dismiss} onSkip={tutorial.skip} />
+      {/* Hidden (not just non-interactive) while any other sheet/overlay is open - `openSheet`
+          is the same "what's currently on top" signal the hardware BackButton uses above, reused
+          here since it's already exhaustive: without this, e.g. the pack-opening ceremony
+          (z-index 60) sat visually underneath the tutorial's full-viewport darkening scrim
+          (z-index 200), fading the whole ceremony out from behind glass even though clicks still
+          passed through. The underlying trigger/autoAdvance logic in useTutorial keeps running
+          either way - this only withholds the visual. */}
+      {openSheet === null && <TutorialOverlay step={tutorial.step} isFirstStep={tutorial.isFirstStep} onDismiss={tutorial.dismiss} onSkip={tutorial.skip} />}
     </div>
   )
 }

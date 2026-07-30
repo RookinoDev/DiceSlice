@@ -12,8 +12,10 @@ import type { NavTab } from './BottomNav'
  *  does several triggering things in quick succession (tap, then immediately open a tab) gets
  *  every eligible step chained back-to-back the instant each trigger flips true, reading as a
  *  lecture rather than "look, here's the thing you just did." This breathing room lets them
- *  actually see the screen the last step pointed at before the next callout interrupts. */
-const STEP_GAP_MS = 3000
+ *  actually see the screen the last step pointed at before the next callout interrupts.
+ *  User-requested: spaced out further than the original 3s, which still felt like steps could
+ *  chain right on top of each other. */
+const STEP_GAP_MS = 6000
 
 /** The lowest-index step whose trigger is true and hasn't been dismissed yet - pure, no React,
  *  so it's directly testable without mounting the hook. A step with a `screen` set is gated on

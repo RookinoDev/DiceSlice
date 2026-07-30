@@ -109,6 +109,18 @@ describe('every step whose content only makes sense on one screen sets `screen`,
   })
 })
 
+describe('noTapHint is set on every step whose landmark is not itself a single tap target', () => {
+  it.each(['first-stardust', 'artifact-spend', 'talents-spend'])('%s sets noTapHint (a status pill or a container, not a button)', (id) => {
+    expect(step(id).noTapHint).toBe(true)
+  })
+  it.each(['welcome-tap', 'tap-upgrade', 'fleet-nav', 'fleet-buy', 'first-pack-nav', 'first-pack-open', 'talents-nav', 'artifacts-nav', 'prestige-explain'])(
+    '%s leaves noTapHint unset (its landmark is a real, single tap target)',
+    (id) => {
+      expect(step(id).noTapHint).toBeUndefined()
+    },
+  )
+})
+
 describe('Missions, Achievements, and Leaderboard get a lightweight Top Bar introduction', () => {
   it('missions-intro triggers once the player has destroyed a few planets', () => {
     const session = createGameSession()

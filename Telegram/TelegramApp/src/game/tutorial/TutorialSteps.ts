@@ -34,6 +34,12 @@ export interface TutorialStep {
    *  whose landmark is screen-independent (the always-mounted bottom nav / top bar) or that are
    *  meant to draw the player TOWARD a tab they haven't opened yet. */
   screen?: NavTab
+  /** Set when `landmark` points at something that isn't itself a single tap target - a status
+   *  pill (Stardust balance) or a container holding several real targets (the Artifact list, the
+   *  Talent points-available strip: "tap one of the things below," not "tap this"). Suppresses
+   *  TutorialOverlay's "tap here" ripple/cursor for this step so it never implies a click that
+   *  wouldn't do anything - the cutout ring (a "look here" cue, not a "tap here" one) still shows. */
+  noTapHint?: boolean
 }
 
 export const TUTORIAL_STEPS: TutorialStep[] = [
@@ -57,6 +63,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     title: 'Stardust',
     body: "Nice hit! That's Stardust - your main currency. Spend it to grow stronger.",
     trigger: (ctx) => ctx.session.wallet.balance.gt(BigNumber.Zero),
+    noTapHint: true, // the balance pill is a status display, not a button
   },
   {
     id: 'tap-upgrade',
@@ -160,6 +167,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     trigger: (ctx) => ctx.tab === 'artifacts' && ctx.session.prestige.relics.balance.gt(BigNumber.Zero),
     autoAdvanceOn: (ctx) => Array.from({ length: ctx.session.artifacts.count }, (_, i) => ctx.session.artifacts.levelOf(i) > 0).some(Boolean),
     screen: 'artifacts',
+    noTapHint: true, // the list is a container - the real target is whichever row inside it
   },
 
   // -- Shop --
@@ -188,6 +196,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
     trigger: (ctx) => ctx.session.talents.level >= 2 && ctx.tab === 'talents',
     autoAdvanceOn: (ctx) => anyTalentNodeBought(ctx.session),
     screen: 'talents',
+    noTapHint: true, // the summary strip is a status display - the real target is a node below it
   },
   {
     id: 'gem-socket',
