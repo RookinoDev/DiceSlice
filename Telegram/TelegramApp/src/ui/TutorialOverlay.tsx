@@ -39,7 +39,7 @@ export function TutorialOverlay({ step, isFirstStep, onDismiss, onSkip }: Tutori
       {rect ? (
         <>
           <div
-            className="tutorial-cutout"
+            className={step.noTapHint ? 'tutorial-cutout tutorial-cutout--info' : 'tutorial-cutout'}
             style={{
               left: rect.left - CUTOUT_PAD,
               top: rect.top - CUTOUT_PAD,

@@ -445,6 +445,17 @@
     box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78), 0 0 16px rgba(255, 178, 56, 0.7);
   }
 }
+/* Steps with noTapHint spotlight something you LOOK at, not something you TAP - a status pill
+   or a container whose real target is a different element below/inside it. The gold pulsing
+   ring elsewhere in this game (this cutout's default style, .talent-node--affordable, etc.)
+   IS the app's own "you can tap this" visual language, so reusing it here would contradict the
+   very "not tappable" message this variant exists to send. A calm, static, cool-toned ring
+   reads as "reference frame" instead. */
+.tutorial-cutout--info {
+  border-color: var(--palette-cyan-light, #7fd8e8);
+  animation: none;
+  box-shadow: 0 0 0 9999px rgba(8, 11, 22, 0.78), 0 0 10px rgba(127, 216, 232, 0.35);
+}
 /* "Tap here" indicator, centered on the same point the cutout spotlights - an expanding ripple
    ring (like a tap's own ripple) plus a cursor icon that bounces toward the center on a beat,
    simulating a repeated tap. Purely additional emphasis on top of the cutout, never the only
