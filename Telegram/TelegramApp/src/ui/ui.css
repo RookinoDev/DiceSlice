@@ -770,8 +770,7 @@
   flex-shrink: 0;
   /* background-color can't be layered in a multi-background shorthand - a same-color
      linear-gradient() simulates the solid glass fill while staying a valid background-image,
-     so it can sit alongside the conic-gradient ring (see the identical trick on
-     .card-grid-item's --frame-grad border). */
+     so it can sit alongside the conic-gradient ring. */
   background: linear-gradient(rgba(10, 14, 28, 0.55), rgba(10, 14, 28, 0.55)) padding-box, conic-gradient(var(--palette-gold) var(--boss-pct), rgba(255, 255, 255, 0.14) var(--boss-pct)) border-box;
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
@@ -6173,14 +6172,11 @@
   }
 }
 
-/* ===== Card Anatomy pass: frame materials, starfield art windows, pouch, reveal rays =====
+/* ===== Card Anatomy pass: starfield art windows, pouch, reveal rays =====
    Appended AFTER all earlier card rules on purpose: equal-specificity selectors here win by
    cascade order, so the old flat borders/backgrounds are overridden without editing them. */
 
-/* Every card face carries a cf-<rarity> class. --frame-grad is the frame MATERIAL - a real
-   TCG differentiates tiers by metal (gunmetal/steel/glass/gold/iridescent), not border hue. */
 :root {
-  --frame-grad: linear-gradient(165deg, #4a5268, #262b3d 55%, #343b52);
   /* Shared pinprick starfield for art windows (planet floats in space, not on a panel). */
   --starfield:
     radial-gradient(1px 1px at 18% 22%, rgba(255, 255, 255, 0.8), transparent 60%),
@@ -6192,78 +6188,25 @@
     radial-gradient(1px 1px at 92% 42%, rgba(255, 255, 255, 0.4), transparent 60%),
     radial-gradient(1px 1px at 44% 8%, rgba(255, 255, 255, 0.55), transparent 60%);
 }
-.cf-common {
-  --frame-grad: linear-gradient(165deg, #4a5268, #262b3d 55%, #343b52);
-}
-.cf-uncommon {
-  --frame-grad: linear-gradient(165deg, #5a7d69, #23372c 55%, #3adc84 130%);
-}
-.cf-rare {
-  --frame-grad: linear-gradient(165deg, #7fd8e8, #1f4652 45%, #43ddee 105%);
-}
-.cf-epic {
-  --frame-grad:
-    radial-gradient(circle 3px at 7px 7px, rgba(255, 255, 255, 0.9), transparent 4px),
-    radial-gradient(circle 3px at calc(100% - 7px) 7px, rgba(255, 255, 255, 0.9), transparent 4px),
-    radial-gradient(circle 3px at 7px calc(100% - 7px), rgba(255, 255, 255, 0.9), transparent 4px),
-    radial-gradient(circle 3px at calc(100% - 7px) calc(100% - 7px), rgba(255, 255, 255, 0.9), transparent 4px),
-    linear-gradient(165deg, #e07bff, #55246e 45%, #a13cc9 105%);
-}
-.cf-legendary {
-  --frame-grad:
-    radial-gradient(circle 3px at 7px 7px, #fff6d8, transparent 4px),
-    radial-gradient(circle 3px at calc(100% - 7px) 7px, #fff6d8, transparent 4px),
-    radial-gradient(circle 3px at 7px calc(100% - 7px), #fff6d8, transparent 4px),
-    radial-gradient(circle 3px at calc(100% - 7px) calc(100% - 7px), #fff6d8, transparent 4px),
-    linear-gradient(160deg, #f7dd8a, #b8860b 35%, #7a5306 55%, #ffcf5e 80%, #f7dd8a);
-}
-.cf-ultra {
-  --frame-grad: linear-gradient(115deg, #ff6e6e, #ffd25a 20%, #82ff96 40%, #64d2ff 60%, #c882ff 80%, #ff6e6e);
-}
 
-/* The double-background border trick: solid card body in the padding box, frame material in
-   the border box - a gradient "metal" frame with zero extra elements. */
-.card-grid-item {
-  border: 1.5px solid transparent;
-  background:
-    linear-gradient(var(--palette-sheet-row), var(--palette-sheet-row)) padding-box,
-    var(--frame-grad) border-box;
-}
-.card-detail-face {
-  border: 2.5px solid transparent;
-  background:
-    linear-gradient(var(--palette-sheet), var(--palette-sheet)) padding-box,
-    var(--frame-grad) border-box;
-}
-.pack-card-front {
-  border: 2.5px solid transparent;
-  background:
-    linear-gradient(var(--palette-sheet), var(--palette-sheet)) padding-box,
-    var(--frame-grad) border-box;
-}
+/* No frame/border on card faces - flat solid body only. */
+.card-grid-item,
+.card-detail-face,
+.pack-card-front,
 .pack-recap-best,
 .pack-recap-mini,
 .showcase-slot {
-  border: 1.5px solid transparent;
-  background:
-    linear-gradient(var(--palette-sheet-row), var(--palette-sheet-row)) padding-box,
-    var(--frame-grad) border-box;
+  border: none;
 }
-/* Ultra frames slowly cycle their iridescence (background-position only - cheap). */
-.cf-ultra.card-grid-item,
-.cf-ultra .card-detail-face,
-.cf-ultra .pack-card-front,
-.cf-ultra.pack-recap-best {
-  background-size: auto, 320% 320%;
-  animation: cf-ultra-cycle 5s linear infinite;
+.card-grid-item,
+.pack-recap-best,
+.pack-recap-mini,
+.showcase-slot {
+  background: var(--palette-sheet-row);
 }
-@keyframes cf-ultra-cycle {
-  0% {
-    background-position: 0 0, 0% 0%;
-  }
-  100% {
-    background-position: 0 0, 320% 320%;
-  }
+.card-detail-face,
+.pack-card-front {
+  background: var(--palette-sheet);
 }
 
 /* Art windows: the object floats in a star-dusted space slot with an inset bezel. */
@@ -6411,10 +6354,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cf-ultra.card-grid-item,
-  .cf-ultra .card-detail-face,
-  .cf-ultra .pack-card-front,
-  .cf-ultra.pack-recap-best,
   .pack-wrapper-emblem::before,
   .pack-overlay::before,
   .pack-card--rays::before {
