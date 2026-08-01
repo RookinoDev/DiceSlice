@@ -9,7 +9,6 @@ import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type P
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, RARITY_GEM, collectionNo } from './cardTheme'
 import { CloseIcon } from '../icons'
-import cornerOrnament from '../../assets/cards/frame-corner-ornament.png'
 import type { CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import { variantRank } from '../../game/cards/variants'
@@ -402,15 +401,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                 )}
 
                 {!locked && <div className="card-detail-flip-hint">TAP CARD TO FLIP · STORY &amp; FACTS ON BACK</div>}
-
-                {!locked && (card.rarity === 'legendary' || card.rarity === 'ultra') && (
-                  <>
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tl" alt="" />
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tr" alt="" />
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--bl" alt="" />
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--br" alt="" />
-                  </>
-                )}
               </div>
               <div className="card-detail-face card-detail-face--back">
                 {locked ? (

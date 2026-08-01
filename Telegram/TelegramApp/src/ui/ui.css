@@ -4975,36 +4975,6 @@
   color: var(--palette-text-dimmer);
   margin-bottom: 10px;
 }
-/* Legendary/Ultra only: real corner filigree layered over the CSS frame gradient - an L-shaped
-   bracket mirrored into all 4 corners from one source asset (see cardTheme.ts's RARITY_GEM
-   sibling comment for the same "one asset, four placements" trick). */
-.card-frame-corner {
-  position: absolute;
-  width: 58px;
-  height: auto;
-  pointer-events: none;
-  opacity: 0.92;
-  filter: drop-shadow(0 0 5px rgba(255, 178, 56, 0.4));
-}
-.card-frame-corner--tl {
-  top: 4px;
-  left: 4px;
-}
-.card-frame-corner--tr {
-  top: 4px;
-  right: 4px;
-  transform: scaleX(-1);
-}
-.card-frame-corner--bl {
-  bottom: 4px;
-  left: 4px;
-  transform: scaleY(-1);
-}
-.card-frame-corner--br {
-  bottom: 4px;
-  right: 4px;
-  transform: scale(-1, -1);
-}
 .card-detail-flip-hint {
   margin-top: auto;
   padding-top: 10px;
