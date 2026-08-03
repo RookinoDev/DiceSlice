@@ -3,7 +3,19 @@
 // atomicity (allocateSerials) and real SQL semantics (ON CONFLICT, json-free column sorting).
 import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
-import { allocateSerials, getLeaderboard, getReferralCount, getUsersDueForReengagement, markNotified, recordReferral, setNotificationsEnabled, syncLeaderboardStats, upsertProfileIdentity } from './d1.mjs'
+import {
+  allocateSerials,
+  getAdminStats,
+  getLeaderboard,
+  getReferralCount,
+  getUsersDueForReengagement,
+  markNotified,
+  recordEvent,
+  recordReferral,
+  setNotificationsEnabled,
+  syncLeaderboardStats,
+  upsertProfileIdentity,
+} from './d1.mjs'
 
 describe('allocateSerials', () => {
   it('allocates sequential serials per (cardId, variant), starting at 1', async () => {
@@ -121,5 +133,38 @@ describe('referrals', () => {
 
   it('self-referral is a no-op', async () => {
     expect(await recordReferral(env, 5010, 5010)).toBe(false)
+  })
+})
+
+describe('analytics events', () => {
+  it('getAdminStats aggregates revenue, per-item conversion, and DAU from recorded events', async () => {
+    // Two invoices opened for the same SKU, only one completes - the classic funnel this exists
+    // to measure (conversionRate should land on exactly 0.5, not silently divide-by-zero).
+    await recordEvent(env, { type: 'invoice_created', telegramUserId: 6001, item: 'stardust_pack_500', valueStars: 25 })
+    await recordEvent(env, { type: 'invoice_created', telegramUserId: 6002, item: 'stardust_pack_500', valueStars: 25 })
+    await recordEvent(env, { type: 'purchase_completed', telegramUserId: 6001, item: 'stardust_pack_500', valueStars: 25 })
+    await recordEvent(env, { type: 'session', telegramUserId: 6001 })
+    await recordEvent(env, { type: 'session', telegramUserId: 6002 })
+
+    const stats = await getAdminStats(env)
+    expect(stats.totalPurchases).toBeGreaterThanOrEqual(1)
+    expect(stats.totalRevenueStars).toBeGreaterThanOrEqual(25)
+    const row = stats.conversionByItem.find((r) => r.item === 'stardust_pack_500')
+    expect(row.invoices).toBeGreaterThanOrEqual(2)
+    expect(row.purchases).toBeGreaterThanOrEqual(1)
+    expect(row.conversionRate).toBeCloseTo(row.purchases / row.invoices)
+    expect(stats.dailyActiveUsers).toBeGreaterThanOrEqual(2) // the two 'session' events just recorded, at minimum
+  })
+
+  it('a purchase_completed event with no matching invoice still counts as revenue (conversionRate stays null, not NaN)', async () => {
+    await recordEvent(env, { type: 'purchase_completed', telegramUserId: 6010, item: 'vip_pass_30d', valueStars: 99 })
+    const stats = await getAdminStats(env)
+    const row = stats.conversionByItem.find((r) => r.item === 'vip_pass_30d')
+    expect(row.invoices).toBe(0)
+    expect(row.conversionRate).toBeNull()
+  })
+
+  it('recordEvent never throws even if D1 rejects the write (analytics must not break the caller)', async () => {
+    await expect(recordEvent({ DB: { prepare: () => ({ bind: () => ({ run: () => Promise.reject(new Error('boom')) }) }) } }, { type: 'session', telegramUserId: 1 })).resolves.toBeUndefined()
   })
 })

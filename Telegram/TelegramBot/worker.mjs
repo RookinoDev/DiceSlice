@@ -10,7 +10,7 @@ import { Api, Bot, webhookCallback } from 'grammy'
 import { validateInitData } from './validateInitData.mjs'
 import { getShopItem, SHOP_ITEMS } from './shop.mjs'
 import { callPlayerDO } from './playerDurableObject.mjs'
-import { getLeaderboard, getUsersDueForReengagement, markNotified, recordReferral, setNotificationsEnabled } from './d1.mjs'
+import { getAdminStats, getLeaderboard, getUsersDueForReengagement, markNotified, recordEvent, recordReferral, setNotificationsEnabled } from './d1.mjs'
 
 export { PlayerDO } from './playerDurableObject.mjs'
 
@@ -127,6 +127,11 @@ function buildBot(env) {
   bot.on('message:successful_payment', async (ctx) => {
     const { invoice_payload } = ctx.message.successful_payment
     await callPlayerDO(env, ctx.from.id, 'record-purchase', { item: invoice_payload })
+    // Revenue event - the real money-in signal (an invoice can be opened and abandoned; this
+    // fires only once Telegram confirms the Stars payment). valueStars comes from our own
+    // catalog, not the payment payload, so a tampered client can't skew revenue reporting.
+    const item = getShopItem(invoice_payload)
+    await recordEvent(env, { type: 'purchase_completed', telegramUserId: ctx.from.id, item: invoice_payload, valueStars: item?.priceStars ?? null })
     console.log('Payment received:', ctx.message.successful_payment)
     await ctx.reply("Thanks for your purchase! Open Stellar Breaker to collect it - it'll be waiting for you.")
   })
@@ -192,6 +197,10 @@ async function handleApi(request, env) {
       // Stars payments use currency "XTR" and an empty provider_token - Telegram settles them
       // natively, no payment provider involved.
       const url_ = await api.createInvoiceLink(item.title, item.description, item.id, '', 'XTR', [{ label: item.title, amount: item.priceStars }])
+      // Funnel-start event - paired with purchase_completed to get invoice->purchase conversion
+      // per SKU (see getAdminStats). Opening an invoice isn't paying for it, so this is a
+      // "seriously considered buying" signal, not revenue.
+      await recordEvent(env, { type: 'invoice_created', telegramUserId: userId, item: item.id, valueStars: item.priceStars })
       return json(200, { url: url_ }, cors)
     } catch (e) {
       console.error('[worker] shop/invoice error:', e)
@@ -381,6 +390,18 @@ async function handleApi(request, env) {
     } catch (e) {
       console.error('[worker] load error:', e)
       return json(400, { error: 'bad request' }, cors)
+    }
+  }
+
+  // Revenue/funnel dashboard - for the developer, not a player, so it's gated by a secret header
+  // (`wrangler secret put ADMIN_STATS_SECRET`) instead of Telegram initData auth.
+  if (request.method === 'GET' && url.pathname === '/api/admin/stats') {
+    if (!env.ADMIN_STATS_SECRET || request.headers.get('x-admin-secret') !== env.ADMIN_STATS_SECRET) return json(401, { error: 'unauthorized' })
+    try {
+      return json(200, await getAdminStats(env))
+    } catch (e) {
+      console.error('[worker] admin/stats error:', e)
+      return json(500, { error: 'internal error' })
     }
   }
 

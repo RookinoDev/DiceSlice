@@ -128,3 +128,55 @@ export async function getReferralCount(env, telegramUserId) {
   const row = await env.DB.prepare('SELECT COUNT(*) AS c FROM referrals WHERE referrer_user_id = ?').bind(telegramUserId).first()
   return row.c
 }
+
+// -- Analytics (see migrations/0002_events.sql) --
+
+/** Records one lightweight analytics event. Never throws into the caller's request path -
+ *  analytics failing must never break gameplay/payments, so a write failure here just logs. */
+export async function recordEvent(env, { type, telegramUserId, item = null, valueStars = null }) {
+  try {
+    await env.DB.prepare('INSERT INTO events (type, telegram_user_id, item, value_stars, created_at) VALUES (?, ?, ?, ?, ?)')
+      .bind(type, telegramUserId, item, valueStars, Date.now())
+      .run()
+  } catch (e) {
+    console.warn('[analytics] recordEvent failed:', e.message)
+  }
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Everything /api/admin/stats needs in one call: revenue, DAU/WAU (distinct users with a
+ *  'session' event in the window), and invoice->purchase conversion per SKU. 'session' events
+ *  come from every save sync (see playerDurableObject.mjs's syncSave), which fires at least once
+ *  per app open - a reasonable session proxy without adding a dedicated client-side ping. */
+export async function getAdminStats(env) {
+  const now = Date.now()
+  const [revenue, revenueByItem, funnelByItem, dau, wau, totalPlayers] = await Promise.all([
+    env.DB.prepare(`SELECT COUNT(*) AS purchases, COALESCE(SUM(value_stars), 0) AS stars FROM events WHERE type = 'purchase_completed'`).first(),
+    env.DB.prepare(
+      `SELECT item, COUNT(*) AS purchases, COALESCE(SUM(value_stars), 0) AS stars FROM events
+         WHERE type = 'purchase_completed' GROUP BY item ORDER BY stars DESC`,
+    ).all(),
+    env.DB.prepare(
+      `SELECT item,
+         SUM(CASE WHEN type = 'invoice_created' THEN 1 ELSE 0 END) AS invoices,
+         SUM(CASE WHEN type = 'purchase_completed' THEN 1 ELSE 0 END) AS purchases
+       FROM events WHERE type IN ('invoice_created', 'purchase_completed') GROUP BY item`,
+    ).all(),
+    env.DB.prepare(`SELECT COUNT(DISTINCT telegram_user_id) AS c FROM events WHERE type = 'session' AND created_at > ?`).bind(now - DAY_MS).first(),
+    env.DB.prepare(`SELECT COUNT(DISTINCT telegram_user_id) AS c FROM events WHERE type = 'session' AND created_at > ?`)
+      .bind(now - 7 * DAY_MS)
+      .first(),
+    env.DB.prepare('SELECT COUNT(*) AS c FROM player_index').first(),
+  ])
+  return {
+    totalRevenueStars: revenue.stars,
+    totalPurchases: revenue.purchases,
+    revenueByItem: revenueByItem.results,
+    conversionByItem: funnelByItem.results.map((r) => ({ ...r, conversionRate: r.invoices > 0 ? r.purchases / r.invoices : null })),
+    dailyActiveUsers: dau.c,
+    weeklyActiveUsers: wau.c,
+    totalPlayers: totalPlayers.c,
+    generatedAt: now,
+  }
+}

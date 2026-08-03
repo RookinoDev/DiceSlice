@@ -7,7 +7,7 @@ compatibility_date = "2026-08-03"
 compatibility_flags = ["nodejs_compat"]
 
 # WEBAPP_URL isn't sensitive (it's the public Mini App URL already visible in the bot's own
-# reply keyboard) - a plain var, unlike BOT_TOKEN/ADMIN_IMPORT_SECRET (see `wrangler secret put`,
+# reply keyboard) - a plain var, unlike BOT_TOKEN/ADMIN_STATS_SECRET (see `wrangler secret put`,
 # not this file). Placeholder here; real value set once the Cloudflare Pages URL is confirmed.
 [vars]
 WEBAPP_URL = "https://stellar-breaker.pages.dev"

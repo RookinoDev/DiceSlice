@@ -19,7 +19,7 @@
 // reliably (including under @cloudflare/vitest-pool-workers, the real test harness for this
 // file). getPlayerStub()/callPlayerDO() below are the only calling convention worker.mjs needs.
 import { craftCost, PACK_TYPES, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER, CARD_POOL } from './cards.mjs'
-import { allocateSerials, syncLeaderboardStats, upsertProfileIdentity } from './d1.mjs'
+import { allocateSerials, recordEvent, syncLeaderboardStats, upsertProfileIdentity } from './d1.mjs'
 
 const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
 
@@ -133,6 +133,9 @@ export class PlayerDO {
         prestigeCount: save?.stats?.prestigeCount ?? 0,
         deepestBossCleared: save?.stats?.deepestBossCleared ?? 0,
       }),
+      // DAU/WAU proxy - a save sync fires at least once per app open (see useGameSession.ts),
+      // so this needs no dedicated client-side session ping.
+      recordEvent(this.env, { type: 'session', telegramUserId }),
     ])
 
     const grantedBoss = this.grantPacksFromSave(save)
