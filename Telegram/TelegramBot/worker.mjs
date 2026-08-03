@@ -11,7 +11,6 @@ import { validateInitData } from './validateInitData.mjs'
 import { getShopItem, SHOP_ITEMS } from './shop.mjs'
 import { callPlayerDO } from './playerDurableObject.mjs'
 import { getLeaderboard, getUsersDueForReengagement, markNotified, recordReferral, setNotificationsEnabled } from './d1.mjs'
-import { handleAdminImport } from './adminImport.mjs'
 
 export { PlayerDO } from './playerDurableObject.mjs'
 
@@ -393,11 +392,6 @@ export default {
     const url = new URL(request.url)
     if (url.pathname === '/telegram-webhook') {
       return webhookCallback(buildBot(env), 'cloudflare-mod')(request)
-    }
-    // Phase 3 only - see adminImport.mjs's header for why this must come out (or its secret get
-    // rotated to garbage) once the real Railway -> Cloudflare data migration has actually run.
-    if (url.pathname === '/admin/import') {
-      return handleAdminImport(request, env)
     }
     return handleApi(request, env)
   },
