@@ -51,11 +51,11 @@ export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab
   // the game tick, so the gap lifts on its own within a frame or two of elapsing - no timer
   // needed to force it.
   const nextEligibleAtRef = useRef(0)
-  // Which tab the currently-active step FIRST appeared on, keyed by its id - updated below,
-  // synchronously during render (not an effect), so it's already correct by the time dismiss()
-  // runs later in the very same render (the autoAdvanceOn effect further down) or in a later one
-  // (a manual "GOT IT" click). Comparing this to `tab` at dismiss time is what tells apart "the
-  // player has been sitting on this screen the whole time" from "they just navigated."
+  // Which step is currently being SHOWN and which tab it first appeared on, keyed by its id -
+  // recorded by an effect further down (not synchronously during render - see why below), so
+  // it's already correct by the time dismiss() runs, whether from the autoAdvanceOn effect or a
+  // later manual "GOT IT" click. Comparing the tab to `tab` at dismiss time is what tells apart
+  // "the player has been sitting on this screen the whole time" from "they just navigated."
   const shownOnRef = useRef<{ id: string; tab: NavTab } | null>(null)
 
   // Mark everything seen once instead of replaying the whole sequence on top of veteran progress.
@@ -70,10 +70,6 @@ export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab
   const ctx: TutorialContext = { session, vm, tab, pendingPacks }
   const candidate = selectActiveStep(session.tutorialSeen, ctx)
   const active = candidate && Date.now() >= nextEligibleAtRef.current ? candidate : undefined
-
-  if (active && shownOnRef.current?.id !== active.id) {
-    shownOnRef.current = { id: active.id, tab }
-  }
 
   // A dismissal (manual or auto-advanced) is a one-time flag, same as a boss kill or purchase -
   // without persistNow() it only lives in-memory until the next autosave/cloud-push tick (up to
@@ -104,10 +100,28 @@ export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab
     persistNow?.()
   }
 
-  // Auto-advance once the taught action happens - re-checked every render (cheap pure checks),
-  // naturally stops once the step is dismissed and `active` moves to the next step or none.
+  // Auto-advance once the taught action happens - checked against whichever step was actually
+  // SHOWN (shownOnRef), not the freshly recomputed `active` above. Those differ for a step like
+  // first-pack-open, whose autoAdvanceOn (pendingPacks.length === 0) is the exact completion of
+  // half its own trigger (pendingPacks.length > 0): the instant it's ready to dismiss, its own
+  // trigger goes false too, so selectActiveStep already stopped returning it as `active` THIS
+  // same render - relying on `active` here would mean dismiss() is never called for it, ever.
   useEffect(() => {
-    if (active?.autoAdvanceOn?.(ctx)) dismiss(active.id)
+    const shownId = shownOnRef.current?.id
+    if (!shownId || session.tutorialSeen.has(shownId)) return
+    const shownStep = TUTORIAL_STEPS.find((s) => s.id === shownId)
+    if (shownStep?.autoAdvanceOn?.(ctx)) dismiss(shownStep.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  })
+
+  // Records which step is now being shown - deliberately a separate, later effect (not inline
+  // during render) so it runs AFTER the auto-advance check above on every commit (React runs a
+  // component's effects in declaration order): overwriting shownOnRef for a brand-new `active`
+  // step can never race ahead of checking its predecessor's own completion first.
+  useEffect(() => {
+    if (active && shownOnRef.current?.id !== active.id) {
+      shownOnRef.current = { id: active.id, tab }
+    }
   })
 
   return {

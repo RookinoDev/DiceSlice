@@ -183,3 +183,32 @@ describe('useTutorial: persists the seen-state immediately, not just at the next
     expect(session.tutorialSeen.size).toBe(TUTORIAL_STEPS.length)
   })
 })
+
+describe('useTutorial: a step whose autoAdvanceOn is the completion of its own trigger still gets dismissed', () => {
+  // Regression test for the real bug report: first-pack-open's trigger requires
+  // pendingPacks.length > 0, and its autoAdvanceOn fires at pendingPacks.length === 0 - the exact
+  // negation of that same condition. The moment the player finishes opening packs, the step's own
+  // trigger goes false too, so it stops being `active` on that very render. The old code only
+  // ever checked `active?.autoAdvanceOn?.(ctx)`, so dismiss() was never reached for this step -
+  // it never entered tutorialSeen, and reappeared on every single session that had pending packs.
+  function markAllSeenExcept(session: ReturnType<typeof createGameSession>, ...keepUnseen: string[]) {
+    for (const s of TUTORIAL_STEPS) if (!keepUnseen.includes(s.id)) session.tutorialSeen.add(s.id)
+  }
+
+  it('dismisses first-pack-open once the last pending pack is opened, even though that also falsifies its own trigger', () => {
+    const session = createGameSession()
+    markAllSeenExcept(session, 'first-pack-open')
+    const vm = buildMainViewModel(session)
+    let pendingPacks: PendingPack[] = [{ id: 1, type: 'meteor', createdAtMs: Date.now() }]
+    const { result, rerender } = renderHook(({ packs }: { packs: PendingPack[] }) => useTutorial(session, vm, 'cards', packs), {
+      initialProps: { packs: pendingPacks },
+    })
+    expect(result.current.step?.id).toBe('first-pack-open')
+
+    // The player opens the last pack - pendingPacks drops to empty in the same render.
+    pendingPacks = []
+    rerender({ packs: pendingPacks })
+
+    expect(session.tutorialSeen.has('first-pack-open')).toBe(true)
+  })
+})
