@@ -155,3 +155,31 @@ describe('useTutorial: dismiss gap length depends on whether the player actually
     expect(result.current.step?.id).toBe('extras')
   })
 })
+
+describe('useTutorial: persists the seen-state immediately, not just at the next autosave tick', () => {
+  // Regression test: a dismissal used to only live in session.tutorialSeen (in-memory) until the
+  // next periodic autosave/cloud-push (up to 15-20s away) - closing the Mini App shortly after
+  // dismissing a step (e.g. right after opening the pack first-pack-open teaches) silently lost
+  // the dismissal, and the same step reappeared on the next launch.
+  it('calls the persist callback when a step is dismissed', () => {
+    const session = createGameSession()
+    const vm = buildMainViewModel(session)
+    const persistNow = vi.fn()
+    const { result } = renderHook(() => useTutorial(session, vm, 'combat', [] as PendingPack[], persistNow))
+    expect(result.current.step?.id).toBe('welcome-tap')
+
+    act(() => result.current.dismiss('welcome-tap'))
+    expect(persistNow).toHaveBeenCalledTimes(1)
+  })
+
+  it('calls the persist callback when the tutorial is skipped', () => {
+    const session = createGameSession()
+    const vm = buildMainViewModel(session)
+    const persistNow = vi.fn()
+    const { result } = renderHook(() => useTutorial(session, vm, 'combat', [] as PendingPack[], persistNow))
+
+    act(() => result.current.skip())
+    expect(persistNow).toHaveBeenCalledTimes(1)
+    expect(session.tutorialSeen.size).toBe(TUTORIAL_STEPS.length)
+  })
+})

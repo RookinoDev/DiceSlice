@@ -439,7 +439,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   }
 
   const vm = buildMainViewModel(session)
-  const tutorial = useTutorial(session, vm, tab, pendingPacks)
+  const tutorial = useTutorial(session, vm, tab, pendingPacks, syncNow)
 
   // Route Telegram's native BackButton to close whichever sheet/toast is open, instead of
   // letting it fall through to the platform's default (which would close the Mini App).

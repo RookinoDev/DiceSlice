@@ -40,7 +40,7 @@ export function needsRetroactiveSkip(session: GameSession): boolean {
   return session.tutorialSeen.size === 0 && (session.tapUpgrade.level > 1 || session.stage.highestStage > 1)
 }
 
-export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab, pendingPacks: PendingPack[]) {
+export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab, pendingPacks: PendingPack[], persistNow?: () => void) {
   // session.tutorialSeen is a plain mutated Set (matches how the rest of the save-bound session
   // state works), not React state - this counter forces a re-render whenever it changes so
   // dismiss()/skip() take effect immediately regardless of the ambient tick-driven re-render rate.
@@ -75,16 +75,23 @@ export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab
     shownOnRef.current = { id: active.id, tab }
   }
 
+  // A dismissal (manual or auto-advanced) is a one-time flag, same as a boss kill or purchase -
+  // without persistNow() it only lives in-memory until the next autosave/cloud-push tick (up to
+  // 15-20s away), so closing the Mini App shortly after dismissing a step (very common right
+  // after the taught action - e.g. closing straight after opening a pack) silently undid the
+  // dismissal and the same step reappeared next launch.
   const dismiss = (id: string) => {
     session.tutorialSeen.add(id)
     const navigatedWhileShown = shownOnRef.current?.id === id && shownOnRef.current.tab !== tab
     nextEligibleAtRef.current = Date.now() + (navigatedWhileShown ? DIFFERENT_SCREEN_GAP_MS : SAME_SCREEN_GAP_MS)
     setVersion((v) => v + 1)
+    persistNow?.()
   }
 
   const skip = () => {
     for (const step of TUTORIAL_STEPS) session.tutorialSeen.add(step.id)
     setVersion((v) => v + 1)
+    persistNow?.()
   }
 
   /** Settings > "Replay Tutorial" - the opposite of skip(), clears every seen id so the whole
@@ -94,6 +101,7 @@ export function useTutorial(session: GameSession, vm: MainViewModel, tab: NavTab
     nextEligibleAtRef.current = 0
     shownOnRef.current = null
     setVersion((v) => v + 1)
+    persistNow?.()
   }
 
   // Auto-advance once the taught action happens - re-checked every render (cheap pure checks),
