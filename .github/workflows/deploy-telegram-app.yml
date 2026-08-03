@@ -29,9 +29,11 @@ jobs:
 
       # VITE_API_URL is baked into the bundle at build time; without it, purchase
       # claiming and cloud saves are silently disabled in the deployed app.
+      # Railway -> Cloudflare Workers migration (Phase 4 cutover): the bot backend now lives at
+      # stellar-breaker-bot.rookph.workers.dev instead of Railway.
       - run: npm run build
         env:
-          VITE_API_URL: https://stellar-breaker-bot-production.up.railway.app
+          VITE_API_URL: https://stellar-breaker-bot.rookph.workers.dev
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
