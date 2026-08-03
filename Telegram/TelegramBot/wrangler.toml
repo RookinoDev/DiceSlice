@@ -27,13 +27,12 @@ tag = "v1"
 new_sqlite_classes = ["PlayerDO"]
 
 # Cross-user aggregate data only (leaderboard/re-engagement index, the global card serial
-# counter, referrals) - see migrations/0001_init.sql and d1.mjs. database_id is a placeholder;
-# real value set once `wrangler d1 create` runs against a real Cloudflare account (Phase 2 -
-# needs the user's own login, not something this agent can do).
+# counter, referrals) - see migrations/0001_init.sql and d1.mjs. Created via `wrangler d1 create
+# stellar-breaker-bot` (Phase 2, region EEUR) on 2026-08-03.
 [[d1_databases]]
 binding = "DB"
 database_name = "stellar-breaker-bot"
-database_id = "REPLACE_AFTER_WRANGLER_D1_CREATE"
+database_id = "0af4d9dd-5e5d-455e-8159-a62b656d9b60"
 migrations_dir = "migrations"
 
 # Replaces index.mjs's setInterval re-engagement scan (a Worker has no persistent background
