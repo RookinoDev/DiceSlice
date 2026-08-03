@@ -2,11 +2,13 @@
 // server-side roll. The client only ever animates what these functions decide. Card
 // ids/rarities come from cardPool.json, generated from the app catalog + roster rules
 // (TelegramApp `npm run gen:cardpool`) so client and server always agree.
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
-import { dirname, join } from 'node:path'
+//
+// Imported as a JSON module (not readFileSync) so this file works unchanged under both Node 22
+// (node --test, still-live Railway process) and Wrangler's bundler (worker.mjs) - verified both
+// runtimes resolve `with { type: 'json' }` correctly.
+import CARD_POOL from './cardPool.json' with { type: 'json' }
 
-export const CARD_POOL = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'cardPool.json'), 'utf8'))
+export { CARD_POOL }
 
 export const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'ultra']
 

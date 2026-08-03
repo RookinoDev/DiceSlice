@@ -1,0 +1,42 @@
+name = "stellar-breaker-bot"
+main = "worker.mjs"
+compatibility_date = "2026-08-03"
+# node:crypto's createHmac (validateInitData.mjs) is the only Node builtin this Worker touches -
+# verified working correctly under this flag (byte-for-byte match against real Node's output)
+# before committing to it instead of a Web Crypto rewrite.
+compatibility_flags = ["nodejs_compat"]
+
+# WEBAPP_URL isn't sensitive (it's the public Mini App URL already visible in the bot's own
+# reply keyboard) - a plain var, unlike BOT_TOKEN/ADMIN_IMPORT_SECRET (see `wrangler secret put`,
+# not this file). Placeholder here; real value set once the Cloudflare Pages URL is confirmed.
+[vars]
+WEBAPP_URL = "https://stellar-breaker.pages.dev"
+
+# One PlayerDO instance per telegram_user_id - see playerDurableObject.mjs for why the
+# per-user transactional state (saves, packs, pity counters, dust, purchases, showcase, gem
+# sockets) lives here rather than in D1.
+[[durable_objects.bindings]]
+name = "PLAYER_DO"
+class_name = "PlayerDO"
+
+# SQLite-backed storage is required for new DO namespaces as of 2026-07-09 - this is also the
+# right fit here regardless, since it gives each PlayerDO a synchronous, prepared-statement SQL
+# API close in shape to db.mjs's current node:sqlite usage (see playerDurableObject.mjs).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["PlayerDO"]
+
+# Cross-user aggregate data only (leaderboard/re-engagement index, the global card serial
+# counter, referrals) - see migrations/0001_init.sql and d1.mjs. database_id is a placeholder;
+# real value set once `wrangler d1 create` runs against a real Cloudflare account (Phase 2 -
+# needs the user's own login, not something this agent can do).
+[[d1_databases]]
+binding = "DB"
+database_name = "stellar-breaker-bot"
+database_id = "REPLACE_AFTER_WRANGLER_D1_CREATE"
+migrations_dir = "migrations"
+
+# Replaces index.mjs's setInterval re-engagement scan (a Worker has no persistent background
+# process to run one in) - see worker.mjs's scheduled() handler.
+[triggers]
+crons = ["0 * * * *"]

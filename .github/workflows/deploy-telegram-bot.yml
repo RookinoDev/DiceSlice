@@ -1,0 +1,41 @@
+name: Deploy Telegram Bot
+
+# workflow_dispatch only for now, deliberately NOT triggered on push yet - wrangler.toml's
+# database_id is still the "REPLACE_AFTER_WRANGLER_D1_CREATE" placeholder (Phase 2 of the
+# Railway -> Cloudflare migration plan: needs `wrangler d1 create` run against a real Cloudflare
+# account, which this repo's CI can't do on its own). An automatic push trigger would just fail
+# every run until that's filled in. Add `push: { paths: ['Telegram/TelegramBot/**'] }` back once
+# it is - see .github/workflows/deploy-telegram-app.yml for the equivalent pattern already
+# working for the frontend.
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Telegram/TelegramBot
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: Telegram/TelegramBot/package-lock.json
+
+      - run: npm ci
+
+      # Both suites: node --test for pure-logic files (cards.mjs, validateInitData.mjs, the
+      # export script) plus vitest-pool-workers for anything touching D1/Durable Object bindings
+      # (d1.mjs, playerDurableObject.mjs, adminImport.mjs) - see package.json's "test" script.
+      - run: npm test
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: 15e2e6ae4f1776f568bdda14f832b6c5
+          workingDirectory: Telegram/TelegramBot
+          command: deploy
