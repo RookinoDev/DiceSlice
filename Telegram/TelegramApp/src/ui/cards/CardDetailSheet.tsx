@@ -9,7 +9,6 @@ import { lazy, Suspense, useEffect, useRef, useState, type CSSProperties, type P
 import { CardArt } from './CardArt'
 import { RARITY_COLOR, RARITY_GEM, collectionNo } from './cardTheme'
 import { CloseIcon } from '../icons'
-import cornerOrnament from '../../assets/cards/frame-corner-ornament.png'
 import type { CardDefinition } from '../../game/cards/catalog'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import { variantRank } from '../../game/cards/variants'
@@ -362,12 +361,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                 <div className="card-detail-name-block">
                   <div className="card-detail-name">{locked ? '???' : card.name}</div>
                   <div className="card-detail-type-tag">{locked ? 'UNDISCOVERED' : card.classification}</div>
-                  {gemAbility && (
-                    <div className="card-detail-gem-ability">
-                      <GemIcon size={11} />
-                      <span>{gemAbility.label}</span>
-                    </div>
-                  )}
                 </div>
 
                 {!locked && (
@@ -378,6 +371,19 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                         <div className="card-detail-stat-v">{value}</div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {/* User-requested: the Gem Socket ability used to be a cramped pill squeezed next
+                    to the card name - moved down into its own clearly-labeled block, matching
+                    the stat cards' k/v style, and spelling out what socketing it actually does. */}
+                {gemAbility && (
+                  <div className="card-detail-gem-section">
+                    <div className="card-detail-gem-section-label">
+                      <GemIcon size={12} />
+                      <span>GEM ABILITY</span>
+                    </div>
+                    <div className="card-detail-gem-section-value">Socket into a Talent Tree Gem slot for {gemAbility.label}.</div>
                   </div>
                 )}
 
@@ -395,15 +401,6 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                 )}
 
                 {!locked && <div className="card-detail-flip-hint">TAP CARD TO FLIP · STORY &amp; FACTS ON BACK</div>}
-
-                {!locked && (card.rarity === 'legendary' || card.rarity === 'ultra') && (
-                  <>
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tl" alt="" />
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--tr" alt="" />
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--bl" alt="" />
-                    <img src={cornerOrnament} className="card-frame-corner card-frame-corner--br" alt="" />
-                  </>
-                )}
               </div>
               <div className="card-detail-face card-detail-face--back">
                 {locked ? (
