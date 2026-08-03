@@ -4,10 +4,14 @@
 // flat arrays (referrals, card counters) that become D1 rows directly. Read-only: never touches
 // the source file's contents, never deletes/mutates the live database.
 //
-// Usage: node scripts/exportRailwaySqlite.mjs <path-to-purchases.db> <output.json>
+// Usage: node scripts/exportRailwaySqlite.mjs <path-to-purchases.db> <output.json|->
 // The source path is whatever the live Railway Volume's SQLite file is called locally once
 // pulled off the volume (see the plan's Phase 3 for how that pull itself happens - outside this
-// script's scope, since it needs the user's own Railway access).
+// script's scope, since it needs the user's own Railway access). Passing "-" as the output path
+// streams the JSON to stdout instead of writing a file - meant for running this DIRECTLY inside
+// the Railway container (e.g. `railway ssh -- node scripts/exportRailwaySqlite.mjs /data/purchases.db -`)
+// and capturing the output locally via shell redirection, with no intermediate file inside the
+// container and no separate download step.
 import { DatabaseSync } from 'node:sqlite'
 import { writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -67,8 +71,15 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   }
 
   const payload = exportRailwaySqlite(dbPath)
-  writeFileSync(outPath, JSON.stringify(payload))
-  console.log(`Exported ${Object.keys(payload.players).length} players, ${payload.referrals.length} referrals, ${payload.cardCounters.length} card counters -> ${outPath}`)
+  const json = JSON.stringify(payload)
+  // The summary line always goes to stderr, never stdout - so `-` (stream-to-stdout) output stays
+  // pure JSON even when the caller redirects stdout to a file (e.g. `... -  > export.json`).
+  if (outPath === '-') {
+    process.stdout.write(json)
+  } else {
+    writeFileSync(outPath, json)
+  }
+  console.error(`Exported ${Object.keys(payload.players).length} players, ${payload.referrals.length} referrals, ${payload.cardCounters.length} card counters -> ${outPath === '-' ? 'stdout' : outPath}`)
 }
 
 export { exportRailwaySqlite }
