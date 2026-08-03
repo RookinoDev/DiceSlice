@@ -37,6 +37,11 @@ const GRANT_EFFECTS: Record<string, (session: GameSession) => void> = {
     const base = Math.max(nowSeconds, session.boosts.vipExpiresUnixSeconds)
     session.boosts.vipExpiresUnixSeconds = base + THIRTY_DAYS_SECONDS
   },
+  // Not a Stars purchase - granted server-side via the same purchases/claim pipeline (see
+  // rewardReferrerIfDue and the /start handler in TelegramBot/worker.mjs). Symmetric amounts:
+  // both sides of a referral get the same welcome.
+  referral_reward: (session) => session.wallet.add(new BigNumber(300)),
+  referral_welcome: (session) => session.wallet.add(new BigNumber(300)),
 }
 
 export async function claimPendingPurchases(apiBaseUrl: string): Promise<PurchaseGrant[]> {

@@ -19,7 +19,7 @@
 // reliably (including under @cloudflare/vitest-pool-workers, the real test harness for this
 // file). getPlayerStub()/callPlayerDO() below are the only calling convention worker.mjs needs.
 import { craftCost, PACK_TYPES, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER, CARD_POOL } from './cards.mjs'
-import { allocateSerials, recordEvent, syncLeaderboardStats, upsertProfileIdentity } from './d1.mjs'
+import { allocateSerials, recordEvent, rewardReferrerIfDue, syncLeaderboardStats, upsertProfileIdentity } from './d1.mjs'
 
 const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
 
@@ -105,6 +105,9 @@ export class PlayerDO {
   async syncSave(telegramUserId, saveJson, profileFields) {
     const save = JSON.parse(saveJson)
     const now = Date.now()
+    // Referral reward trigger (see rewardReferrerIfDue's own comment for why "first sync" and
+    // not "/start") - must read before the profile INSERT below creates the row.
+    const isFirstSync = this.sql.exec('SELECT 1 AS x FROM profile WHERE id = 1').toArray().length === 0
     this.sql.exec(
       `INSERT INTO saves (id, save_json, updated_at) VALUES (1, ?, ?)
          ON CONFLICT(id) DO UPDATE SET save_json = excluded.save_json, updated_at = excluded.updated_at`,
@@ -137,6 +140,11 @@ export class PlayerDO {
       // so this needs no dedicated client-side session ping.
       recordEvent(this.env, { type: 'session', telegramUserId }),
     ])
+
+    if (isFirstSync) {
+      const referrerId = await rewardReferrerIfDue(this.env, telegramUserId)
+      if (referrerId) await callPlayerDO(this.env, referrerId, 'record-purchase', { item: 'referral_reward' })
+    }
 
     const grantedBoss = this.grantPacksFromSave(save)
     const grantedDaily = this.grantDailyPackFromSave(save)

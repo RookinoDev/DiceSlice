@@ -129,6 +129,20 @@ export async function getReferralCount(env, telegramUserId) {
   return row.c
 }
 
+/** Grants the referrer's reward exactly once, the first time their referred player shows real
+ *  engagement (their first save sync - see playerDurableObject.mjs's syncSave) rather than at
+ *  /start, so a link spammed at accounts that never actually play never pays out. The
+ *  UPDATE...WHERE rewarded_at IS NULL is the exactly-once guard: it succeeds at most once per
+ *  referred_user_id (D1 is single-writer), so a retried/racing call just sees 0 rows changed and
+ *  returns null instead of double-granting. Returns the referrer's id to reward, or null if
+ *  there's no referral row for this user or it was already rewarded. */
+export async function rewardReferrerIfDue(env, referredUserId) {
+  const result = await env.DB.prepare('UPDATE referrals SET rewarded_at = ? WHERE referred_user_id = ? AND rewarded_at IS NULL').bind(Date.now(), referredUserId).run()
+  if (result.meta.changes === 0) return null
+  const row = await env.DB.prepare('SELECT referrer_user_id FROM referrals WHERE referred_user_id = ?').bind(referredUserId).first()
+  return row.referrer_user_id
+}
+
 // -- Analytics (see migrations/0002_events.sql) --
 
 /** Records one lightweight analytics event. Never throws into the caller's request path -

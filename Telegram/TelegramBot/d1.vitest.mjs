@@ -12,6 +12,7 @@ import {
   markNotified,
   recordEvent,
   recordReferral,
+  rewardReferrerIfDue,
   setNotificationsEnabled,
   syncLeaderboardStats,
   upsertProfileIdentity,
@@ -133,6 +134,19 @@ describe('referrals', () => {
 
   it('self-referral is a no-op', async () => {
     expect(await recordReferral(env, 5010, 5010)).toBe(false)
+  })
+})
+
+describe('rewardReferrerIfDue', () => {
+  it('returns the referrer id once, then null on every later call for the same referred user', async () => {
+    await recordReferral(env, 5020, 9020)
+    expect(await rewardReferrerIfDue(env, 5020)).toBe(9020)
+    expect(await rewardReferrerIfDue(env, 5020)).toBeNull()
+    expect(await rewardReferrerIfDue(env, 5020)).toBeNull()
+  })
+
+  it('returns null for a user with no referral row at all', async () => {
+    expect(await rewardReferrerIfDue(env, 5099)).toBeNull()
   })
 })
 

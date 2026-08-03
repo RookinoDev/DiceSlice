@@ -99,13 +99,19 @@ function buildBot(env) {
     await next()
   })
 
-  // Referral tracking only - no rewards granted here (Phase 3, gated on a future economy
-  // proposal). ctx.match is whatever follows "/start " - a shared link of the form
-  // t.me/<bot>?start=ref_<id> arrives as "ref_<id>" here on the referred user's very first
-  // /start. First-touch wins and self-referral is a no-op (see recordReferral in d1.mjs).
+  // ctx.match is whatever follows "/start " - a shared link of the form t.me/<bot>?start=ref_<id>
+  // arrives as "ref_<id>" here on the referred user's very first /start. First-touch wins and
+  // self-referral is a no-op (see recordReferral in d1.mjs). The referred player's welcome
+  // reward is granted right here (recordReferral returning true means this genuinely just got
+  // recorded, so a repeat /start from the same chat never re-grants it) - it's claimed the same
+  // way any other purchase is, the moment the Mini App first calls /api/claim-purchases. The
+  // referrer's matching reward is bigger-stakes (paid out from a stranger's actions) and waits
+  // for the referred player's first real save sync - see rewardReferrerIfDue in d1.mjs.
   bot.command('start', async (ctx) => {
     const match = ctx.match.match(/^ref_(\d+)$/)
-    if (match) await recordReferral(env, ctx.from.id, Number(match[1]))
+    if (match && (await recordReferral(env, ctx.from.id, Number(match[1])))) {
+      await callPlayerDO(env, ctx.from.id, 'record-purchase', { item: 'referral_welcome' })
+    }
 
     await ctx.reply('Tap below to launch Stellar Breaker.', {
       reply_markup: { inline_keyboard: [[{ text: '🚀 Play Stellar Breaker', web_app: { url: env.WEBAPP_URL } }]] },

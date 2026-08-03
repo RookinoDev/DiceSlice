@@ -5,6 +5,7 @@
 import { env } from 'cloudflare:test'
 import { describe, expect, it } from 'vitest'
 import { callPlayerDO } from './playerDurableObject.mjs'
+import { recordReferral } from './d1.mjs'
 
 let nextUserId = 100000
 /** A fresh, never-used telegram_user_id (and therefore a fresh PlayerDO) per call, so tests
@@ -288,5 +289,26 @@ describe('reset', () => {
     expect(await callPlayerDO(env, userId, 'get-dust')).toBe(0)
     expect(await callPlayerDO(env, userId, 'get-gem-sockets')).toEqual([])
     expect(await callPlayerDO(env, userId, 'get-save')).not.toBeNull() // the save itself is untouched
+  })
+})
+
+describe('referral rewards', () => {
+  it('grants the referrer exactly once, on the referred players first save sync (not on later ones)', async () => {
+    const referrer = freshUser()
+    const referred = freshUser()
+    expect(await recordReferral(env, referred, referrer)).toBe(true)
+
+    await syncSave(referred, { version: 1 }) // referred player's first sync - the trigger
+    const firstClaim = await callPlayerDO(env, referrer, 'claim-purchases')
+    expect(firstClaim.filter((g) => g.item === 'referral_reward')).toHaveLength(1)
+
+    await syncSave(referred, { version: 1, highestStage: 5 }) // a later sync, not their first
+    const secondClaim = await callPlayerDO(env, referrer, 'claim-purchases')
+    expect(secondClaim.filter((g) => g.item === 'referral_reward')).toHaveLength(0)
+  })
+
+  it('does nothing when the syncing player was never referred', async () => {
+    const userId = freshUser()
+    await expect(syncSave(userId, { version: 1 })).resolves.toBeTruthy() // just proving it doesn't throw
   })
 })
