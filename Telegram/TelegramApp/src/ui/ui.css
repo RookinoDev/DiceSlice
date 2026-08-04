@@ -4293,9 +4293,18 @@
   background: var(--palette-sheet-row);
   box-shadow: 0 0 10px color-mix(in srgb, var(--rarity-color, transparent) 35%, transparent);
   cursor: pointer;
+  /* Touch-tilt (see CardGridItem.tsx's pointer handlers, mouse/hover input skips these) - the
+     card leans into a hold like a real object in your hand, not a flat icon. -1..1, updated
+     directly via style.setProperty so tracking a finger never triggers a React re-render. */
+  --tilt-x: 0;
+  --tilt-y: 0;
+  --press-scale: 1;
+  transform: scale(var(--press-scale)) perspective(700px) rotateX(calc(var(--tilt-y) * -7deg)) rotateY(calc(var(--tilt-x) * 7deg));
 }
-.card-grid-item:active {
-  transform: scale(0.97);
+/* While a finger is actively down: no transition, the tilt must track 1:1 with real-time
+   movement. Released (class removed) falls back to the springy transition below. */
+.card-grid-item--tilting {
+  transition: none;
 }
 /* Grid-cell sheen: an OVERSIZED pseudo-element swept across via transform (composited on the
    GPU), not a background-position animation (which repaints the cell every frame - with a
@@ -4341,7 +4350,9 @@
 .card-grid-item {
   height: 138px;
   overflow: hidden;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  /* Springy overshoot back to flat on release - a snap-back read as a held object relaxing,
+     not a UI tween easing out. box-shadow stays a plain ease (a glow "overshooting" looks wrong). */
+  transition: transform 0.5s cubic-bezier(0.22, 1.6, 0.36, 1), box-shadow 0.15s ease;
 }
 /* Desktop/preview nicety - gated on real hover support so touch taps never get stuck "hovered". */
 @media (hover: hover) and (pointer: fine) {
