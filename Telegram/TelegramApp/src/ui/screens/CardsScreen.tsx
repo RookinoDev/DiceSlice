@@ -16,6 +16,7 @@ import type { OwnedCard } from '../../game/cards/cardsApi'
 import { summarizeCollection, type OwnedSummary } from '../../game/cards/collectionSummary'
 import { loadFavorites, loadRecentViews } from '../../game/cards/cardPrefs'
 import { CardGridItem } from '../cards/CardGridItem'
+import { StarMapView } from '../cards/StarMapView'
 import { registerLandmark } from '../combatFx/landmarks'
 
 const COLUMNS = 3
@@ -48,6 +49,7 @@ export const CardsScreen = memo(function CardsScreen({ ownedCards, dust, pending
   const [query, setQuery] = useState('')
   const [rarity, setRarity] = useState<CardRarity | 'all'>('all')
   const [sort, setSort] = useState<SortMode>('number')
+  const [view, setView] = useState<'grid' | 'map'>('grid')
 
   // Favoriting happens in a sibling sheet (CardDetailSheet); prefsVersion is bumped when that
   // sheet closes, which is exactly when a stale value could otherwise be seen here.
@@ -159,19 +161,29 @@ export const CardsScreen = memo(function CardsScreen({ ownedCards, dust, pending
             {r === 'all' ? 'ALL' : r.toUpperCase()}
           </button>
         ))}
+        {/* Not a rarity filter - a separate view-mode toggle, kept in the same row since both
+            are "how am I looking at this collection" controls and the screen has no room to
+            spare for a whole extra row. */}
+        <button className={chip(view === 'map')} onClick={() => setView(view === 'grid' ? 'map' : 'grid')}>
+          {view === 'grid' ? 'MAP' : 'GRID'}
+        </button>
       </div>
-      <div className="cards-filter-row">
-        {(['number', 'rarity', 'newest', 'recent', 'name', 'count'] as SortMode[]).map((s) => (
-          <button key={s} className={chip(sort === s)} onClick={() => setSort(s)}>
-            {SORT_LABEL[s]}
-          </button>
-        ))}
-      </div>
+      {view === 'grid' && (
+        <div className="cards-filter-row">
+          {(['number', 'rarity', 'newest', 'recent', 'name', 'count'] as SortMode[]).map((s) => (
+            <button key={s} className={chip(sort === s)} onClick={() => setSort(s)}>
+              {SORT_LABEL[s]}
+            </button>
+          ))}
+        </div>
+      )}
 
       {entries.length === 0 ? (
         <div className="cards-empty">
           {ownedCards.length === 0 ? 'Destroy bosses to earn card packs - your collection starts there.' : 'No cards match these filters.'}
         </div>
+      ) : view === 'map' ? (
+        <StarMapView cards={cardsList} onSelect={handleSelect} />
       ) : (
         <div
           ref={viewportRef}

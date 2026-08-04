@@ -4281,6 +4281,37 @@
   height: 138px; /* + 10px effective gap = ROW_HEIGHT_PX (148) in CardsScreen.tsx */
 }
 
+/* Star Map: fills the same slot .card-grid-viewport does (see StarMapView.tsx) - a pannable/
+   zoomable canvas instead of a scrolling grid, so it needs the same flex:1/min-height:0
+   contract, not scroll overflow. touch-action:none stops the browser's own pinch-zoom/scroll
+   from fighting the view's own pointer-driven pan/zoom. */
+.star-map-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  margin-top: 6px;
+  border-radius: 10px;
+  overflow: hidden;
+  touch-action: none;
+}
+.star-map-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.star-map-hint {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 8px;
+  text-align: center;
+  font-family: var(--font-display);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+}
+
 .card-grid-item {
   position: relative;
   display: flex;
