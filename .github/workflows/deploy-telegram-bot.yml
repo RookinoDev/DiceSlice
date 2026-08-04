@@ -1,13 +1,11 @@
 name: Deploy Telegram Bot
 
-# workflow_dispatch only for now, deliberately NOT triggered on push yet - wrangler.toml's
-# database_id is still the "REPLACE_AFTER_WRANGLER_D1_CREATE" placeholder (Phase 2 of the
-# Railway -> Cloudflare migration plan: needs `wrangler d1 create` run against a real Cloudflare
-# account, which this repo's CI can't do on its own). An automatic push trigger would just fail
-# every run until that's filled in. Add `push: { paths: ['Telegram/TelegramBot/**'] }` back once
-# it is - see .github/workflows/deploy-telegram-app.yml for the equivalent pattern already
-# working for the frontend.
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'Telegram/TelegramBot/**'
+      - '.github/workflows/deploy-telegram-bot.yml'
   workflow_dispatch:
 
 jobs:
