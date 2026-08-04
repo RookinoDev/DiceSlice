@@ -19,7 +19,7 @@
 // reliably (including under @cloudflare/vitest-pool-workers, the real test harness for this
 // file). getPlayerStub()/callPlayerDO() below are the only calling convention worker.mjs needs.
 import { craftCost, PACK_TYPES, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER, CARD_POOL } from './cards.mjs'
-import { allocateSerials, recordEvent, rewardReferrerIfDue, syncLeaderboardStats, upsertProfileIdentity } from './d1.mjs'
+import { allocateSerials, recordEvent, rewardReferrerIfDue, syncLeaderboardStats, syncVipExpiry, upsertProfileIdentity } from './d1.mjs'
 
 const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
 
@@ -139,6 +139,10 @@ export class PlayerDO {
       // DAU/WAU proxy - a save sync fires at least once per app open (see useGameSession.ts),
       // so this needs no dedicated client-side session ping.
       recordEvent(this.env, { type: 'session', telegramUserId }),
+      // vipExpiresUnixSeconds is epoch SECONDS in the save (see MonetizationBoosts.ts); D1
+      // stores epoch ms like every other timestamp column here. 0 (never bought VIP) -> null,
+      // not 0 - keeps "IS NOT NULL" in getPlayersDueForVipExpiryNotice meaning "has ever had VIP".
+      syncVipExpiry(this.env, telegramUserId, save?.vipExpiresUnixSeconds ? save.vipExpiresUnixSeconds * 1000 : null),
     ])
 
     if (isFirstSync) {

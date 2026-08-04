@@ -71,6 +71,42 @@ export async function markNotified(env, telegramUserId) {
   await env.DB.prepare('UPDATE player_index SET last_notified_at = ? WHERE telegram_user_id = ?').bind(Date.now(), telegramUserId).run()
 }
 
+/** Pushes this user's VIP expiry (epoch ms, or null if never bought VIP) into the leaderboard
+ *  index - called from playerDurableObject.mjs's syncSave alongside syncLeaderboardStats, same
+ *  "extract from the save at write time" reasoning. A single-column upsert, same shape as
+ *  setNotificationsEnabled. */
+export async function syncVipExpiry(env, telegramUserId, vipExpiresAtMs) {
+  await env.DB.prepare(
+    `INSERT INTO player_index (telegram_user_id, vip_expires_at) VALUES (?, ?)
+       ON CONFLICT(telegram_user_id) DO UPDATE SET vip_expires_at = excluded.vip_expires_at`,
+  )
+    .bind(telegramUserId, vipExpiresAtMs)
+    .run()
+}
+
+/** Users whose VIP lapses within `windowMs` and haven't already been warned for THIS expiry
+ *  cycle. The vip_expiry_notified_at < (vip_expires_at - windowMs) comparison (rather than just
+ *  "notified recently") is what makes a renewal correctly re-arm this: renewing pushes
+ *  vip_expires_at far into the future, which also pushes it outside the now..now+windowMs range
+ *  below, so nothing fires again until the new expiry is genuinely close. */
+export async function getPlayersDueForVipExpiryNotice(env, windowMs) {
+  const now = Date.now()
+  const { results } = await env.DB.prepare(
+    `SELECT telegram_user_id AS telegramUserId FROM player_index
+       WHERE vip_expires_at IS NOT NULL AND vip_expires_at > ? AND vip_expires_at <= ?
+         AND (vip_expiry_notified_at IS NULL OR vip_expiry_notified_at < vip_expires_at - ?)`,
+  )
+    .bind(now, now + windowMs, windowMs)
+    .all()
+  return results.map((r) => r.telegramUserId)
+}
+
+/** Mirrors markNotified but for the VIP-expiry channel - a separate column so the two
+ *  notification types cool down independently. */
+export async function markVipExpiryNotified(env, telegramUserId) {
+  await env.DB.prepare('UPDATE player_index SET vip_expiry_notified_at = ? WHERE telegram_user_id = ?').bind(Date.now(), telegramUserId).run()
+}
+
 // Same sort keys/columns db.mjs's old LEADERBOARD_SORT_COLUMNS exposed, now plain columns
 // instead of json_extract expressions (see syncLeaderboardStats above for why). The caller's
 // sortBy string is looked up here, never interpolated into SQL - an unknown key yields

@@ -7,14 +7,17 @@ import {
   allocateSerials,
   getAdminStats,
   getLeaderboard,
+  getPlayersDueForVipExpiryNotice,
   getReferralCount,
   getUsersDueForReengagement,
   markNotified,
+  markVipExpiryNotified,
   recordEvent,
   recordReferral,
   rewardReferrerIfDue,
   setNotificationsEnabled,
   syncLeaderboardStats,
+  syncVipExpiry,
   upsertProfileIdentity,
 } from './d1.mjs'
 
@@ -147,6 +150,53 @@ describe('rewardReferrerIfDue', () => {
 
   it('returns null for a user with no referral row at all', async () => {
     expect(await rewardReferrerIfDue(env, 5099)).toBeNull()
+  })
+})
+
+describe('VIP expiry notice', () => {
+  const DAY_MS = 24 * 60 * 60 * 1000
+
+  it('includes a player whose VIP lapses within the window and excludes everyone else', async () => {
+    const now = Date.now()
+    await upsertProfileIdentity(env, 7001, { firstName: 'Expiring soon', username: null, photoUrl: null })
+    await syncVipExpiry(env, 7001, now + 2 * 60 * 60 * 1000) // 2h away - inside a 24h window
+
+    await upsertProfileIdentity(env, 7002, { firstName: 'Expires later', username: null, photoUrl: null })
+    await syncVipExpiry(env, 7002, now + 10 * DAY_MS) // far outside the window
+
+    await upsertProfileIdentity(env, 7003, { firstName: 'Already expired', username: null, photoUrl: null })
+    await syncVipExpiry(env, 7003, now - 1000) // in the past
+
+    await upsertProfileIdentity(env, 7004, { firstName: 'Never VIP', username: null, photoUrl: null })
+    // no syncVipExpiry call at all - vip_expires_at stays NULL
+
+    const due = await getPlayersDueForVipExpiryNotice(env, DAY_MS)
+    expect(due).toContain(7001)
+    expect(due).not.toContain(7002)
+    expect(due).not.toContain(7003)
+    expect(due).not.toContain(7004)
+  })
+
+  it('markVipExpiryNotified suppresses a repeat notice for the current countdown', async () => {
+    const now = Date.now()
+    await upsertProfileIdentity(env, 7010, { firstName: 'Just notified', username: null, photoUrl: null })
+    await syncVipExpiry(env, 7010, now + 2 * 60 * 60 * 1000)
+    expect(await getPlayersDueForVipExpiryNotice(env, DAY_MS)).toContain(7010)
+
+    await markVipExpiryNotified(env, 7010)
+    expect(await getPlayersDueForVipExpiryNotice(env, DAY_MS)).not.toContain(7010)
+  })
+
+  it('a notified_at left over from a much earlier (since-renewed) cycle does not suppress a fresh countdown', async () => {
+    // Real sequence this simulates: notified about cycle A, player renews (expiry jumps far out,
+    // no longer due), then ~30 days of real time pass and a NEW countdown brings expiry back
+    // within the window - notified_at is still cycle A's timestamp, long before this window
+    // opened, so it must not be mistaken for "already notified about THIS cycle".
+    const now = Date.now()
+    await upsertProfileIdentity(env, 7011, { firstName: 'Stale notice', username: null, photoUrl: null })
+    await syncVipExpiry(env, 7011, now + 2 * 60 * 60 * 1000)
+    await env.DB.prepare('UPDATE player_index SET vip_expiry_notified_at = ? WHERE telegram_user_id = ?').bind(now - 40 * DAY_MS, 7011).run()
+    expect(await getPlayersDueForVipExpiryNotice(env, DAY_MS)).toContain(7011)
   })
 })
 

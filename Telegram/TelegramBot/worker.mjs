@@ -10,7 +10,17 @@ import { Api, Bot, webhookCallback } from 'grammy'
 import { validateInitData } from './validateInitData.mjs'
 import { getShopItem, SHOP_ITEMS } from './shop.mjs'
 import { callPlayerDO } from './playerDurableObject.mjs'
-import { getAdminStats, getLeaderboard, getUsersDueForReengagement, markNotified, recordEvent, recordReferral, setNotificationsEnabled } from './d1.mjs'
+import {
+  getAdminStats,
+  getLeaderboard,
+  getPlayersDueForVipExpiryNotice,
+  getUsersDueForReengagement,
+  markNotified,
+  markVipExpiryNotified,
+  recordEvent,
+  recordReferral,
+  setNotificationsEnabled,
+} from './d1.mjs'
 
 export { PlayerDO } from './playerDurableObject.mjs'
 
@@ -429,12 +439,21 @@ export default {
   async scheduled(event, env, ctx) {
     const REENGAGEMENT_IDLE_MS = 24 * 60 * 60 * 1000 // hasn't synced in ~a day
     const REENGAGEMENT_COOLDOWN_MS = 20 * 60 * 60 * 1000 // won't re-notify inside this window
+    const VIP_EXPIRY_WARNING_MS = 24 * 60 * 60 * 1000 // warn once VIP is this close to lapsing
 
     const api = new Api(env.BOT_TOKEN)
     const userIds = await getUsersDueForReengagement(env, REENGAGEMENT_IDLE_MS, REENGAGEMENT_COOLDOWN_MS)
     for (const userId of userIds) {
       try {
-        await api.sendMessage(userId, "🚀 Your fleet's been idle, Commander! Come back and keep the Stardust flowing.", {
+        // Differentiate the nudge when there's something concrete waiting, rather than always
+        // sending the same generic line - a specific reason to come back converts better than
+        // "your fleet's idle" for the umpteenth time.
+        const pendingPacks = await callPlayerDO(env, userId, 'list-unopened-packs')
+        const message =
+          pendingPacks.length > 0
+            ? `🎁 You've got ${pendingPacks.length} unopened card pack${pendingPacks.length > 1 ? 's' : ''} waiting, Commander! Come claim them.`
+            : "🚀 Your fleet's been idle, Commander! Come back and keep the Stardust flowing."
+        await api.sendMessage(userId, message, {
           reply_markup: { inline_keyboard: [[{ text: '🚀 Play Stellar Breaker', web_app: { url: env.WEBAPP_URL } }]] },
         })
         await markNotified(env, userId)
@@ -450,5 +469,24 @@ export default {
       }
     }
     if (userIds.length > 0) console.log(`[notify] sent re-engagement reminder to ${userIds.length} player(s)`)
+
+    // Separate channel from the idle scan above - a player can be actively playing (never idle)
+    // and still be about to lose VIP, so this can't just be folded into the same message.
+    const vipUserIds = await getPlayersDueForVipExpiryNotice(env, VIP_EXPIRY_WARNING_MS)
+    for (const userId of vipUserIds) {
+      try {
+        await api.sendMessage(userId, "⭐ Your VIP Pass expires in the next 24 hours! Renew now to keep your +25% Stardust bonus going.", {
+          reply_markup: { inline_keyboard: [[{ text: '⭐ Renew VIP', web_app: { url: env.WEBAPP_URL } }]] },
+        })
+        await markVipExpiryNotified(env, userId)
+      } catch (e) {
+        if (e.error_code === 403) await setNotificationsEnabled(env, userId, false)
+        else {
+          console.warn('[notify] failed to send VIP expiry notice to', userId, ':', e.message)
+          await markVipExpiryNotified(env, userId)
+        }
+      }
+    }
+    if (vipUserIds.length > 0) console.log(`[notify] sent VIP expiry warning to ${vipUserIds.length} player(s)`)
   },
 }

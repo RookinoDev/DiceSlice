@@ -312,3 +312,20 @@ describe('referral rewards', () => {
     await expect(syncSave(userId, { version: 1 })).resolves.toBeTruthy() // just proving it doesn't throw
   })
 })
+
+describe('VIP expiry sync to D1', () => {
+  it('converts the saves epoch-seconds vipExpiresUnixSeconds into epoch-ms in player_index', async () => {
+    const userId = freshUser()
+    const expiresSeconds = Math.floor(Date.now() / 1000) + 3600
+    await syncSave(userId, { version: 1, vipExpiresUnixSeconds: expiresSeconds })
+    const row = await env.DB.prepare('SELECT vip_expires_at FROM player_index WHERE telegram_user_id = ?').bind(userId).first()
+    expect(row.vip_expires_at).toBe(expiresSeconds * 1000)
+  })
+
+  it('stores null (not 0) when the save has no VIP purchase', async () => {
+    const userId = freshUser()
+    await syncSave(userId, { version: 1 })
+    const row = await env.DB.prepare('SELECT vip_expires_at FROM player_index WHERE telegram_user_id = ?').bind(userId).first()
+    expect(row.vip_expires_at).toBeNull()
+  })
+})
