@@ -4416,6 +4416,7 @@
 }
 
 .card-art {
+  position: relative;
   width: 100%;
   aspect-ratio: 1;
   border-radius: 10px;
@@ -4423,7 +4424,8 @@
 }
 /* Grid placeholder (no live WebGL per cell - see CardArt.tsx): a genuine circular orb
    silhouette (highlight layer + a sphere gradient that goes fully transparent past its
-   radius, not a formless blur filling the whole tile) floating in the card's dark slot. */
+   radius, not a formless blur filling the whole tile) floating in the card's dark slot. Stays
+   mounted under .card-art-thumb as the loading/fallback state - see the rule below. */
 .card-art-swatch {
   background:
     radial-gradient(circle at 30% 24%, rgba(255, 255, 255, 0.65) 0%, transparent 26%),
@@ -4435,6 +4437,26 @@
       transparent 68%
     );
   background-color: var(--palette-panel);
+}
+/* The real pre-rendered planet (see useCardThumbnail.ts) - fades in over the swatch once its
+   one-time render/cache-read resolves, instead of popping in abruptly. */
+.card-art-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  animation: card-art-thumb-in 0.25s ease-out both;
+}
+@keyframes card-art-thumb-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 .card-art-loading,
 .card-art-missing {

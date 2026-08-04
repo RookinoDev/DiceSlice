@@ -32,7 +32,7 @@ function colorsToVec4(colors: RGB[]): Vector4[] {
   return colors.map(([r, g, b]) => new Vector4(r, g, b, 1))
 }
 
-interface LayerSpec {
+export interface LayerSpec {
   fragmentShader: string
   uniforms: Record<string, IUniform>
   timeRate: number
@@ -50,7 +50,10 @@ interface LayerSpec {
   isAdditive?: boolean
 }
 
-function buildLayers(profile: PlanetProfile): LayerSpec[] {
+// Exported so planetThumbnail.ts's one-shot offscreen renderer can build the exact same scene
+// (layers, features, cracks, atmosphere, moons) as this live view - a pre-rendered grid
+// thumbnail should be the same object, just a single frame of it instead of an animated one.
+export function buildLayers(profile: PlanetProfile): LayerSpec[] {
   const lightOrigin = new Vector2(profile.lightOrigin[0], profile.lightOrigin[1])
 
   if (profile.kind === 'noAtmosphere') {
@@ -301,7 +304,7 @@ const CRACK_IMPACT_MIN_STRENGTH = 0.04
 // Cracks Follow Tap Patterns (#65) - rendered on top of every solid-surface kind. Gas giants
 // are excluded on purpose: gas has no surface to fracture; their damage story is the storm
 // speeding up (isStorm) and the ring eroding (planetRing's uHpFraction) instead.
-function buildCrackLayer(profile: PlanetProfile): LayerSpec {
+export function buildCrackLayer(profile: PlanetProfile): LayerSpec {
   return {
     fragmentShader: planetCracksFragmentShader,
     isCracks: true,
@@ -325,7 +328,7 @@ function buildCrackLayer(profile: PlanetProfile): LayerSpec {
 // Signature Features (#1 in docs/CARD_SYSTEM_PLAN.md): stamps up to MAX_FEATURES real landmarks
 // on top of the surface. Rendered above every base layer but below the crack overlay (damage
 // scars should read as sitting on top of, not under, a storm/canyon).
-function buildFeatureLayer(profile: PlanetProfile, baseLayers: LayerSpec[]): LayerSpec | null {
+export function buildFeatureLayer(profile: PlanetProfile, baseLayers: LayerSpec[]): LayerSpec | null {
   const features = profile.features
   if (!features || features.length === 0) return null
   const slots = Array.from({ length: MAX_FEATURES }, (_, i) => features[i] ?? null)
@@ -383,7 +386,7 @@ function atmosphereBaseColor(profile: PlanetProfile): RGB | null {
   }
 }
 
-function buildAtmosphereLayer(profile: PlanetProfile, allLayers: LayerSpec[]): LayerSpec | null {
+export function buildAtmosphereLayer(profile: PlanetProfile, allLayers: LayerSpec[]): LayerSpec | null {
   const strength = ATMOSPHERE_STRENGTH[profile.kind]
   const base = strength ? atmosphereBaseColor(profile) : null
   if (!strength || !base) return null
@@ -414,12 +417,12 @@ function frac(x: number): number {
   return x - Math.floor(x)
 }
 
-interface MoonMesh {
+export interface MoonMesh {
   mesh: Mesh
   spec: MoonSpec
 }
 
-function buildMoonMeshes(moons: MoonSpec[] | undefined, geometry: PlaneGeometry, scene: Scene): MoonMesh[] {
+export function buildMoonMeshes(moons: MoonSpec[] | undefined, geometry: PlaneGeometry, scene: Scene): MoonMesh[] {
   if (!moons || moons.length === 0) return []
   return moons.map((spec) => {
     const theme = themesNoAtmo[Math.floor(frac(spec.seed * 13.7) * themesNoAtmo.length)]
