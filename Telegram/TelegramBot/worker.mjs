@@ -10,6 +10,7 @@ import { Api, Bot, webhookCallback } from 'grammy'
 import { validateInitData } from './validateInitData.mjs'
 import { getShopItem, SHOP_ITEMS } from './shop.mjs'
 import { callPlayerDO } from './playerDurableObject.mjs'
+import { gaCommonFields, sendGAEvents } from './gameAnalytics.mjs'
 import {
   getAdminStats,
   getLeaderboard,
@@ -148,6 +149,26 @@ function buildBot(env) {
     // catalog, not the payment payload, so a tampered client can't skew revenue reporting.
     const item = getShopItem(invoice_payload)
     await recordEvent(env, { type: 'purchase_completed', telegramUserId: ctx.from.id, item: invoice_payload, valueStars: item?.priceStars ?? null })
+    // GameAnalytics business event, same "price from our own catalog, not the payment payload"
+    // reasoning as the D1 event above. transaction_num is a real per-user incrementing counter
+    // (getGASession's own ga_progress.purchase_num), not derived from anything client-supplied.
+    if (item) {
+      const ga = await callPlayerDO(env, ctx.from.id, 'get-ga-session', { incrementPurchase: true })
+      await sendGAEvents(env, [
+        {
+          ...gaCommonFields(ctx.from.id, ga.sessionId, ga.sessionNum),
+          category: 'business',
+          event_id: `${item.kind}:${item.id}`,
+          // Telegram Stars have no sub-unit (unlike GA's "amount in cents" convention for real
+          // currencies), so amount is a plain Star count. currency "XTR" is Telegram's own code
+          // for Stars, not a real ISO 4217 currency - GA's USD-normalized revenue charts won't
+          // apply to it, but the raw event (and this project's own /api/admin/stats) still will.
+          amount: item.priceStars,
+          currency: 'XTR',
+          transaction_num: ga.purchaseNum,
+        },
+      ])
+    }
     console.log('Payment received:', ctx.message.successful_payment)
     await ctx.reply("Thanks for your purchase! Open Stellar Breaker to collect it - it'll be waiting for you.")
   })
@@ -217,6 +238,12 @@ async function handleApi(request, env) {
       // per SKU (see getAdminStats). Opening an invoice isn't paying for it, so this is a
       // "seriously considered buying" signal, not revenue.
       await recordEvent(env, { type: 'invoice_created', telegramUserId: userId, item: item.id, valueStars: item.priceStars })
+      // Mirrors the D1 event above as a GameAnalytics 'design' event (not 'business' - no money
+      // has moved yet) so the same invoice->purchase funnel is visible in GA's own funnel tools
+      // too. Ambient session only (incrementPurchase omitted) - opening an invoice isn't a
+      // transaction, so it must not bump the purchase_num a real 'business' event later needs.
+      const ga = await callPlayerDO(env, userId, 'get-ga-session', {})
+      await sendGAEvents(env, [{ ...gaCommonFields(userId, ga.sessionId, ga.sessionNum), category: 'design', event_id: `Shop:InvoiceOpened:${item.id}`, value: item.priceStars }])
       return json(200, { url: url_ }, cors)
     } catch (e) {
       console.error('[worker] shop/invoice error:', e)

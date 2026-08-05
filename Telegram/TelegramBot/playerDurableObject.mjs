@@ -20,6 +20,7 @@
 // file). getPlayerStub()/callPlayerDO() below are the only calling convention worker.mjs needs.
 import { craftCost, PACK_TYPES, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER, CARD_POOL } from './cards.mjs'
 import { allocateSerials, recordEvent, rewardReferrerIfDue, syncLeaderboardStats, syncVipExpiry, upsertProfileIdentity } from './d1.mjs'
+import { buildSyncGAEvents, gaCommonFields, sendGAEvents } from './gameAnalytics.mjs'
 
 const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
 
@@ -33,6 +34,12 @@ const MAX_DAILY_STREAK_SCAN = 300
 const BUY_PACK_PREFIX = 'buy_pack_'
 const STARTER_PACK_ITEM = 'starter_pack'
 const STARTER_PACK_TYPE = 'stellar'
+// GameAnalytics has no server-side session concept of its own (unlike its client SDKs, which
+// start/end a session around app foreground/background) - its own REST API docs say the server
+// submitting events "should keep track of the session time for each user". 30 minutes idle
+// between save syncs before counting as a new session is a common industry default, not a value
+// GameAnalytics prescribes.
+const GA_SESSION_GAP_MS = 30 * 60 * 1000
 
 function dayInDailyCycle(streak) {
   return ((Math.max(1, streak) - 1) % DAILY_CYCLE_LENGTH) + 1
@@ -87,10 +94,53 @@ export class PlayerDO {
     // more often than the old always-on Railway process ever restarted, which would reopen the
     // exact double-invoice race that Map existed to close. Needs real storage, not DO memory.
     this.sql.exec(`CREATE TABLE IF NOT EXISTS pending_invoices (item_id TEXT PRIMARY KEY, expires_at INTEGER NOT NULL)`)
+    // GameAnalytics bookkeeping - a brand-new table rather than adding columns to pack_progress
+    // (which would need a guarded ALTER TABLE for every already-provisioned DO instance; a new
+    // CREATE TABLE IF NOT EXISTS needs no such migration). prestige_count_seen mirrors
+    // pack_progress.bosses_granted's own "high-water mark we've already reported" role, just for
+    // Prestige instead of boss clears - see _getOrStartGASession and syncSave below.
+    this.sql.exec(`CREATE TABLE IF NOT EXISTS ga_progress (
+      id INTEGER PRIMARY KEY CHECK (id = 1), session_id TEXT, session_num INTEGER NOT NULL DEFAULT 0,
+      last_activity_at INTEGER NOT NULL DEFAULT 0, prestige_count_seen INTEGER NOT NULL DEFAULT 0,
+      purchase_num INTEGER NOT NULL DEFAULT 0
+    )`)
   }
 
   _insertCardInstance(cardId, variant, serial, source, now) {
     this.sql.exec('INSERT INTO card_instances (card_id, variant, serial, source, minted_at) VALUES (?, ?, ?, ?, ?)', cardId, variant, serial, source, now)
+  }
+
+  // -- GameAnalytics session bookkeeping (see gameAnalytics.mjs for why this lives here rather
+  //    than in that module) --
+
+  /** Returns this player's current GameAnalytics session, starting a new session_id/session_num
+   *  if more than GA_SESSION_GAP_MS has passed since their last recorded activity (or none has
+   *  ever been recorded). isNewSession tells the caller whether to also emit a 'user' (session
+   *  start) event this call - reused by syncSave below and by worker.mjs for purchase/invoice
+   *  events, which need the player's CURRENT session id but must not force a new one just because
+   *  a purchase happens to be the first GA-relevant thing recorded in a while. */
+  _getOrStartGASession(now) {
+    this.sql.exec('INSERT OR IGNORE INTO ga_progress (id) VALUES (1)')
+    const row = this.sql.exec('SELECT session_id, session_num, last_activity_at FROM ga_progress WHERE id = 1').toArray()[0]
+    const isNewSession = !row.session_id || now - row.last_activity_at > GA_SESSION_GAP_MS
+    const sessionId = isNewSession ? crypto.randomUUID() : row.session_id
+    const sessionNum = isNewSession ? row.session_num + 1 : row.session_num
+    this.sql.exec('UPDATE ga_progress SET session_id = ?, session_num = ?, last_activity_at = ? WHERE id = 1', sessionId, sessionNum, now)
+    return { sessionId, sessionNum, isNewSession }
+  }
+
+  /** Dispatch-facing wrapper - worker.mjs calls this to get session context for a purchase or
+   *  invoice-opened event without duplicating the session logic above. incrementPurchase bumps
+   *  and returns this player's GA transaction_num (business events need a per-user, per-lifetime
+   *  incrementing counter - see gameAnalytics.mjs's event shape); omit it for non-revenue events. */
+  getGASession(incrementPurchase = false) {
+    const ga = this._getOrStartGASession(Date.now())
+    let purchaseNum = null
+    if (incrementPurchase) {
+      this.sql.exec('UPDATE ga_progress SET purchase_num = purchase_num + 1 WHERE id = 1')
+      purchaseNum = this.sql.exec('SELECT purchase_num FROM ga_progress WHERE id = 1').toArray()[0].purchase_num
+    }
+    return { sessionId: ga.sessionId, sessionNum: ga.sessionNum, purchaseNum }
   }
 
   // -- Profile / saves --
@@ -153,6 +203,22 @@ export class PlayerDO {
     const grantedBoss = this.grantPacksFromSave(save)
     const grantedDaily = this.grantDailyPackFromSave(save)
     const pendingPacks = this.listUnopenedPacks().length
+
+    // GameAnalytics: session-start + progression events, best-effort and after every durable
+    // write above has already landed. See gameAnalytics.mjs's buildSyncGAEvents for the actual
+    // decision logic (kept pure/testable there) - this is just the DO-side plumbing: starting
+    // the session, reading/persisting the prestige high-water-mark, and sending the result.
+    const ga = this._getOrStartGASession(now)
+    const { prestige_count_seen } = this.sql.exec('SELECT prestige_count_seen FROM ga_progress WHERE id = 1').toArray()[0]
+    const { events: gaEvents, newPrestigeCountSeen } = buildSyncGAEvents({ save, grantedBoss, isNewSession: ga.isNewSession, prestigeCountSeen: prestige_count_seen })
+    if (newPrestigeCountSeen !== prestige_count_seen) this.sql.exec('UPDATE ga_progress SET prestige_count_seen = ? WHERE id = 1', newPrestigeCountSeen)
+    if (gaEvents.length > 0) {
+      await sendGAEvents(
+        this.env,
+        gaEvents.map((e) => ({ ...gaCommonFields(telegramUserId, ga.sessionId, ga.sessionNum), ...e })),
+      )
+    }
+
     return { grantedBoss, grantedDaily, pendingPacks }
   }
 
@@ -557,6 +623,8 @@ export class PlayerDO {
         return this.reservePendingInvoice(a.itemId, a.ttlMs)
       case 'import-legacy-state':
         return this.importLegacyState(a)
+      case 'get-ga-session':
+        return this.getGASession(a.incrementPurchase)
       default:
         throw new Error(`unknown PlayerDO method: ${method}`)
     }

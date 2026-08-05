@@ -7,6 +7,13 @@ import { describe, expect, it } from 'vitest'
 import { callPlayerDO } from './playerDurableObject.mjs'
 import { recordReferral } from './d1.mjs'
 
+// GA_GAME_KEY/GA_SECRET_KEY aren't set anywhere in this test environment, so syncSave's real
+// sendGAEvents call silently no-ops on every call by design (see gameAnalytics.mjs) - there's
+// nothing to observe from out here. The GA *decision* logic (which events a sync should produce)
+// is covered directly and deterministically in gameAnalytics.vitest.mjs's buildSyncGAEvents
+// tests instead; the tests below only cover the DO-owned session bookkeeping (get-ga-session),
+// which is real, observable behavior independent of whether sendGAEvents actually fires.
+
 let nextUserId = 100000
 /** A fresh, never-used telegram_user_id (and therefore a fresh PlayerDO) per call, so tests
  *  never share state even if isolation turns out to be per-file rather than per-test. */
@@ -327,5 +334,44 @@ describe('VIP expiry sync to D1', () => {
     await syncSave(userId, { version: 1 })
     const row = await env.DB.prepare('SELECT vip_expires_at FROM player_index WHERE telegram_user_id = ?').bind(userId).first()
     expect(row.vip_expires_at).toBeNull()
+  })
+})
+
+describe('GameAnalytics session tracking (get-ga-session)', () => {
+  it('starts session_num at 1 on first use and reuses the same session_id/session_num on the next call', async () => {
+    const userId = freshUser()
+    const first = await callPlayerDO(env, userId, 'get-ga-session', {})
+    expect(first.sessionNum).toBe(1)
+    expect(first.sessionId).toEqual(expect.any(String))
+
+    const second = await callPlayerDO(env, userId, 'get-ga-session', {})
+    expect(second.sessionId).toBe(first.sessionId)
+    expect(second.sessionNum).toBe(1)
+  })
+
+  it('keeps sessions independent per player', async () => {
+    const a = await callPlayerDO(env, freshUser(), 'get-ga-session', {})
+    const b = await callPlayerDO(env, freshUser(), 'get-ga-session', {})
+    expect(a.sessionId).not.toBe(b.sessionId)
+  })
+
+  it('increments purchase_num only when incrementPurchase is passed, and leaves session identity untouched', async () => {
+    const userId = freshUser()
+    const ambient = await callPlayerDO(env, userId, 'get-ga-session', {})
+    expect(ambient.purchaseNum).toBeNull()
+
+    const first = await callPlayerDO(env, userId, 'get-ga-session', { incrementPurchase: true })
+    expect(first.purchaseNum).toBe(1)
+    expect(first.sessionId).toBe(ambient.sessionId) // getting a purchase number doesn't start a new session
+
+    const second = await callPlayerDO(env, userId, 'get-ga-session', { incrementPurchase: true })
+    expect(second.purchaseNum).toBe(2)
+  })
+})
+
+describe('syncSave does not error with GameAnalytics wired in but no credentials configured', () => {
+  it('a sync that would normally emit session/progression/prestige events still succeeds', async () => {
+    const userId = freshUser()
+    await expect(syncSave(userId, { version: 1, stats: { deepestBossCleared: 5, deepestStage: 6, prestigeCount: 1 } })).resolves.toBeTruthy()
   })
 })
