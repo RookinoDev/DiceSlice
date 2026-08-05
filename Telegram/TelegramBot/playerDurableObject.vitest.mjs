@@ -71,8 +71,37 @@ describe('pack grants', () => {
     expect((await syncSave(userId, save(25, 60))).grantedBoss).toBe(2) // cleared 20, 25 too
     const packs = await callPlayerDO(env, userId, 'list-unopened-packs')
     expect(packs.length).toBe(5)
-    expect(packs[0].type).toBe('meteor') // deepest 20 -> giants band
-    expect(packs[4].type).toBe('stellar') // deepest 60 -> star band
+    // Bosses 5/10/15/20/25 (milestones 1-5) are all within the meteor band (cycle positions
+    // 1-10) - each pack's type reflects the specific boss it came from, not the player's later,
+    // much deeper progress (deepest=60 would itself map to the stellar band).
+    expect(packs.map((p) => p.type)).toEqual(['meteor', 'meteor', 'meteor', 'meteor', 'meteor'])
+  })
+
+  it('a catch-up sync spanning a pack-band boundary grants each pack its own type instead of stamping the whole batch with one type', async () => {
+    // Regression test for a real bug report: a big single sync (e.g. an offline-earnings catch-
+    // up) used to type EVERY newly-granted pack by the player's current deepest stage alone - so
+    // a batch landing entirely in one band (e.g. Stellar, which is always exactly 4 cards) looked
+    // identical pack after pack. Jumping straight to boss 60 in one sync crosses 12 unique boss
+    // milestones: 1-10 (stages 5-50) are the meteor band, 11-12 (stages 55/60) are the stellar
+    // band - the fix must split the batch across both, not report it all as one type.
+    const userId = freshUser()
+    const save = (deepestBossCleared, deepest) => ({ version: 1, highestStage: deepest, stats: { deepestBossCleared, deepestStage: deepest } })
+    expect((await syncSave(userId, save(60, 60))).grantedBoss).toBe(12)
+    const packs = await callPlayerDO(env, userId, 'list-unopened-packs')
+    expect(packs.map((p) => p.type)).toEqual([
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'meteor',
+      'stellar',
+      'stellar',
+    ])
   })
 
   it('do not repeat for a boss stage re-cleared after a prestige reset', async () => {
@@ -180,14 +209,18 @@ describe('purchases', () => {
 })
 
 describe('refine and craft', () => {
-  // Duplicates are rare with the real 5,890-card pool - flood a small pool (singularity packs,
-  // deepest stage 145, guarantee a legendary from a ~77-card pool) so dupes show up reliably.
-  async function grantManyPacksAndOpen(userId, waves = 3) {
-    for (let w = 1; w <= waves; w++) {
-      await syncSave(userId, { version: 1, highestStage: 145, stats: { deepestBossCleared: w * 100, deepestStage: 145 } })
-      for (const pack of await callPlayerDO(env, userId, 'list-unopened-packs')) {
-        await callPlayerDO(env, userId, 'open-pack', { packId: pack.id })
-      }
+  // Duplicates are rare with the real 5,890-card pool - flood a small pool (singularity packs
+  // guarantee a legendary from a ~77-card pool) so dupes show up reliably. Grants via the shop-
+  // purchase path (record-purchase + claim-purchases) rather than syncSave/grantPacksFromSave -
+  // that path now types each pack by its OWN boss milestone (see grantPacksFromSave's own
+  // comment), so a single deep sync no longer yields many same-type packs the way it used to;
+  // purchases mint an exact, controllable type regardless, which is what this flood actually
+  // needs and keeps this test decoupled from boss-cycle pack-typing entirely.
+  async function grantManyPacksAndOpen(userId, count = 60) {
+    for (let i = 0; i < count; i++) await callPlayerDO(env, userId, 'record-purchase', { item: 'buy_pack_singularity' })
+    await callPlayerDO(env, userId, 'claim-purchases')
+    for (const pack of await callPlayerDO(env, userId, 'list-unopened-packs')) {
+      await callPlayerDO(env, userId, 'open-pack', { packId: pack.id })
     }
   }
 

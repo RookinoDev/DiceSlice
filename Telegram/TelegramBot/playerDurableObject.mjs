@@ -269,9 +269,19 @@ export class PlayerDO {
   // -- Card packs --
 
   /** Grants packs for boss kills revealed by a save sync - see db.mjs's old grantPacksFromSave
-   *  for the full one-pack-per-boss-ever reasoning (unchanged here, purely a storage-API port:
-   *  no BEGIN IMMEDIATE/COMMIT needed since this whole method runs as one synchronous block on
-   *  a single-threaded DO, so nothing else can interleave with it). */
+   *  for the full one-pack-per-boss-ever reasoning. Diverges from that port in one deliberate
+   *  way (user-reported): a sync that reveals SEVERAL new boss clears at once (a big offline-
+   *  earnings catch-up, a fast multi-boss run) used to stamp every pack in that batch with
+   *  whatever type matched the player's CURRENT deepest stage - so a catch-up batch landing in
+   *  one 10-boss band (e.g. "Stellar", always-4-cards) meant every pack in it looked identical.
+   *  Each pack now gets the type its OWN boss milestone actually maps to via
+   *  packTypeForBossStage, so a batch spanning a band boundary correctly mixes types again -
+   *  matching the intended one-pack-per-boss variety instead of collapsing it under a big grant.
+   *  Quality still uses the player's current depth (packQualityForStage(deepest)) - that's a
+   *  power-level bonus tied to where they are now, not a per-boss identity like type is, and
+   *  wasn't part of what was reported broken. No BEGIN IMMEDIATE/COMMIT needed: this whole
+   *  method runs as one synchronous block on a single-threaded DO, so nothing else can
+   *  interleave with it. */
   grantPacksFromSave(save) {
     const deepestBossCleared = Number(save?.stats?.deepestBossCleared)
     if (!Number.isFinite(deepestBossCleared) || deepestBossCleared <= 0) return 0
@@ -284,9 +294,12 @@ export class PlayerDO {
     const progress = this.sql.exec('SELECT bosses_granted FROM pack_progress WHERE id = 1').toArray()[0]
     const delta = Math.min(uniqueBossesCleared - progress.bosses_granted, MAX_PACKS_PER_SYNC)
     if (delta <= 0) return 0
-    const type = packTypeForBossStage(deepest)
     const quality = packQualityForStage(deepest)
-    for (let i = 0; i < delta; i++) this.sql.exec('INSERT INTO packs (type, created_at, quality) VALUES (?, ?, ?)', type, now, quality)
+    for (let i = 0; i < delta; i++) {
+      const bossMilestone = progress.bosses_granted + i + 1 // 1st, 2nd, ... unique boss this player has ever cleared
+      const type = packTypeForBossStage(bossMilestone * BOSS_STAGE_INTERVAL) // that milestone's OWN stage, not the current deepest
+      this.sql.exec('INSERT INTO packs (type, created_at, quality) VALUES (?, ?, ?)', type, now, quality)
+    }
     this.sql.exec('UPDATE pack_progress SET bosses_granted = bosses_granted + ? WHERE id = 1', delta)
     return delta
   }
