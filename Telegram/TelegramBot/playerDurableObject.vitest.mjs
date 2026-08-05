@@ -367,6 +367,25 @@ describe('GameAnalytics session tracking (get-ga-session)', () => {
     const second = await callPlayerDO(env, userId, 'get-ga-session', { incrementPurchase: true })
     expect(second.purchaseNum).toBe(2)
   })
+
+  it('detects and persists platform/os_version from a real User-Agent, per player - not a fixed value for everyone', async () => {
+    const androidUA = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36'
+    const iosUA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15'
+
+    const androidUser = await callPlayerDO(env, freshUser(), 'get-ga-session', { userAgent: androidUA })
+    expect(androidUser).toMatchObject({ platform: 'android', osVersion: 'android 14' })
+
+    const iosUser = await callPlayerDO(env, freshUser(), 'get-ga-session', { userAgent: iosUA })
+    expect(iosUser).toMatchObject({ platform: 'ios', osVersion: 'ios 17.4' })
+  })
+
+  it('reuses the last-detected platform when a later call has no User-Agent of its own (the payment webhook case)', async () => {
+    const userId = freshUser()
+    await callPlayerDO(env, userId, 'get-ga-session', { userAgent: 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36' })
+
+    const webhookLike = await callPlayerDO(env, userId, 'get-ga-session', { incrementPurchase: true }) // no userAgent
+    expect(webhookLike).toMatchObject({ platform: 'android', osVersion: 'android 14' })
+  })
 })
 
 describe('syncSave does not error with GameAnalytics wired in but no credentials configured', () => {

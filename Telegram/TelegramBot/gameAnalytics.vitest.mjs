@@ -2,10 +2,42 @@
 // the real Web Crypto implementation this module ships with in production, not a Node polyfill.
 import { createHmac } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { buildSyncGAEvents, gaCommonFields, sendGAEvents } from './gameAnalytics.mjs'
+import { buildSyncGAEvents, gaCommonFields, platformFromUserAgent, sendGAEvents } from './gameAnalytics.mjs'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('platformFromUserAgent', () => {
+  it('recognizes iOS (checked before mac_osx, since Safari UA on iPhone contains "like Mac OS X")', () => {
+    const ua = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15'
+    expect(platformFromUserAgent(ua)).toEqual({ platform: 'ios', osVersion: 'ios 17.4' })
+  })
+
+  it('recognizes Android', () => {
+    const ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36'
+    expect(platformFromUserAgent(ua)).toEqual({ platform: 'android', osVersion: 'android 14' })
+  })
+
+  it('recognizes desktop macOS', () => {
+    const ua = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15'
+    expect(platformFromUserAgent(ua)).toEqual({ platform: 'mac_osx', osVersion: 'mac_osx 10.15' })
+  })
+
+  it('recognizes Windows', () => {
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    expect(platformFromUserAgent(ua)).toEqual({ platform: 'windows', osVersion: 'windows 10.0' })
+  })
+
+  it('recognizes Linux desktop (not Android, which is also Linux-kernel but matched first)', () => {
+    const ua = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36'
+    expect(platformFromUserAgent(ua)).toEqual({ platform: 'linux', osVersion: 'linux 1.0' })
+  })
+
+  it('falls back to the fixed default for a missing or unrecognized User-Agent', () => {
+    expect(platformFromUserAgent(undefined)).toEqual({ platform: 'windows', osVersion: 'windows 10.0' })
+    expect(platformFromUserAgent('some-unknown-bot/1.0')).toEqual({ platform: 'windows', osVersion: 'windows 10.0' })
+  })
 })
 
 describe('buildSyncGAEvents', () => {
@@ -69,7 +101,7 @@ describe('gaCommonFields', () => {
       v: 2,
       user_id: '12345', // GA's schema wants a string, not our numeric telegram_user_id
       sdk_version: 'rest api v2',
-      platform: 'webapp',
+      platform: 'windows',
       session_id: 'session-uuid',
       session_num: 3,
     })

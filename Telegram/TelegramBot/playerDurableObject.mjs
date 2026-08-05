@@ -20,7 +20,7 @@
 // file). getPlayerStub()/callPlayerDO() below are the only calling convention worker.mjs needs.
 import { craftCost, PACK_TYPES, packQualityForStage, packTypeForBossStage, refineValue, rollPack, VARIANT_ORDER, CARD_POOL } from './cards.mjs'
 import { allocateSerials, recordEvent, rewardReferrerIfDue, syncLeaderboardStats, syncVipExpiry, upsertProfileIdentity } from './d1.mjs'
-import { buildSyncGAEvents, gaCommonFields, sendGAEvents } from './gameAnalytics.mjs'
+import { buildSyncGAEvents, gaCommonFields, platformFromUserAgent, sendGAEvents } from './gameAnalytics.mjs'
 
 const POOL_BY_ID = new Map(CARD_POOL.map((c) => [c.id, c]))
 
@@ -104,6 +104,15 @@ export class PlayerDO {
       last_activity_at INTEGER NOT NULL DEFAULT 0, prestige_count_seen INTEGER NOT NULL DEFAULT 0,
       purchase_num INTEGER NOT NULL DEFAULT 0
     )`)
+    // Added after ga_progress already shipped (and already has real rows) - CREATE TABLE IF NOT
+    // EXISTS above is a no-op for those, so this needs the same guarded-ALTER-TABLE pattern the
+    // old db.mjs used for its own post-launch columns (see hasColumn there). Persists the last
+    // *detected* platform/os_version (see gameAnalytics.mjs's platformFromUserAgent) so a request
+    // with no User-Agent of its own - the Telegram bot webhook a payment confirmation arrives on -
+    // can still report a real player device instead of always falling back to the same constant.
+    const gaCols = this.sql.exec('PRAGMA table_info(ga_progress)').toArray().map((c) => c.name)
+    if (!gaCols.includes('platform')) this.sql.exec('ALTER TABLE ga_progress ADD COLUMN platform TEXT')
+    if (!gaCols.includes('os_version')) this.sql.exec('ALTER TABLE ga_progress ADD COLUMN os_version TEXT')
   }
 
   _insertCardInstance(cardId, variant, serial, source, now) {
@@ -118,29 +127,46 @@ export class PlayerDO {
    *  ever been recorded). isNewSession tells the caller whether to also emit a 'user' (session
    *  start) event this call - reused by syncSave below and by worker.mjs for purchase/invoice
    *  events, which need the player's CURRENT session id but must not force a new one just because
-   *  a purchase happens to be the first GA-relevant thing recorded in a while. */
-  _getOrStartGASession(now) {
+   *  a purchase happens to be the first GA-relevant thing recorded in a while.
+   *
+   *  userAgent, when the caller actually has one (an HTTP request from the Mini App - unlike a
+   *  Telegram bot webhook, which carries none), re-detects and persists platform/os_version via
+   *  platformFromUserAgent so they stay current across a player's real devices. Every caller gets
+   *  back whatever's currently stored (freshly detected this call, or from the last call that had
+   *  a real userAgent) - never GA_PLATFORM's fallback unless NO request for this player has ever
+   *  supplied one. */
+  _getOrStartGASession(now, userAgent) {
     this.sql.exec('INSERT OR IGNORE INTO ga_progress (id) VALUES (1)')
-    const row = this.sql.exec('SELECT session_id, session_num, last_activity_at FROM ga_progress WHERE id = 1').toArray()[0]
+    const row = this.sql.exec('SELECT session_id, session_num, last_activity_at, platform, os_version FROM ga_progress WHERE id = 1').toArray()[0]
     const isNewSession = !row.session_id || now - row.last_activity_at > GA_SESSION_GAP_MS
     const sessionId = isNewSession ? crypto.randomUUID() : row.session_id
     const sessionNum = isNewSession ? row.session_num + 1 : row.session_num
-    this.sql.exec('UPDATE ga_progress SET session_id = ?, session_num = ?, last_activity_at = ? WHERE id = 1', sessionId, sessionNum, now)
-    return { sessionId, sessionNum, isNewSession }
+    let platform = row.platform
+    let osVersion = row.os_version
+    if (userAgent) ({ platform, osVersion } = platformFromUserAgent(userAgent))
+    this.sql.exec(
+      'UPDATE ga_progress SET session_id = ?, session_num = ?, last_activity_at = ?, platform = ?, os_version = ? WHERE id = 1',
+      sessionId,
+      sessionNum,
+      now,
+      platform,
+      osVersion,
+    )
+    return { sessionId, sessionNum, isNewSession, platform, osVersion }
   }
 
   /** Dispatch-facing wrapper - worker.mjs calls this to get session context for a purchase or
    *  invoice-opened event without duplicating the session logic above. incrementPurchase bumps
    *  and returns this player's GA transaction_num (business events need a per-user, per-lifetime
    *  incrementing counter - see gameAnalytics.mjs's event shape); omit it for non-revenue events. */
-  getGASession(incrementPurchase = false) {
-    const ga = this._getOrStartGASession(Date.now())
+  getGASession(incrementPurchase = false, userAgent = undefined) {
+    const ga = this._getOrStartGASession(Date.now(), userAgent)
     let purchaseNum = null
     if (incrementPurchase) {
       this.sql.exec('UPDATE ga_progress SET purchase_num = purchase_num + 1 WHERE id = 1')
       purchaseNum = this.sql.exec('SELECT purchase_num FROM ga_progress WHERE id = 1').toArray()[0].purchase_num
     }
-    return { sessionId: ga.sessionId, sessionNum: ga.sessionNum, purchaseNum }
+    return { sessionId: ga.sessionId, sessionNum: ga.sessionNum, purchaseNum, platform: ga.platform, osVersion: ga.osVersion }
   }
 
   // -- Profile / saves --
@@ -151,8 +177,10 @@ export class PlayerDO {
    *  4 sortable stats get pushed to D1 at write time instead) + grantPacksFromSave +
    *  grantDailyPackFromSave + listUnopenedPacks, mirroring the old /api/save handler's full
    *  sequence in one DO call instead of five separate db.mjs calls. Needs telegramUserId only
-   *  for the D1 push (this DO's own storage never needs to know its own key). */
-  async syncSave(telegramUserId, saveJson, profileFields) {
+   *  for the D1 push (this DO's own storage never needs to know its own key). userAgent is the
+   *  Mini App request's own header (see worker.mjs's /api/save) - see _getOrStartGASession for
+   *  why it matters. */
+  async syncSave(telegramUserId, saveJson, profileFields, userAgent) {
     const save = JSON.parse(saveJson)
     const now = Date.now()
     // Referral reward trigger (see rewardReferrerIfDue's own comment for why "first sync" and
@@ -208,14 +236,14 @@ export class PlayerDO {
     // write above has already landed. See gameAnalytics.mjs's buildSyncGAEvents for the actual
     // decision logic (kept pure/testable there) - this is just the DO-side plumbing: starting
     // the session, reading/persisting the prestige high-water-mark, and sending the result.
-    const ga = this._getOrStartGASession(now)
+    const ga = this._getOrStartGASession(now, userAgent)
     const { prestige_count_seen } = this.sql.exec('SELECT prestige_count_seen FROM ga_progress WHERE id = 1').toArray()[0]
     const { events: gaEvents, newPrestigeCountSeen } = buildSyncGAEvents({ save, grantedBoss, isNewSession: ga.isNewSession, prestigeCountSeen: prestige_count_seen })
     if (newPrestigeCountSeen !== prestige_count_seen) this.sql.exec('UPDATE ga_progress SET prestige_count_seen = ? WHERE id = 1', newPrestigeCountSeen)
     if (gaEvents.length > 0) {
       await sendGAEvents(
         this.env,
-        gaEvents.map((e) => ({ ...gaCommonFields(telegramUserId, ga.sessionId, ga.sessionNum), ...e })),
+        gaEvents.map((e) => ({ ...gaCommonFields(telegramUserId, ga.sessionId, ga.sessionNum, { platform: ga.platform, osVersion: ga.osVersion }), ...e })),
       )
     }
 
@@ -584,7 +612,7 @@ export class PlayerDO {
   _dispatch(method, a) {
     switch (method) {
       case 'sync-save':
-        return this.syncSave(a.telegramUserId, a.saveJson, a.profileFields)
+        return this.syncSave(a.telegramUserId, a.saveJson, a.profileFields, a.userAgent)
       case 'get-save':
         return this.getSave()
       case 'get-profile':
@@ -624,7 +652,7 @@ export class PlayerDO {
       case 'import-legacy-state':
         return this.importLegacyState(a)
       case 'get-ga-session':
-        return this.getGASession(a.incrementPurchase)
+        return this.getGASession(a.incrementPurchase, a.userAgent)
       default:
         throw new Error(`unknown PlayerDO method: ${method}`)
     }

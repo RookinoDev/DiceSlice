@@ -152,11 +152,15 @@ function buildBot(env) {
     // GameAnalytics business event, same "price from our own catalog, not the payment payload"
     // reasoning as the D1 event above. transaction_num is a real per-user incrementing counter
     // (getGASession's own ga_progress.purchase_num), not derived from anything client-supplied.
+    // No userAgent to pass - a Telegram bot webhook carries none of the buyer's own device info,
+    // unlike an HTTP request from the Mini App - getGASession falls back to whatever platform was
+    // last detected for this player (almost always just moments ago, from the /api/shop/invoice
+    // call that started this same purchase).
     if (item) {
       const ga = await callPlayerDO(env, ctx.from.id, 'get-ga-session', { incrementPurchase: true })
       await sendGAEvents(env, [
         {
-          ...gaCommonFields(ctx.from.id, ga.sessionId, ga.sessionNum),
+          ...gaCommonFields(ctx.from.id, ga.sessionId, ga.sessionNum, { platform: ga.platform, osVersion: ga.osVersion }),
           category: 'business',
           event_id: `${item.kind}:${item.id}`,
           // Telegram Stars have no sub-unit (unlike GA's "amount in cents" convention for real
@@ -242,8 +246,12 @@ async function handleApi(request, env) {
       // has moved yet) so the same invoice->purchase funnel is visible in GA's own funnel tools
       // too. Ambient session only (incrementPurchase omitted) - opening an invoice isn't a
       // transaction, so it must not bump the purchase_num a real 'business' event later needs.
-      const ga = await callPlayerDO(env, userId, 'get-ga-session', {})
-      await sendGAEvents(env, [{ ...gaCommonFields(userId, ga.sessionId, ga.sessionNum), category: 'design', event_id: `Shop:InvoiceOpened:${item.id}`, value: item.priceStars }])
+      // This IS a real request from the Mini App, so its User-Agent updates the player's stored
+      // platform/os_version - the payment-confirmation webhook later reuses whatever's set here.
+      const ga = await callPlayerDO(env, userId, 'get-ga-session', { userAgent: request.headers.get('user-agent') })
+      await sendGAEvents(env, [
+        { ...gaCommonFields(userId, ga.sessionId, ga.sessionNum, { platform: ga.platform, osVersion: ga.osVersion }), category: 'design', event_id: `Shop:InvoiceOpened:${item.id}`, value: item.priceStars },
+      ])
       return json(200, { url: url_ }, cors)
     } catch (e) {
       console.error('[worker] shop/invoice error:', e)
@@ -276,6 +284,9 @@ async function handleApi(request, env) {
         telegramUserId: userId,
         saveJson: JSON.stringify(body.save),
         profileFields: { firstName: user.first_name, username: user.username, photoUrl: user.photo_url },
+        // A real request from the Mini App - see playerDurableObject.mjs's _getOrStartGASession
+        // for why this matters (GameAnalytics platform/os_version detection, not auth/CORS).
+        userAgent: request.headers.get('user-agent'),
       })
       return json(200, { ok: true, pendingPacks }, cors)
     } catch (e) {

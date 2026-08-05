@@ -16,13 +16,37 @@
 // batch of already-decided events; every call is best-effort like d1.mjs's recordEvent, so a
 // GameAnalytics outage or a bad/missing key must never break gameplay or payments.
 
-// Confirm this matches the platform configured for GA_GAME_KEY at gameanalytics.com - the game's
-// dashboard settings are the source of truth for accepted values, not this constant. There's no
-// real device/OS here (a Telegram Mini App has no hardware of its own to report), so these are
-// constants describing that fact as accurately as GA's required schema allows, not real telemetry.
-const GA_PLATFORM = 'webapp'
+// Verified against GA's real API, not guessed: platform:"webapp" was rejected with error_type
+// "not_in_range" and os_version:"telegram_miniapp" with "no_match", even though this game's
+// GameAnalytics dashboard has Platform set to "Other" - the events endpoint still validates
+// `platform` against a real OS token (windows/mac_osx/linux/ios/android/...), and os_version
+// must be formatted "<platform> <version>" (confirmed against GA's own JS SDK source,
+// GADevice.ts). "windows"/"windows 10.0" is a fixed placeholder, not per-player device detection
+// - a Telegram Mini App genuinely has no hardware of its own to report, and every player's actual
+// OS varies. Worth revisiting with real per-request User-Agent sniffing (worker.mjs's `request`
+// has it; PlayerDO's syncSave and the invoice/purchase paths currently don't receive it) if
+// GameAnalytics' OS/platform breakdown ever needs to be accurate rather than just accepted.
+const GA_PLATFORM = 'windows'
+const GA_OS_VERSION = 'windows 10.0'
 const GA_SDK_VERSION = 'rest api v2'
 const EVENTS_URL_PREFIX = 'https://api.gameanalytics.com/v2'
+
+/** Best-effort platform/os_version from a request's User-Agent - the game genuinely runs on
+ *  Android, iOS, and desktop (Windows/Mac/Linux) Telegram clients, so a single hardcoded value
+ *  for every player would misreport most of them. Falls back to GA_PLATFORM/GA_OS_VERSION for a
+ *  UA that matches nothing recognized (missing UA, an unusual client) - a fallback event is still
+ *  useful data; guessing a specific-but-wrong OS is not. iOS is checked before mac_osx: Safari's
+ *  UA on iPhone/iPad includes "like Mac OS X", which would otherwise false-match first. */
+export function platformFromUserAgent(userAgent) {
+  const ua = userAgent || ''
+  let m
+  if ((m = ua.match(/(?:iPhone OS|CPU OS) (\d+)_(\d+)/))) return { platform: 'ios', osVersion: `ios ${m[1]}.${m[2]}` }
+  if ((m = ua.match(/Android (\d+(?:\.\d+)?)/))) return { platform: 'android', osVersion: `android ${m[1]}` }
+  if ((m = ua.match(/Mac OS X (\d+)[_.](\d+)/))) return { platform: 'mac_osx', osVersion: `mac_osx ${m[1]}.${m[2]}` }
+  if ((m = ua.match(/Windows NT (\d+\.\d+)/))) return { platform: 'windows', osVersion: `windows ${m[1]}` }
+  if (/Linux/.test(ua)) return { platform: 'linux', osVersion: 'linux 1.0' }
+  return { platform: GA_PLATFORM, osVersion: GA_OS_VERSION }
+}
 
 async function hmacBase64(secretKey, body) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secretKey), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
@@ -32,17 +56,21 @@ async function hmacBase64(secretKey, body) {
 
 /** The fields every GameAnalytics event needs regardless of category - see
  *  docs.gameanalytics.com's event-types reference. Callers spread this into each event object
- *  alongside its own category-specific fields (category, event_id, amount, ...). */
-export function gaCommonFields(telegramUserId, sessionId, sessionNum) {
+ *  alongside its own category-specific fields (category, event_id, amount, ...). platform/
+ *  osVersion default to the fixed fallback (see GA_PLATFORM) but should normally come from
+ *  platformFromUserAgent() - see playerDurableObject.mjs for where that's actually detected and
+ *  persisted (a Telegram bot webhook, e.g. a payment confirmation, has no User-Agent of its own
+ *  to read). */
+export function gaCommonFields(telegramUserId, sessionId, sessionNum, { platform = GA_PLATFORM, osVersion = GA_OS_VERSION } = {}) {
   return {
     v: 2,
     user_id: String(telegramUserId),
     client_ts: Math.floor(Date.now() / 1000),
     sdk_version: GA_SDK_VERSION,
-    os_version: 'telegram_miniapp',
+    os_version: osVersion,
     manufacturer: 'telegram',
     device: 'webapp',
-    platform: GA_PLATFORM,
+    platform,
     session_id: sessionId,
     session_num: sessionNum,
   }
