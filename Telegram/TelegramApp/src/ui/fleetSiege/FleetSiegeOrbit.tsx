@@ -20,9 +20,11 @@ interface FleetSiegeOrbitProps {
   bossTimerSeconds: number
 }
 
-/** Sprite footprint before the per-frame depth scale is applied - later/heavier ships read a touch bigger. */
+/** Sprite footprint before the per-frame depth scale is applied - later/heavier ships read a touch bigger.
+ *  Scaled down 30% (user-requested) from the original 15 + min(13, index * 0.65) - the *0.7 factor keeps
+ *  those original numbers legible instead of baking pre-multiplied decimals into the formula. */
 function spriteSizePx(index: number): number {
-  return 15 + Math.min(13, index * 0.65)
+  return (15 + Math.min(13, index * 0.65)) * 0.7
 }
 
 function FleetSiegeOrbitImpl({ session, planetRef, impulseApiRef, triggerShake, bossActive, bossSecondsLeft, bossTimerSeconds }: FleetSiegeOrbitProps) {

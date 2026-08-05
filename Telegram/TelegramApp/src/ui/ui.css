@@ -1767,8 +1767,8 @@
 
 .row-icon-wrap {
   position: relative;
-  width: 50px;
-  height: 50px;
+  width: 35px;
+  height: 35px;
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.04);
   display: flex;
@@ -1785,15 +1785,15 @@
   }
 }
 .row-icon-shape {
-  width: 25px;
-  height: 25px;
+  width: 17.5px;
+  height: 17.5px;
 }
 /* Real ship art (see shipTierVisuals.ts's SHIP_ART map) instead of the tier clip-path
    silhouette - a bit bigger than the placeholder shape since it isn't just a flat wedge and
    reads better with room to show its own detail. */
 .row-icon-art {
-  width: 40px;
-  height: 40px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
 }
 .row-icon-locked-overlay {
@@ -3592,8 +3592,8 @@
   margin-bottom: 14px;
 }
 .ship-unlock-icon-wrap {
-  width: 116px;
-  height: 116px;
+  width: 81.2px;
+  height: 81.2px;
   border-radius: 32px;
   background: rgba(67, 221, 238, 0.08);
   border: 1.5px solid rgba(67, 221, 238, 0.35);
@@ -3604,14 +3604,14 @@
   animation: sb-pop-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1);
 }
 .ship-unlock-icon-shape {
-  width: 58px;
-  height: 58px;
+  width: 40.6px;
+  height: 40.6px;
 }
 /* Real ship art (see shipTierVisuals.ts's SHIP_ART map) instead of the tier clip-path
    silhouette, same reasoning as .row-icon-art. */
 .ship-unlock-icon-art {
-  width: 92px;
-  height: 92px;
+  width: 64.4px;
+  height: 64.4px;
   object-fit: contain;
 }
 .ship-unlock-name {
