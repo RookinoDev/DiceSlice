@@ -56,24 +56,41 @@ export async function pushCloudSave(apiBaseUrl: string | undefined, save: SaveSt
 }
 
 /**
- * Which of two saves represents more progress? Relics first (they persist across
- * prestige, so they are the best lifetime proxy), then talent level (also prestige-
- * persistent and monotonic, like Relics), then deepest stage of the current run, then
- * the newer timestamp. All ties keep `local`, so a same-device boot never swaps the
- * running session for an identical cloud copy.
+ * Which of two saves represents more progress? Genuinely monotonic, prestige-persistent
+ * lifetime counters first - stats.prestigeCount (Stellar Ascensions), then stats.deepestStage
+ * (see LifetimeStats.ts: "resets on prestige" is highestStage below, NOT this one), then talent
+ * level. Only once all of those are equal (or missing - pre-profile-feature saves) does this
+ * fall back to relics balance, then the current run's highestStage, then the newer timestamp.
+ * All ties keep `local`, so a same-device boot never swaps the running session for an identical
+ * cloud copy.
+ *
+ * relics and highestStage used to be checked FIRST (see git history) - both turned out to be
+ * unreliable "more progress" signals for exactly the players who play the most: relics is a
+ * spendable currency (spending it on an Artifact legitimately lowers a save's own balance below
+ * an OLDER save of the SAME player that simply hadn't spent yet), and highestStage resets to
+ * ~1 on every prestige. A real report matched this precisely - a player with hundreds of
+ * Stellar Ascensions had their talent level/stage/everything visibly roll back after the app
+ * resumed from a long background and reconciled against a stale cloud copy that happened to
+ * have a higher leftover relics balance, even though it represented meaningfully less lifetime
+ * progress. stats.prestigeCount/deepestStage never regress like that, so they're the real signal.
  */
 export function pickBetterSave(local: SaveState | null, cloud: SaveState | null): SaveState | null {
   if (!local) return cloud
   if (!cloud) return local
 
-  const localRelics = toBig(local.relics)
-  const cloudRelics = toBig(cloud.relics)
-  if (cloudRelics.gt(localRelics)) return cloud
-  if (localRelics.gt(cloudRelics)) return local
+  if (local.stats && cloud.stats) {
+    if (cloud.stats.prestigeCount !== local.stats.prestigeCount) return cloud.stats.prestigeCount > local.stats.prestigeCount ? cloud : local
+    if (cloud.stats.deepestStage !== local.stats.deepestStage) return cloud.stats.deepestStage > local.stats.deepestStage ? cloud : local
+  }
 
   const localTalentLevel = local.talentLevel ?? 1
   const cloudTalentLevel = cloud.talentLevel ?? 1
   if (cloudTalentLevel !== localTalentLevel) return cloudTalentLevel > localTalentLevel ? cloud : local
+
+  const localRelics = toBig(local.relics)
+  const cloudRelics = toBig(cloud.relics)
+  if (cloudRelics.gt(localRelics)) return cloud
+  if (localRelics.gt(cloudRelics)) return local
 
   if (cloud.highestStage !== local.highestStage) return cloud.highestStage > local.highestStage ? cloud : local
   return cloud.lastSaveUnixSeconds > local.lastSaveUnixSeconds ? cloud : local

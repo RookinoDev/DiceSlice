@@ -61,6 +61,58 @@ describe('pickBetterSave', () => {
     const cloud = makeSave()
     expect(pickBetterSave(local, cloud)).toBe(local)
   })
+
+  describe('lifetime stats (real bug: relics/highestStage are not reliable progress signals)', () => {
+    // Regression test for a real player report: hundreds of Stellar Ascensions in, they spent
+    // relics on an Artifact (a completely normal action) and prestiged since their last cloud
+    // sync. A stale cloud copy from before either of those - fewer prestiges, an unspent relics
+    // balance that's now numerically HIGHER than local's post-spend balance, and a higher
+    // highestStage from deep in that older run before it reset - used to win purely on relics,
+    // silently rolling back everything (talent level, stage, relics) to that old snapshot.
+    it('never rolls back to a stale cloud copy just because it has more UNSPENT relics', () => {
+      const local = makeSave({
+        relics: { mantissa: 3.6429, exponent: 2 }, // 364.29 - just spent a batch on an Artifact
+        highestStage: 5, // just prestiged, current run has barely started
+        talentLevel: 211,
+        stats: { planetsDestroyed: 500_000, bossesDefeated: 12_000, prestigeCount: 269, deepestStage: 2230, deepestBossCleared: 2230, firstPlayedUnixSeconds: 1 },
+      })
+      const cloud = makeSave({
+        relics: { mantissa: 2, exponent: 2 }, // 200 - stale, hadn't spent yet
+        highestStage: 1800, // stale, from deep in a PREVIOUS run before it reset on prestige
+        talentLevel: 118,
+        stats: { planetsDestroyed: 240_000, bossesDefeated: 6_000, prestigeCount: 130, deepestStage: 1800, deepestBossCleared: 1800, firstPlayedUnixSeconds: 1 },
+        lastSaveUnixSeconds: 999_999_999, // even "newer" by timestamp must not matter here
+      })
+      expect(pickBetterSave(local, cloud)).toBe(local)
+    })
+
+    it('still restores from the cloud when it genuinely has more lifetime progress (new device)', () => {
+      const local = makeSave({
+        relics: { mantissa: 5, exponent: 2 },
+        talentLevel: 50,
+        stats: { planetsDestroyed: 10_000, bossesDefeated: 200, prestigeCount: 5, deepestStage: 300, deepestBossCleared: 300, firstPlayedUnixSeconds: 1 },
+      })
+      const cloud = makeSave({
+        relics: { mantissa: 1, exponent: 1 }, // fewer unspent relics, but genuinely more progress
+        talentLevel: 80,
+        stats: { planetsDestroyed: 40_000, bossesDefeated: 900, prestigeCount: 20, deepestStage: 900, deepestBossCleared: 900, firstPlayedUnixSeconds: 1 },
+      })
+      expect(pickBetterSave(local, cloud)).toBe(cloud)
+    })
+
+    it('falls back to talent level, then relics/highestStage/timestamp when prestigeCount and deepestStage tie', () => {
+      const statsBase = { planetsDestroyed: 1, bossesDefeated: 1, prestigeCount: 10, deepestStage: 500, deepestBossCleared: 500, firstPlayedUnixSeconds: 1 }
+      const local = makeSave({ talentLevel: 20, stats: statsBase })
+      const cloud = makeSave({ talentLevel: 25, stats: statsBase })
+      expect(pickBetterSave(local, cloud)).toBe(cloud)
+    })
+
+    it('legacy saves without stats (pre-profile-feature) still fall back to the old relics-first comparison', () => {
+      const local = makeSave({ relics: { mantissa: 1, exponent: 1 } }) // no stats field
+      const cloud = makeSave({ relics: { mantissa: 5, exponent: 1 } }) // no stats field
+      expect(pickBetterSave(local, cloud)).toBe(cloud)
+    })
+  })
 })
 
 describe('sanitizeSave', () => {
