@@ -144,8 +144,8 @@ export function buildMainViewModel(s: GameSession): MainViewModel {
     tapLevel: s.tapUpgrade.level,
     fleetDpsText: s.ships.fleetDps().toShortString(),
 
-    tapUpgradeCostText: s.tapUpgrade.nextCost.toShortString(),
-    canUpgradeTap: s.wallet.canAfford(s.tapUpgrade.nextCost),
+    tapUpgradeCostText: s.tapUpgrade.nextIsFree ? 'FREE' : s.tapUpgrade.nextCost.toShortString(),
+    canUpgradeTap: s.tapUpgrade.nextIsFree || s.wallet.canAfford(s.tapUpgrade.nextCost),
 
     hasShip,
     shipButtonText,

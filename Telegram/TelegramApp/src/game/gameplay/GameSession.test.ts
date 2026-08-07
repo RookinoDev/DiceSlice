@@ -73,18 +73,30 @@ describe('GameSession integration', () => {
   })
 
   it('cannot afford a ship with zero Stardust', () => {
+    // Ship 1, not 0 - see the previous test's comment: ship 0's first purchase is
+    // intentionally free, so it's the wrong ship to prove "unaffordable" with.
     const session = createGameSession()
     expect(session.wallet.balance.eq(BigNumber.Zero)).toBe(true)
-    expect(session.buyShip(0)).toBe(false)
+    expect(session.buyShip(1)).toBe(false)
+  })
+
+  it("ship 0's first purchase is free even with zero Stardust", () => {
+    const session = createGameSession()
+    expect(session.wallet.balance.eq(BigNumber.Zero)).toBe(true)
+    expect(session.buyShip(0)).toBe(true)
+    expect(session.wallet.balance.eq(BigNumber.Zero)).toBe(true) // still nothing charged
   })
 
   it('buying a ship deducts the exact next cost', () => {
+    // Ship 1, not 0 - ship 0's very first purchase is intentionally free (the tutorial teaches
+    // it before a new player has necessarily earned anything, see ShipService.nextIsFree), so
+    // it can't exercise the "deducts exactly nextCost" invariant this test is actually after.
     const session = createGameSession()
-    const cost = session.ships.nextCost(0)
+    const cost = session.ships.nextCost(1)
     session.wallet.add(cost)
-    expect(session.buyShip(0)).toBe(true)
+    expect(session.buyShip(1)).toBe(true)
     expect(session.wallet.balance.eq(BigNumber.Zero)).toBe(true)
-    expect(session.ships.levelOf(0)).toBe(1)
+    expect(session.ships.levelOf(1)).toBe(1)
   })
 
   it('prestige is locked before the unlock stage and grants no relics', () => {

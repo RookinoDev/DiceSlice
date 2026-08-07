@@ -51,6 +51,13 @@ export class ShipService {
     return upgradeCostExponential(this.levels[i] + 1, this.ships[i].baseCost, this.cfg.shipCostPerLevel)
   }
 
+  /** Whether ship i's NEXT purchase is actually free - see buyOrUpgrade's doc comment. The UI
+   *  reads this to show "FREE" instead of nextCost, so the button doesn't look priced/
+   *  unaffordable for a purchase that won't actually charge anything. */
+  nextIsFree(i: number): boolean {
+    return i === 0 && this.levels[0] === 0
+  }
+
   cooldown(i: number): number {
     return shipCooldown(this.levels[i], this.ships[i].baseCooldown, this.cfg.shipCooldownBreakpoints, this.cfg.shipCooldownFactor, this.cfg.shipCooldownMin)
   }
@@ -89,8 +96,12 @@ export class ShipService {
     return sum
   }
 
+  /** Buys/upgrades ship i. The very first ship (index 0's first-ever purchase) is free - the
+   *  tutorial's "recruit your first ship" step teaches this before a new player has necessarily
+   *  earned enough Stardust for it, so it must never be blocked by cost. Every other purchase,
+   *  including ship 0's later levels, costs normally. */
   buyOrUpgrade(i: number, wallet: CurrencyService): boolean {
-    if (!wallet.trySpend(this.nextCost(i))) return false
+    if (!this.nextIsFree(i) && !wallet.trySpend(this.nextCost(i))) return false
     this.levels[i]++
     this.onShipChanged.emit({ index: i, level: this.levels[i] })
     return true

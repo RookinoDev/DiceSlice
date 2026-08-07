@@ -20,7 +20,8 @@ export function FleetRow({ session: s, index, onToast }: FleetRowProps) {
   const ships = s.ships
   const def = ships.def(index)
   const owned = ships.isOwned(index)
-  const afford = s.wallet.canAfford(ships.nextCost(index))
+  const freeFirst = ships.nextIsFree(index)
+  const afford = freeFirst || s.wallet.canAfford(ships.nextCost(index))
   const tier = shipTierVisualForIndex(index)
   const art = SHIP_ART[index]
   const [popKey, setPopKey] = useState(0)
@@ -56,7 +57,7 @@ export function FleetRow({ session: s, index, onToast }: FleetRowProps) {
         {/* User-requested: show what buying/upgrading actually gets you, not just what it
             costs - the DPS number already shown above only ever reflected the CURRENT level. */}
         <div className="row-action-dps">+{ships.nextLevelDps(index).sub(owned ? ships.shipDps(index) : BigNumber.Zero).toShortString()} DPS</div>
-        <div className="row-action-cost">{ships.nextCost(index).toShortString()} G</div>
+        <div className="row-action-cost">{freeFirst ? 'FREE' : `${ships.nextCost(index).toShortString()} G`}</div>
       </button>
     </div>
   )

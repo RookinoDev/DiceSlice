@@ -33,9 +33,18 @@ export class TapDamageUpgrade {
     return upgradeCostTapDamage(this._level, this.cfg)
   }
 
-  /** Spend Stardust to raise the level by one. False if unaffordable. */
+  /** Whether the NEXT upgrade is actually free - see tryUpgrade's doc comment. The UI reads
+   *  this to show "FREE" instead of nextCost, so the button doesn't look priced/unaffordable
+   *  for a purchase that won't actually charge anything. */
+  get nextIsFree(): boolean {
+    return this._level === 1
+  }
+
+  /** Spend Stardust to raise the level by one. False if unaffordable. The very first upgrade
+   *  (level 1 -> 2) is free - the tutorial teaches this action before a new player has had time
+   *  to earn much Stardust, so it must never be blocked by cost. */
   tryUpgrade(wallet: CurrencyService): boolean {
-    if (!wallet.trySpend(this.nextCost)) return false
+    if (!this.nextIsFree && !wallet.trySpend(this.nextCost)) return false
     this._level++
     this.onLevelChanged.emit(this._level)
     return true
