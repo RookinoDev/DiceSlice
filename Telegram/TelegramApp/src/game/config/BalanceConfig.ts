@@ -23,12 +23,15 @@ export interface BalanceConfig {
   tapUpgradeBaseCost: number
   tapUpgradeCostGrowth: number
 
-  // Ships: cost(n) = base * perLevelGrowth^(n-1)
+  // Ships: cost(n) = base * perLevelGrowth^(n-1), steepening to shipCostBreakpointGrowth for
+  // every level past shipCostBreakpointLevel (see the field comments below for why).
   shipBaseCost: number
   shipCostPerLevel: number
   shipBaseCostGrowthMin: number
   shipBaseCostGrowthMax: number
   shipCount: number
+  shipCostBreakpointLevel: number
+  shipCostBreakpointGrowth: number
 
   // Ship combat: cooldown-based hits
   shipBaseDpsFirst: number
@@ -131,6 +134,19 @@ export const defaultBalanceConfig: BalanceConfig = {
   shipBaseCostGrowthMin: 3.5,
   shipBaseCostGrowthMax: 8.9,
   shipCount: 19,
+  // User-reported: one ship leveled to ~100 could carry the whole game, and late-game sectors
+  // stopped costing anything (Stardust balance never went down). Root cause: shipDamagePerLevel
+  // (1.5x/level) grows FAR faster than shipCostPerLevel (1.075x/level - see its own comment for
+  // why it's deliberately low), so the marginal DPS-per-Stardust of the NEXT level on whichever
+  // ship you're already leveling gets exponentially better forever - there's no point where
+  // switching ships (or just not spending) ever becomes competitive. Levels 1-50 keep the
+  // original curve untouched (no change to the early/mid game this wasn't about) - level 50 is
+  // the second shipMilestoneLevels breakpoint, a natural "the real late game starts here" line.
+  // Past it, cost growth steepens close to (not fully matching) shipDamagePerLevel, so going
+  // deep on one ship - reaching the 100/200/400 milestones - stays a real, felt investment
+  // instead of a free byproduct of spamming whatever's cheapest.
+  shipCostBreakpointLevel: 50,
+  shipCostBreakpointGrowth: 1.25,
 
   shipBaseDpsFirst: 8.0,
   // User-reported: ships felt weak vs. tapping. Tap damage grows up to 2.1x/level early

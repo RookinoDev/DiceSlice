@@ -4,8 +4,7 @@ import { Emitter } from '../core/Emitter'
 import type { BalanceConfig } from '../config/BalanceConfig'
 import type { ShipDefinition } from '../config/ShipDefinition'
 import type { CurrencyService } from '../economy/CurrencyService'
-import { shipCooldown, shipEffectiveDps, shipHitDamage } from '../economy/ShipCombat'
-import { upgradeCostExponential } from '../economy/UpgradeCost'
+import { shipCooldown, shipEffectiveDps, shipHitDamage, upgradeCostShip } from '../economy/ShipCombat'
 import type { EnemyController } from './EnemyController'
 
 const MAX_HITS_PER_SHIP_PER_TICK = 1000 // safety clamp
@@ -48,7 +47,7 @@ export class ShipService {
   }
 
   nextCost(i: number): BigNumber {
-    return upgradeCostExponential(this.levels[i] + 1, this.ships[i].baseCost, this.cfg.shipCostPerLevel)
+    return upgradeCostShip(this.levels[i] + 1, this.ships[i].baseCost, this.cfg.shipCostPerLevel, this.cfg.shipCostBreakpointLevel, this.cfg.shipCostBreakpointGrowth)
   }
 
   /** Whether ship i's NEXT purchase is actually free - see buyOrUpgrade's doc comment. The UI

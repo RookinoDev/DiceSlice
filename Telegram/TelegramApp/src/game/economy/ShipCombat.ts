@@ -42,6 +42,22 @@ export function shipHitDamage(
   return dmg.mul(milestoneMultiplier(level, milestoneLevels, milestoneMults))
 }
 
+/**
+ * Cost to go from `currentLevel-1` to `currentLevel` (same "currentLevel = the level being paid
+ * for" convention as upgradeCostExponential). Plain exponential growth up to
+ * breakpointLevel, then steepens to breakpointGrowth for every level past it - see
+ * BalanceConfig.shipCostBreakpointLevel's own comment for why (a late-game-only fix, continuous
+ * at the breakpoint so it's a change in slope, not a sudden price jump).
+ */
+export function upgradeCostShip(currentLevel: number, baseCost: number, growth: number, breakpointLevel: number, breakpointGrowth: number): BigNumber {
+  const steps = currentLevel - 1
+  if (steps <= 0) return new BigNumber(baseCost)
+  const breakpointSteps = Math.max(0, breakpointLevel - 1)
+  const normalSteps = Math.min(steps, breakpointSteps)
+  const steepSteps = steps - normalSteps
+  return new BigNumber(baseCost).mul(new BigNumber(growth).pow(normalSteps)).mul(new BigNumber(breakpointGrowth).pow(steepSteps))
+}
+
 export function shipEffectiveDps(
   level: number,
   baseHit: number,
