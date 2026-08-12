@@ -667,6 +667,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         ownedCards={ownedCards}
         showcase={myShowcase}
         onShowcaseChange={setMyShowcase}
+        onToast={showToast}
         onInspectCard={(card) => {
           setSelectedCard(card)
           setSelectedCardList([])

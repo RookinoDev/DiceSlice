@@ -24,17 +24,27 @@ interface ShowcaseEditorProps {
   showcase: ShowcaseEntry[]
   onChange: (next: ShowcaseEntry[]) => void
   onInspect: (card: CardDefinition) => void
+  onToast: (text: string) => void
 }
 
-export function ShowcaseEditor({ apiBaseUrl, ownedCards, showcase, onChange, onInspect }: ShowcaseEditorProps) {
+export function ShowcaseEditor({ apiBaseUrl, ownedCards, showcase, onChange, onInspect, onToast }: ShowcaseEditorProps) {
   const [activeSlot, setActiveSlot] = useState<number | null>(null)
   const [picking, setPicking] = useState(false)
   const [query, setQuery] = useState('')
   const summary = useMemo(() => summarizeCollection(ownedCards), [ownedCards])
 
-  const commit = (next: ShowcaseEntry[]) => {
+  // Optimistic update for instant feedback, but a save failure (network blip, timeout, or the
+  // server rejecting the whole array over one stale entry) used to be silent - the player saw
+  // their edit "stick" locally while nothing was actually persisted, then lost it on next reload.
+  // Roll back and say so instead.
+  const commit = (prev: ShowcaseEntry[], next: ShowcaseEntry[]) => {
     onChange(next)
-    void saveShowcase(apiBaseUrl, next) // fire-and-forget; server re-validates ownership
+    saveShowcase(apiBaseUrl, next).then((ok) => {
+      if (!ok) {
+        onChange(prev)
+        onToast('COULD NOT SAVE SHOWCASE - TRY AGAIN')
+      }
+    })
   }
 
   const entryAt = (i: number): ShowcaseEntry | null => showcase[i] ?? null
@@ -58,7 +68,7 @@ export function ShowcaseEditor({ apiBaseUrl, ownedCards, showcase, onChange, onI
     const next = [...showcase]
     next[slot] = entry
     // Collapse holes so order stays contiguous (slot array -> ordered list).
-    commit(next.filter(Boolean).slice(0, SHOWCASE_SLOTS))
+    commit(showcase, next.filter(Boolean).slice(0, SHOWCASE_SLOTS))
     setPicking(false)
     setActiveSlot(null)
     setQuery('')
@@ -71,14 +81,14 @@ export function ShowcaseEditor({ apiBaseUrl, ownedCards, showcase, onChange, onI
     if (to < 0 || to >= showcase.length) return
     const next = [...showcase]
     ;[next[from], next[to]] = [next[to], next[from]]
-    commit(next)
+    commit(showcase, next)
     setActiveSlot(to)
     audio.click()
     hapticTap()
   }
 
   const remove = (slot: number) => {
-    commit(showcase.filter((_, i) => i !== slot))
+    commit(showcase, showcase.filter((_, i) => i !== slot))
     setActiveSlot(null)
     audio.click()
     hapticTap()

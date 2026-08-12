@@ -25,6 +25,7 @@ interface ProfileSheetProps {
   showcase: ShowcaseEntry[]
   onShowcaseChange: (next: ShowcaseEntry[]) => void
   onInspectCard: (card: CardDefinition) => void
+  onToast: (text: string) => void
 }
 
 interface ProfileView {
@@ -76,7 +77,7 @@ function sinceText(unixSeconds: number): string {
   return new Date(unixSeconds * 1000).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })
 }
 
-export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, ownedCards, showcase, onShowcaseChange, onInspectCard }: ProfileSheetProps) {
+export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, ownedCards, showcase, onShowcaseChange, onInspectCard, onToast }: ProfileSheetProps) {
   const v = visitor ? fromPublic(visitor) : fromSession(session)
 
   const stats: Array<{ label: string; value: string; accent?: 'gold' | 'cyan' | 'magenta' }> = [
@@ -129,7 +130,7 @@ export function ProfileSheet({ session, open, onClose, visitor, apiBaseUrl, owne
       {visitor ? (
         <ShowcaseView showcase={visitor.showcase ?? []} onInspect={onInspectCard} />
       ) : (
-        <ShowcaseEditor apiBaseUrl={apiBaseUrl} ownedCards={ownedCards} showcase={showcase} onChange={onShowcaseChange} onInspect={onInspectCard} />
+        <ShowcaseEditor apiBaseUrl={apiBaseUrl} ownedCards={ownedCards} showcase={showcase} onChange={onShowcaseChange} onInspect={onInspectCard} onToast={onToast} />
       )}
 
       {!visitor && (
