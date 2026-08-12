@@ -7,7 +7,7 @@ import { nowUnixSeconds } from '../game/persistence/localStorageSave'
 import type { OfflineReport } from '../game/useGameSession'
 import type { PurchaseGrant } from '../game/monetization/purchases'
 import { audio } from '../game/audio/AudioManager'
-import { bindTelegramBackButton, getStartParam, getTelegramUser, hapticAction, hapticSuccess } from '../telegram'
+import { bindTelegramBackButton, getSharedProfileUserId, getTelegramUser, hapticAction, hapticSuccess } from '../telegram'
 import { fetchPublicProfile, type PublicProfile, type ShowcaseEntry } from '../game/profileApi'
 import { fetchCollection, fetchPendingPacks, type OpenPackResult, type OwnedCard, type PendingPack } from '../game/cards/cardsApi'
 import { summarizeCollection } from '../game/cards/collectionSummary'
@@ -585,12 +585,12 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     })
   }, [])
 
-  // Profile deep link ("u_<id>" start param): open that player's profile on launch.
-  // Falls back silently if the profile doesn't exist or the API is unreachable.
+  // Opened via a shared "SHARE MY RECORD" link (?u=<id>, see worker.mjs's /start handler and
+  // telegram.ts's getSharedProfileUserId): open that player's profile on launch. Falls back
+  // silently if the profile doesn't exist or the API is unreachable.
   useEffect(() => {
-    const param = getStartParam()
-    const match = param?.match(/^u_(\d+)$/)
-    if (match) openVisitorProfile(Number(match[1]))
+    const sharedUserId = getSharedProfileUserId()
+    if (sharedUserId !== null) openVisitorProfile(sharedUserId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

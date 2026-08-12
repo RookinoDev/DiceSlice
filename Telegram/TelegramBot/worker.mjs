@@ -120,12 +120,18 @@ function buildBot(env) {
   // for the referred player's first real save sync - see rewardReferrerIfDue in d1.mjs.
   bot.command('start', async (ctx) => {
     const match = ctx.match.match(/^ref_(\d+)$/)
+    // Same link doubles as "view this player's profile" - ProfileSheet.tsx's SHARE MY RECORD
+    // button is the only thing that ever generates a ref_<id> link, so whoever opens it should
+    // land straight in the sharer's profile, not a bare launch (see telegram.ts's
+    // getSharedProfileUserId - a plain URL query on the button's own web_app.url, since a
+    // startapp deep link needs a Mini App short name this bot doesn't have registered).
+    const webAppUrl = match ? `${env.WEBAPP_URL}?u=${match[1]}` : env.WEBAPP_URL
     if (match && (await recordReferral(env, ctx.from.id, Number(match[1])))) {
       await callPlayerDO(env, ctx.from.id, 'record-purchase', { item: 'referral_welcome' })
     }
 
     await ctx.reply('Tap below to launch Stellar Breaker.', {
-      reply_markup: { inline_keyboard: [[{ text: '🚀 Play Stellar Breaker', web_app: { url: env.WEBAPP_URL } }]] },
+      reply_markup: { inline_keyboard: [[{ text: '🚀 Play Stellar Breaker', web_app: { url: webAppUrl } }]] },
     })
   })
 

@@ -108,9 +108,17 @@ export function getTelegramUser(): TelegramUser | null {
   return cachedWebApp?.initDataUnsafe.user ?? null
 }
 
-/** Deep-link start parameter (t.me startapp links), e.g. "u_12345" for a profile visit. */
-export function getStartParam(): string | null {
-  return cachedWebApp?.initDataUnsafe.start_param ?? null
+/** The shared player's id when this launch came from a "SHARE MY RECORD" link - the bot's own
+ *  /start handler (see worker.mjs) appends `?u=<id>` to the Mini App URL for a ref_<id> deep
+ *  link, so opening someone's shared record opens straight into their profile instead of a bare
+ *  launch. Plain URL query, not initDataUnsafe.start_param - the latter only populates for a
+ *  direct t.me/<bot>/<app>?startapp=... link, which needs a Mini App short name registered in
+ *  BotFather that this bot doesn't have; a query string on the button's own web_app.url works
+ *  with zero extra Telegram-side setup. */
+export function getSharedProfileUserId(): number | null {
+  const raw = new URLSearchParams(window.location.search).get('u')
+  const id = raw ? Number(raw) : NaN
+  return Number.isFinite(id) && id > 0 ? id : null
 }
 
 /** Opens Telegram's native share sheet with prefilled text + link. No-ops outside Telegram. */
