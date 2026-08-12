@@ -48,7 +48,7 @@ export function applySave(s: GameSession, st: SaveState): void {
   s.tutorialSeen.clear()
   for (const id of st.tutorialSeen ?? []) s.tutorialSeen.add(id)
   s.talents.restoreLevels(st.talentNodeLevels)
-  s.talents.restoreProgress(st.talentLevel ?? 1, st.talentXp ?? 0, st.talentPoints ?? 0)
+  s.talents.restoreProgress(st.talentLevel ?? 1, st.talentXp ?? 0)
   if (st.lastDailyClaimUnixSeconds > 0) {
     s.daily.restore(Math.floor(st.lastDailyClaimUnixSeconds / DailyRewardService.SECONDS_PER_DAY), st.dailyStreak)
   }

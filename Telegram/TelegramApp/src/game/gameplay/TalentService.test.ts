@@ -199,4 +199,38 @@ describe('TalentService', () => {
     const afterTwo = t.dpsMultiplier().toNumber()
     expect(afterTwo).toBeGreaterThan(afterOne) // a second Capstone node compounds, isn't ignored
   })
+
+  describe('unspentPoints is derived, not stored (regression: a real reported bug)', () => {
+    // A player's talent tree got reset (Eternal Drive shipped: 60 nodes -> 61, restoreLevels's
+    // own "tree redesigned" rule wipes node allocation - see its comment) but their points never
+    // came back: unspentPoints used to be its OWN persisted field, restored from the OLD save's
+    // leftover-after-spending value - a small number for anyone who'd already spent most of what
+    // they'd earned. The 200+ points that had been sitting in now-wiped node levels were simply
+    // gone: not in a node, not spendable. Deriving unspentPoints from level - 1 - sum(levels)
+    // instead means it can never desync from the levels array, by construction.
+    it('after buying nodes, spent + unspent always sums to exactly level - 1', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      grantBranchPoints(t, 'cannon', 30)
+      t.buyNode(indexOf(t, 'cannon-nova-lance')) // won't unlock without 35, harmless no-op either way
+      const spent = Array.from({ length: t.count }, (_, i) => t.levelOf(i)).reduce((a, b) => a + b, 0)
+      expect(t.unspentPoints + spent).toBe(t.level - 1)
+    })
+
+    it('a tree-redesign reset (restoreLevels bails on a node-count mismatch) still leaves every earned point spendable', () => {
+      // Models the real production path: a load starts from a FRESH TalentService (levels all
+      // 0, from createGameSession()), then restoreLevels() is handed the OLD save's node array.
+      // With a length mismatch, restoreLevels bails out and leaves the already-zero levels alone
+      // - it never "wipes" anything, it just never re-applies the old (now-incompatible) spend.
+      const t = freshService()
+      t.restoreLevels(new Array(t.count - 1).fill(1)) // one fewer node than the live tree - e.g. before Eternal Drive shipped
+      for (let i = 0; i < t.count; i++) expect(t.levelOf(i)).toBe(0) // bailed out, nothing applied
+
+      // The level itself restores fine (it's a separate, unaffected save field) - a real veteran
+      // player who'd already spent most of what they'd earned, like the reported 200+ points.
+      t.restoreProgress(211, 0)
+
+      expect(t.unspentPoints).toBe(210) // every point is spendable again, not just whatever was left unspent
+    })
+  })
 })

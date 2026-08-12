@@ -19,7 +19,6 @@ export class TalentService {
   private readonly levels: number[]
   private _level = 1
   private _xp = 0
-  private _unspentPoints = 0
 
   /** New level reached (fires once per level, even across a multi-level XP grant). */
   readonly onLevelUp = new Emitter<number>()
@@ -37,8 +36,13 @@ export class TalentService {
   get xp(): number {
     return this._xp
   }
+  /** Derived, not stored: 1 point per level ever earned, minus whatever's currently allocated
+   *  across every node. This is the real fix for a bug that hit live players - unspentPoints used
+   *  to be its own persisted field, which went stale the moment restoreLevels() reset node
+   *  allocation (a tree redesign - see its own comment) without anyone recomputing how many points
+   *  that freed back up. Deriving it can never desync from the levels array again, by construction. */
   get unspentPoints(): number {
-    return this._unspentPoints
+    return this._level - 1 - this.levels.reduce((sum, l) => sum + l, 0)
   }
 
   xpToNextLevel(): number {
@@ -53,7 +57,6 @@ export class TalentService {
     while (this._xp >= this.xpToNextLevel()) {
       this._xp -= this.xpToNextLevel()
       this._level++
-      this._unspentPoints++
       this.onLevelUp.emit(this._level)
     }
   }
@@ -82,8 +85,7 @@ export class TalentService {
   buyNode(i: number): boolean {
     if (!this.isUnlocked(i)) return false
     if (this.levels[i] >= this.defs[i].maxLevel) return false
-    if (this._unspentPoints < 1) return false
-    this._unspentPoints--
+    if (this.unspentPoints < 1) return false
     this.levels[i]++
     this.onTalentChanged.emit({ index: i, level: this.levels[i] })
     return true
@@ -98,11 +100,12 @@ export class TalentService {
     if (!levels || levels.length !== this.levels.length) return
     for (let i = 0; i < levels.length; i++) this.levels[i] = levels[i] < 0 ? 0 : levels[i]
   }
-  /** Restore level/xp/points together (interdependent - set atomically). */
-  restoreProgress(level: number, xp: number, points: number): void {
+  /** Restore level/xp together (interdependent - set atomically). unspentPoints is derived (see
+   *  its own getter), so there's nothing to restore for it here - call this AFTER restoreLevels
+   *  so the derived value reflects the levels that are actually about to be in effect. */
+  restoreProgress(level: number, xp: number): void {
     this._level = Math.max(1, level)
     this._xp = Math.max(0, xp)
-    this._unspentPoints = Math.max(0, points)
   }
 
   /** Aggregate multiplier for a stat = prod(1 + bonus(level)) across every owned node tagged
