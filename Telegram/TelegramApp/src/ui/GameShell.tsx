@@ -553,20 +553,29 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const handleOpenPacks = useCallback(() => setPackSheetOpen(true), [])
   const handleClosePackSheet = useCallback(() => setPackSheetOpen(false), [])
 
-  // Profile deep link ("u_<id>" start param): open that player's profile on launch.
-  // Falls back silently if the profile doesn't exist or the API is unreachable.
-  useEffect(() => {
-    const param = getStartParam()
-    const match = param?.match(/^u_(\d+)$/)
-    if (!match) return
-    const userId = Number(match[1])
-    if (userId === getTelegramUser()?.id) return // own profile via link: nothing special to fetch
+  // Opens a player's profile - own (live session data) if it's mine, otherwise fetches the
+  // public snapshot. Shared by the "u_<id>" deep link below and Leaderboard row taps.
+  const openVisitorProfile = useCallback((userId: number) => {
+    if (userId === getTelegramUser()?.id) {
+      setVisitorProfile(null)
+      setProfileOpen(true)
+      return
+    }
     fetchPublicProfile(import.meta.env.VITE_API_URL, userId).then((p) => {
       if (p) {
         setVisitorProfile(p)
         setProfileOpen(true)
       }
     })
+  }, [])
+
+  // Profile deep link ("u_<id>" start param): open that player's profile on launch.
+  // Falls back silently if the profile doesn't exist or the API is unreachable.
+  useEffect(() => {
+    const param = getStartParam()
+    const match = param?.match(/^u_(\d+)$/)
+    if (match) openVisitorProfile(Number(match[1]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Boss Planet Takes Over the Screen: dim/recede the surrounding chrome while a boss fight is
@@ -686,7 +695,15 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onToast={showToast}
       />
       <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
-      <LeaderboardSheet open={leaderboardOpen} onClose={() => setLeaderboardOpen(false)} apiBaseUrl={import.meta.env.VITE_API_URL} />
+      <LeaderboardSheet
+        open={leaderboardOpen}
+        onClose={() => setLeaderboardOpen(false)}
+        apiBaseUrl={import.meta.env.VITE_API_URL}
+        onSelectPlayer={(userId) => {
+          setLeaderboardOpen(false)
+          openVisitorProfile(userId)
+        }}
+      />
       <ShopSheet
         open={shopOpen}
         onClose={() => {

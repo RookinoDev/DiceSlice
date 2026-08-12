@@ -3,13 +3,14 @@
 // fetch/sort state locally (unlike ownedCards, nothing else in the tree needs this data).
 import { useEffect, useState } from 'react'
 import { fetchLeaderboard, type LeaderboardEntry, type LeaderboardSortBy } from '../../game/leaderboardApi'
-import { getTelegramUser } from '../../telegram'
+import { getTelegramUser, hapticTap } from '../../telegram'
 import { Sheet } from '../Sheet'
 
 interface LeaderboardSheetProps {
   open: boolean
   onClose: () => void
   apiBaseUrl: string | undefined
+  onSelectPlayer: (userId: number) => void
 }
 
 const SORT_TABS: Array<{ id: LeaderboardSortBy; label: string }> = [
@@ -27,7 +28,7 @@ function displayValue(sortBy: LeaderboardSortBy, value: number): string {
   return value.toLocaleString()
 }
 
-export function LeaderboardSheet({ open, onClose, apiBaseUrl }: LeaderboardSheetProps) {
+export function LeaderboardSheet({ open, onClose, apiBaseUrl, onSelectPlayer }: LeaderboardSheetProps) {
   const [sortBy, setSortBy] = useState<LeaderboardSortBy>('deepestStage')
   const [entries, setEntries] = useState<LeaderboardEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -67,7 +68,14 @@ export function LeaderboardSheet({ open, onClose, apiBaseUrl }: LeaderboardSheet
       ) : (
         <div className="leaderboard-list">
           {entries.map((e, i) => (
-            <div key={e.telegramUserId} className={`leaderboard-row ${e.telegramUserId === myId ? 'leaderboard-row--me' : ''}`}>
+            <button
+              key={e.telegramUserId}
+              className={`leaderboard-row ${e.telegramUserId === myId ? 'leaderboard-row--me' : ''}`}
+              onClick={() => {
+                hapticTap()
+                onSelectPlayer(e.telegramUserId)
+              }}
+            >
               <div className="leaderboard-rank">{i + 1}</div>
               {e.photoUrl ? (
                 <img className="leaderboard-avatar" src={e.photoUrl} alt="" />
@@ -76,7 +84,7 @@ export function LeaderboardSheet({ open, onClose, apiBaseUrl }: LeaderboardSheet
               )}
               <div className="leaderboard-name">{e.firstName ?? 'Commander'}</div>
               <div className="leaderboard-value">{displayValue(sortBy, e.value)}</div>
-            </div>
+            </button>
           ))}
         </div>
       )}
