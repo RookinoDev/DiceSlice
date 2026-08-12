@@ -37,6 +37,8 @@ import { SettingsSheet } from './sheets/SettingsSheet'
 import { ProfileSheet } from './sheets/ProfileSheet'
 import { AchievementsSheet } from './sheets/AchievementsSheet'
 import { LeaderboardSheet } from './sheets/LeaderboardSheet'
+import { NewsSheet } from './sheets/NewsSheet'
+import { unseenNewsEntries, markNewsSeen, type NewsEntry } from '../game/news'
 import { ShopSheet } from './sheets/ShopSheet'
 import { OfflineRewardsSheet } from './sheets/OfflineRewardsSheet'
 import { CardDetailSheet } from './cards/CardDetailSheet'
@@ -92,6 +94,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const [achievementsOpen, setAchievementsOpen] = useState(false)
   const [leaderboardOpen, setLeaderboardOpen] = useState(false)
   const [shopOpen, setShopOpen] = useState(false)
+  const [newsEntries, setNewsEntries] = useState<NewsEntry[]>([])
   // A visited player's profile, opened via a "u_<id>" deep-link start param.
   const [visitorProfile, setVisitorProfile] = useState<PublicProfile | null>(null)
   const [offlineOpen, setOfflineOpen] = useState(false)
@@ -441,40 +444,48 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const vm = buildMainViewModel(session)
   const tutorial = useTutorial(session, vm, tab, pendingPacks, syncNow)
 
+  const closeNews = useCallback(() => {
+    markNewsSeen()
+    setNewsEntries([])
+  }, [])
+
   // Route Telegram's native BackButton to close whichever sheet/toast is open, instead of
   // letting it fall through to the platform's default (which would close the Mini App).
-  const openSheet = socketPickerNodeId !== null
-    ? 'socketPicker'
-    : prestigeConfirmOpen
-      ? 'prestigeConfirm'
-      : missionsOpen
-        ? 'missions'
-        : achievementsOpen
-          ? 'achievements'
-          : leaderboardOpen
-            ? 'leaderboard'
-            : shopOpen
-              ? dailyOpen
-                ? 'daily'
-                : 'shop'
-              : settingsOpen
-                ? 'settings'
-                : profileOpen
-                  ? 'profile'
-                  : offlineOpen
-                    ? 'offline'
-                    : shipUnlock
-                      ? 'shipUnlock'
-                      : selectedCard
-                        ? objectViewerOpen
-                          ? 'objectViewer'
-                          : 'cardDetail'
-                        : packSheetOpen
-                          ? 'packOpen'
-                          : null
+  const openSheet = newsEntries.length > 0
+    ? 'news'
+    : socketPickerNodeId !== null
+      ? 'socketPicker'
+      : prestigeConfirmOpen
+        ? 'prestigeConfirm'
+        : missionsOpen
+          ? 'missions'
+          : achievementsOpen
+            ? 'achievements'
+            : leaderboardOpen
+              ? 'leaderboard'
+              : shopOpen
+                ? dailyOpen
+                  ? 'daily'
+                  : 'shop'
+                : settingsOpen
+                  ? 'settings'
+                  : profileOpen
+                    ? 'profile'
+                    : offlineOpen
+                      ? 'offline'
+                      : shipUnlock
+                        ? 'shipUnlock'
+                        : selectedCard
+                          ? objectViewerOpen
+                            ? 'objectViewer'
+                            : 'cardDetail'
+                          : packSheetOpen
+                            ? 'packOpen'
+                            : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
+      news: closeNews,
       socketPicker: () => setSocketPickerNodeId(null),
       prestigeConfirm: () => setPrestigeConfirmOpen(false),
       missions: () => setMissionsOpen(false),
@@ -575,6 +586,17 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     const param = getStartParam()
     const match = param?.match(/^u_(\d+)$/)
     if (match) openVisitorProfile(Number(match[1]))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // What's New: only for a returning player (real progress already, same "veteran" signal
+  // useTutorial.ts's needsRetroactiveSkip uses) - a brand-new install has nothing to compare
+  // against, so a changelog would just be confusing noise on their very first launch.
+  useEffect(() => {
+    if (session.tapUpgrade.level > 1 || session.stage.highestStage > 1) {
+      const unseen = unseenNewsEntries()
+      if (unseen.length > 0) setNewsEntries(unseen)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -704,6 +726,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
           openVisitorProfile(userId)
         }}
       />
+      <NewsSheet entries={newsEntries} open={newsEntries.length > 0} onClose={closeNews} />
       <ShopSheet
         open={shopOpen}
         onClose={() => {

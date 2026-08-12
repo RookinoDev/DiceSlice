@@ -2802,6 +2802,58 @@
 .leaderboard-sort-row::-webkit-scrollbar {
   display: none;
 }
+.news-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.news-entry {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--palette-sheet-row);
+  border: 1px solid color-mix(in srgb, var(--palette-gold) 22%, transparent);
+}
+.news-entry-date {
+  font-family: var(--font-display);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--palette-text-dim);
+}
+.news-entry-title {
+  margin: 2px 0 10px;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--palette-gold-label);
+}
+.news-entry-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.news-entry-items li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--palette-text-secondary);
+}
+.news-entry-items li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 7px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--palette-cyan);
+}
+
 .leaderboard-sort-chip {
   flex-shrink: 0;
   padding: 5px 10px;
