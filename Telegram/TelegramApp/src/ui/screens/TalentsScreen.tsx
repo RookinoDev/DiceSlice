@@ -22,6 +22,7 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
 
   const branchIndices = (branch: TalentBranch): number[] => allDefs.map((_, i) => i).filter((i) => allDefs[i].branch === branch)
   const comboIndexBetween = (a: TalentBranch, b: TalentBranch): number => allDefs.findIndex((d) => d.id === `combo-${a}-${b}`)
+  const eternalDriveIndex = allDefs.findIndex((d) => d.id === 'eternal-drive')
 
   return (
     <div className="screen talents-screen">
@@ -58,6 +59,17 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
           </div>
         )
       })}
+
+      {eternalDriveIndex >= 0 && (
+        <div className="branch-section eternal-drive-section">
+          <div className="branch-panel-header">
+            <span className="branch-panel-label">ETERNAL DRIVE</span>
+          </div>
+          <div className="combo-row">
+            <TalentNode session={s} index={eternalDriveIndex} onToast={onToast} onOpenSocket={onOpenSocket} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

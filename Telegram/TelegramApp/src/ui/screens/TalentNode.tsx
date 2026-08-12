@@ -31,7 +31,7 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
   const def = t.def(index)
   const lvl = t.levelOf(index)
   const unlocked = t.isUnlocked(index)
-  const maxed = lvl >= def.maxLevel
+  const maxed = !def.unbounded && lvl >= def.maxLevel
   const isGem = def.effect === TalentEffect.GemSocket
   const pct = Math.round(talentBonusAt(def, lvl) * 100)
 
@@ -89,9 +89,7 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
       <div key={popKey} className="talent-node-icon row-icon-pop">
         {!unlocked ? <LockIcon /> : isGem ? <GemIcon filled={!!socketed} /> : branchIcon(def.branch)}
       </div>
-      <div className="talent-node-level">
-        {lvl}/{def.maxLevel}
-      </div>
+      <div className="talent-node-level">{def.unbounded ? lvl : `${lvl}/${def.maxLevel}`}</div>
       <div className="talent-node-name">{EFFECT_LABEL[def.effect]}</div>
       {lvl > 0 && !isGem && <div className="talent-node-bonus">+{pct}%</div>}
       {isGem && lvl > 0 && <div className="talent-node-bonus talent-node-gem-fill">{socketedCard ? socketedCard.name : 'EMPTY'}</div>}

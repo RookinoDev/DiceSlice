@@ -1,17 +1,37 @@
 import { describe, expect, it } from 'vitest'
 import { buildDefaultTalents, isTalentNodeUnlocked, branchPointsSpent, talentBonusAt, BRANCH_ORDER, TalentEffect } from './TalentDefinition'
 
+/** The 5 real bridging combos, excluding Eternal Drive - it shares branch: 'combo' for its color
+ *  treatment but isn't one of them (see its own doc comment in TalentDefinition.ts). */
+const realCombos = (defs: ReturnType<typeof buildDefaultTalents>) => defs.filter((d) => d.branch === 'combo' && d.id !== 'eternal-drive')
+
 describe('talent tree node catalog', () => {
-  it('builds 5 branches x 11 nodes (8 tier + 1 capstone + 2 gem) + 5 combo talents = 60 nodes', () => {
+  it('builds 5 branches x 11 nodes (8 tier + 1 capstone + 2 gem) + 5 combo talents + Eternal Drive = 61 nodes', () => {
     const defs = buildDefaultTalents()
-    expect(defs.length).toBe(BRANCH_ORDER.length * 11 + 5)
+    expect(defs.length).toBe(BRANCH_ORDER.length * 11 + 5 + 1)
     for (const branch of BRANCH_ORDER) {
       const branchDefs = defs.filter((d) => d.branch === branch)
       expect(branchDefs.length).toBe(11)
       expect(branchDefs.filter((d) => d.effect === TalentEffect.GemSocket).length).toBe(2)
       expect(branchDefs.filter((d) => d.isCapstone).length).toBe(1)
     }
-    expect(defs.filter((d) => d.branch === 'combo').length).toBe(5)
+    expect(realCombos(defs).length).toBe(5)
+  })
+
+  it('Eternal Drive has no ceiling, no unlock requirements, and grows sub-linearly', () => {
+    const defs = buildDefaultTalents()
+    const eternal = defs.find((d) => d.id === 'eternal-drive')!
+    expect(eternal.unlockRequirements).toEqual([])
+    expect(eternal.unbounded).toBe(true)
+    expect(eternal.curve).toBe('sqrt')
+    // Sub-linear: the 100th point adds far less than 100x the first point's bonus.
+    const first = talentBonusAt(eternal, 1)
+    const hundredth = talentBonusAt(eternal, 100) - talentBonusAt(eternal, 99)
+    expect(hundredth).toBeLessThan(first)
+    // A single point here is worse than a single point in any real branch node - a rational
+    // player only lands here once genuinely out of better options (see its own comment).
+    const cheapestRealNode = defs.find((d) => d.id === 'cannon-pulse-amplifier')!
+    expect(first).toBeLessThan(talentBonusAt(cheapestRealNode, 1))
   })
 
   it('every id is unique', () => {
@@ -56,7 +76,7 @@ describe('talent tree node catalog', () => {
 
   it('each combo talent requires 12 points in BOTH of the two branches it bridges, and bridges every adjacent ring pair', () => {
     const defs = buildDefaultTalents()
-    const combos = defs.filter((d) => d.branch === 'combo')
+    const combos = realCombos(defs)
     expect(combos.length).toBe(5)
     for (const combo of combos) {
       expect(combo.unlockRequirements.length).toBe(2)
@@ -71,7 +91,7 @@ describe('talent tree node catalog', () => {
 
   it('combo talents run 3 ranks (matching the design doc), branch talents run 5 or 3, capstones run 1', () => {
     const defs = buildDefaultTalents()
-    for (const combo of defs.filter((d) => d.branch === 'combo')) expect(combo.maxLevel).toBe(3)
+    for (const combo of realCombos(defs)) expect(combo.maxLevel).toBe(3)
     for (const capstone of defs.filter((d) => d.isCapstone)) expect(capstone.maxLevel).toBe(1)
   })
 

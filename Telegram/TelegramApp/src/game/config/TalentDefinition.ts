@@ -84,6 +84,14 @@ export interface TalentDefinition {
   /** True only for the 5 branch capstones (Nova Lance, Hive Carrier, ...) - the UI gives these a
    *  bigger, distinct treatment, same idea as the old single Grand Nexus card. */
   isCapstone: boolean
+  /** 'sqrt' = firstLevelBonus + bonusPerLevel * sqrt(level - 1) instead of the normal linear
+   *  formula - undefined/omitted means linear (every existing node). Only used by Eternal Drive
+   *  (see below): a node with no real maxLevel needs sub-linear growth, or a player who dumps
+   *  every future point into just this one node would eventually dwarf the rest of the tree. */
+  curve?: 'sqrt'
+  /** True only for Eternal Drive - maxLevel is a large placeholder, not a real ceiling; the UI
+   *  hides the "/maxLevel" fraction and never shows it as maxed. */
+  unbounded?: boolean
 }
 
 /** Per-node-role bonus formula. A regular talent runs 5 ranks at the main pace; a "special" runs
@@ -521,12 +529,34 @@ function buildCombo(spec: ComboSpec): TalentDefinition {
   }
 }
 
+/** The tree's only node with no real ceiling - see the doc comment on buildDefaultTalents for
+ *  why it exists. Always unlocked (no requirements), tagged Capstone so it stacks into the same
+ *  5 stats the Core branch's universal-boost nodes do. Sub-linear (curve: 'sqrt') growth keeps a
+ *  player who dumps everything here from ever dwarfing the rest of the tree: the first point
+ *  alone (+2%) is worse than any real branch node's first point, so a rational player only turns
+ *  here once genuinely out of better places to spend - exactly the "overflow sink" it's for. */
+const ETERNAL_DRIVE: TalentDefinition = {
+  id: 'eternal-drive',
+  branch: 'combo',
+  unlockRequirements: [],
+  effect: TalentEffect.Capstone,
+  displayName: 'Eternal Drive',
+  description: 'Keeps compounding forever, growing slower with every rank - the place Talent Points go once every branch and combo is fully mastered.',
+  firstLevelBonus: 0.02,
+  bonusPerLevel: 0.015,
+  maxLevel: Number.MAX_SAFE_INTEGER,
+  isCapstone: false,
+  curve: 'sqrt',
+  unbounded: true,
+}
+
 /**
  * 5 branches (11 nodes each: 8 tier talents + 1 capstone + 2 gem sockets = 55) + 5 cross-branch
- * combo talents (3 ranks each) = 60 nodes total. Unlike the previous id/prerequisite graph, tiers
- * are gated purely by cumulative points spent in that SAME branch (0/5/12/22, capstone at 35) -
- * no specific node-to-node dependency, so the 2 talents within a tier are always siblings, pick
- * either or both freely. Combo talents require 12 points in BOTH of the two branches they bridge.
+ * combo talents (3 ranks each) = 60 nodes, plus Eternal Drive = 61 total. Unlike the previous
+ * id/prerequisite graph, tiers are gated purely by cumulative points spent in that SAME branch
+ * (0/5/12/22, capstone at 35) - no specific node-to-node dependency, so the 2 talents within a
+ * tier are always siblings, pick either or both freely. Combo talents require 12 points in BOTH
+ * of the two branches they bridge.
  *
  * Max points per branch (talents only, no gems): Cannon/Core/Salvage/Warp = 37, Fleet = 35 (one
  * fewer full-strength rank on Adaptive Formation, which is capped at 1 like a keystone). Plus 5
@@ -534,14 +564,21 @@ function buildCombo(spec: ComboSpec): TalentDefinition {
  * realistic playthrough earns (see BalanceConfig.ts's talentXpCurve* - tuned so ~70-80 points is
  * a real, achievable milestone while fully maxing every branch stays a distant long-term goal;
  * per the design doc, if everything is completable the choices stop mattering).
+ *
+ * That 208 ceiling turned out to matter for real: a level-210 player (unbounded, this is an idle
+ * game) reported every branch fully maxed with points still piling up uselessly. Eternal Drive
+ * is the fix - once the other 208 points are spent, the 209th+ still buys something, forever.
  */
 export function buildDefaultTalents(): TalentDefinition[] {
-  return [...BRANCH_ORDER.flatMap((b) => buildBranch(BRANCH_SPECS[b])), ...COMBOS.map(buildCombo)]
+  return [...BRANCH_ORDER.flatMap((b) => buildBranch(BRANCH_SPECS[b])), ...COMBOS.map(buildCombo), ETERNAL_DRIVE]
 }
 
-/** Fractional bonus at a given level (0 for level <= 0) - same formula as artifactBonusAt. */
+/** Fractional bonus at a given level (0 for level <= 0) - same formula as artifactBonusAt, plus
+ *  an optional sub-linear curve for Eternal Drive (see its own comment for why). */
 export function talentBonusAt(def: TalentDefinition, level: number): number {
-  return level <= 0 ? 0 : def.firstLevelBonus + (level - 1) * def.bonusPerLevel
+  if (level <= 0) return 0
+  if (def.curve === 'sqrt') return def.firstLevelBonus + def.bonusPerLevel * Math.sqrt(level - 1)
+  return def.firstLevelBonus + (level - 1) * def.bonusPerLevel
 }
 
 /** Total points (summed levels) spent on nodes tagged with `branch` - the sole unlock currency
