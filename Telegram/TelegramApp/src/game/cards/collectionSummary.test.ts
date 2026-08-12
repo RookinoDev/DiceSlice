@@ -18,6 +18,12 @@ describe('summarizeCollection', () => {
     expect(map.get('venus')?.count).toBe(1)
   })
 
+  it('derives level from count (see cardLevel.ts) for every entry', () => {
+    const map = summarizeCollection([owned('venus', 1), owned('mars', 1), owned('mars', 2), owned('mars', 3), owned('mars', 4)])
+    expect(map.get('venus')?.level).toBe(1) // 1 copy
+    expect(map.get('mars')?.level).toBe(3) // 4 copies -> 1 + floor(log2(4))
+  })
+
   it('tracks the lowest serial as bestSerial regardless of arrival order', () => {
     const map = summarizeCollection([owned('earth', 50), owned('earth', 4), owned('earth', 999)])
     expect(map.get('earth')?.bestSerial).toBe(4)

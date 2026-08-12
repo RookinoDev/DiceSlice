@@ -8,6 +8,8 @@ import { BigNumber } from '../core/BigNumber'
 import { Emitter } from '../core/Emitter'
 import { TalentEffect } from '../config/TalentDefinition'
 import { gemAbilityForCard } from '../cards/gemAbility'
+import { summarizeCollection } from '../cards/collectionSummary'
+import type { OwnedCard } from '../cards/cardsApi'
 import type { CardVariant } from '../cards/variants'
 
 export interface GemSocketAssignment {
@@ -23,20 +25,29 @@ const GEM_CRIT_CHANCE_CAP = 0.3
 
 export class GemSocketService {
   private readonly assignments = new Map<string, { cardId: string; variant: CardVariant }>()
+  /** cardId -> level (see cardLevel.ts), from the same owned-cards snapshot hydrate() was given -
+   *  a socketed card's ability scales with how many duplicates you own. */
+  private levels = new Map<string, number>()
 
   readonly onSocketsChanged = new Emitter<void>()
 
   /** Replace all assignments from a server/save payload (e.g. right after /api/collection
-   *  resolves). Malformed entries are dropped rather than throwing - a card the player no longer
+   *  resolves), and refresh each owned card's level from that same collection snapshot.
+   *  Malformed assignment entries are dropped rather than throwing - a card the player no longer
    *  owns by the time this loads just silently grants nothing (gemAbilityForCard still resolves
    *  it fine; ownership is enforced server-side on write, not read). */
-  hydrate(sockets: GemSocketAssignment[] | undefined | null): void {
+  hydrate(sockets: GemSocketAssignment[] | undefined | null, ownedCards: OwnedCard[] = []): void {
     this.assignments.clear()
     for (const s of sockets ?? []) {
       if (!s || typeof s.nodeId !== 'string' || typeof s.cardId !== 'string') continue
       this.assignments.set(s.nodeId, { cardId: s.cardId, variant: s.variant })
     }
+    this.levels = new Map(Array.from(summarizeCollection(ownedCards), ([cardId, sum]) => [cardId, sum.level]))
     this.onSocketsChanged.emit()
+  }
+
+  levelOf(cardId: string): number {
+    return this.levels.get(cardId) ?? 1
   }
 
   cardAt(nodeId: string): { cardId: string; variant: CardVariant } | undefined {
@@ -68,7 +79,7 @@ export class GemSocketService {
   private multiplier(effect: TalentEffect): BigNumber {
     let mult = BigNumber.One
     for (const { cardId } of this.assignments.values()) {
-      const ability = gemAbilityForCard(cardId)
+      const ability = gemAbilityForCard(cardId, this.levelOf(cardId))
       if (!ability || ability.effect !== effect) continue
       mult = mult.mul(new BigNumber(1 + ability.magnitude))
     }
@@ -95,7 +106,7 @@ export class GemSocketService {
   private critChanceFor(effect: TalentEffect): number {
     let chance = 0
     for (const { cardId } of this.assignments.values()) {
-      const ability = gemAbilityForCard(cardId)
+      const ability = gemAbilityForCard(cardId, this.levelOf(cardId))
       if (!ability || ability.effect !== effect) continue
       chance += ability.magnitude
     }
@@ -115,7 +126,7 @@ export class GemSocketService {
   xpGainMultiplier(): number {
     let mult = 1
     for (const { cardId } of this.assignments.values()) {
-      const ability = gemAbilityForCard(cardId)
+      const ability = gemAbilityForCard(cardId, this.levelOf(cardId))
       if (!ability || ability.effect !== TalentEffect.XpGain) continue
       mult *= 1 + ability.magnitude
     }

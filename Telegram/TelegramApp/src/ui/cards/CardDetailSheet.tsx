@@ -189,7 +189,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
   if (!open || !card) return null
   const color = RARITY_COLOR[card.rarity]
   const locked = !owned
-  const gemAbility = !locked ? gemAbilityForCard(card.id) : undefined
+  const gemAbility = owned ? gemAbilityForCard(card.id, owned.level) : undefined
   const variantClass = owned && owned.bestVariant !== 'standard' ? `card-detail-flip--${owned.bestVariant}` : ''
   const rarityClass = card.rarity === 'legendary' || card.rarity === 'ultra' ? `card-detail-flip--${card.rarity}` : ''
 
@@ -383,7 +383,10 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                       <GemIcon size={12} />
                       <span>GEM ABILITY</span>
                     </div>
-                    <div className="card-detail-gem-section-value">Socket into a Talent Tree Gem slot for {gemAbility.label}.</div>
+                    <div className="card-detail-gem-section-value">
+                      Socket into a Talent Tree Gem slot for {gemAbility.label}
+                      {owned && owned.level > 1 ? ` (boosted by Level ${owned.level})` : ''}.
+                    </div>
                   </div>
                 )}
 
@@ -396,6 +399,12 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                         {owned.count > 1 ? ` · ×${owned.count} owned` : ''}
                       </div>
                     </div>
+                    {owned.level > 1 && (
+                      <div>
+                        <div className="card-detail-edition-label">LEVEL</div>
+                        <div className="card-detail-edition-value">{owned.level}</div>
+                      </div>
+                    )}
                     <img src={RARITY_GEM[card.rarity]} className="card-detail-edition-gem" alt="" />
                   </div>
                 )}

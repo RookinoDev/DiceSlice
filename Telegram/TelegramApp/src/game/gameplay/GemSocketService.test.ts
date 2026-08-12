@@ -82,4 +82,20 @@ describe('GemSocketService', () => {
     expect(g.dpsMultiplier().toNumber()).toBeCloseTo(1, 6)
     expect(g.tapCritChance()).toBe(0)
   })
+
+  it('hydrate with owned duplicates boosts the socketed card - the real player report: 14 copies (level 4)', () => {
+    const g = new GemSocketService()
+    const fourteenEarths = Array.from({ length: 14 }, (_, i) => ({ instanceId: i, cardId: 'earth', variant: 'standard' as const, serial: i, mintedAtMs: 0 }))
+    g.hydrate([{ nodeId: 'armada-gem-1', cardId: 'earth', variant: 'standard' }], fourteenEarths)
+    expect(g.levelOf('earth')).toBe(4) // 1 + floor(log2(14))
+    // Base Earth ability is OfflineReward +35%; level 4 = +15%*3 = +45% of that base magnitude.
+    expect(g.offlineRewardMultiplier().toNumber()).toBeCloseTo(1 + 0.35 * 1.45, 6)
+  })
+
+  it('a single owned copy (level 1) is unaffected - no boost until you own duplicates', () => {
+    const g = new GemSocketService()
+    g.hydrate([{ nodeId: 'armada-gem-1', cardId: 'earth', variant: 'standard' }], [{ instanceId: 1, cardId: 'earth', variant: 'standard', serial: 1, mintedAtMs: 0 }])
+    expect(g.levelOf('earth')).toBe(1)
+    expect(g.offlineRewardMultiplier().toNumber()).toBeCloseTo(1.35, 6)
+  })
 })

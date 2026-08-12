@@ -36,7 +36,7 @@ export function SocketPickerSheet({ session: s, apiBaseUrl, ownedCards, nodeId, 
 
   const current = nodeId ? s.gems.cardAt(nodeId) : undefined
   const currentCard = current ? cardById(current.cardId) : undefined
-  const currentAbility = current ? gemAbilityForCard(current.cardId) : undefined
+  const currentAbility = current ? gemAbilityForCard(current.cardId, summary.get(current.cardId)?.level ?? 1) : undefined
 
   const assignedElsewhere = useMemo(() => {
     const set = new Set<string>()
@@ -48,13 +48,13 @@ export function SocketPickerSheet({ session: s, apiBaseUrl, ownedCards, nodeId, 
   const pickResults = useMemo(() => {
     if (!nodeId) return []
     const q = query.trim().toLowerCase()
-    const out: Array<{ card: CardDefinition; variant: CardVariant }> = []
+    const out: Array<{ card: CardDefinition; variant: CardVariant; level: number }> = []
     for (const [cardId, sum] of summary) {
       if (assignedElsewhere.has(cardId)) continue
       const card = cardById(cardId)
       if (!card) continue
       if (q && !card.name.toLowerCase().includes(q)) continue
-      out.push({ card, variant: sum.bestVariant })
+      out.push({ card, variant: sum.bestVariant, level: sum.level })
       if (out.length >= 40) break
     }
     return out
@@ -107,8 +107,8 @@ export function SocketPickerSheet({ session: s, apiBaseUrl, ownedCards, nodeId, 
         <input className="cards-search" type="search" placeholder="Search owned cards..." value={query} onChange={(e) => setQuery(e.target.value)} autoFocus={!current} />
         <div className="socket-picker-list">
           {pickResults.length === 0 && <div className="cards-empty">No owned cards match.</div>}
-          {pickResults.map(({ card, variant }) => {
-            const ability = gemAbilityForCard(card.id)
+          {pickResults.map(({ card, variant, level }) => {
+            const ability = gemAbilityForCard(card.id, level)
             return (
               <button key={card.id} className="socket-picker-item" onClick={() => pick(card, variant)}>
                 <span className="socket-picker-item-name" style={{ color: RARITY_COLOR[card.rarity] }}>

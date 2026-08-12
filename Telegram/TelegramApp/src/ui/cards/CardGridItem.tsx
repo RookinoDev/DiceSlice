@@ -79,7 +79,7 @@ export const CardGridItem = memo(function CardGridItem({ card, owned, setTotal, 
     >
       <CardArt cardName={card.name} mode="grid" />
       {owned.bestVariant !== 'standard' && <div className="card-grid-variant">{VARIANT_LABEL[owned.bestVariant]}</div>}
-      {owned.count > 1 && <div className="card-grid-count">×{owned.count}</div>}
+      {owned.level > 1 && <div className="card-grid-count">LV {owned.level}</div>}
       {favorite && <div className="card-grid-fav">♥</div>}
       <div className="card-grid-no">
         <img src={RARITY_GEM[card.rarity]} className="card-grid-gem" alt="" />

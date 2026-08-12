@@ -3,6 +3,7 @@
 // (a component file that also exports plain functions/types breaks React's fast refresh).
 import type { OwnedCard } from './cardsApi'
 import { variantRank, type CardVariant } from './variants'
+import { cardLevelForCount } from './cardLevel'
 
 export interface OwnedSummary {
   /** Total instances owned of this base card (all variants) - the duplicate count. */
@@ -15,6 +16,8 @@ export interface OwnedSummary {
   bestSerial: number
   /** Most recent mint timestamp - powers the "recent" sort. */
   newestMintedAtMs: number
+  /** Derived from `count` (see cardLevel.ts) - how much a socketed copy's Gem ability is boosted. */
+  level: number
 }
 
 export function summarizeCollection(ownedCards: OwnedCard[]): Map<string, OwnedSummary> {
@@ -34,8 +37,10 @@ export function summarizeCollection(ownedCards: OwnedCard[]): Map<string, OwnedS
         bestVariant: c.variant,
         bestSerial: c.serial,
         newestMintedAtMs: c.mintedAtMs,
+        level: 1,
       })
     }
   }
+  for (const s of map.values()) s.level = cardLevelForCount(s.count)
   return map
 }

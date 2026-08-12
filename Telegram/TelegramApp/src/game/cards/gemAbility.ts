@@ -166,11 +166,7 @@ const BESPOKE_GEM_ABILITIES: Record<string, GemAbility> = {
   'm87-star': abilityFor(TalentEffect.Dps, 0.4),
 }
 
-/** Resolve a Base Card's Gem Socket ability. Every one of the 5,890 catalog cards resolves to a
- *  defined ability - bespoke table first, else the classification-bucket x rarity formula (see
- *  gemAbility.test.ts's completeness check over the full catalog). `undefined` only for an id
- *  that isn't a real card at all. */
-export function gemAbilityForCard(cardId: string): GemAbility | undefined {
+function baseAbilityFor(cardId: string): GemAbility | undefined {
   const bespoke = BESPOKE_GEM_ABILITIES[cardId]
   if (bespoke) return bespoke
 
@@ -181,4 +177,20 @@ export function gemAbilityForCard(cardId: string): GemAbility | undefined {
   const effect = BUCKET_EFFECT[bucket]
   const magnitude = CRIT_BUCKETS.has(bucket) ? CRIT_RARITY_BONUS[card.rarity] : RARITY_BONUS[card.rarity]
   return abilityFor(effect, magnitude)
+}
+
+/** Owning duplicates of a socketed card scales its own ability - see cardLevel.ts for the
+ *  count->level curve. +15% of the base magnitude per level beyond 1, so e.g. the reported 14
+ *  copies (level 4) is a solid +45%, not a rounding error. */
+const LEVEL_MAGNITUDE_BONUS_PER_LEVEL = 0.15
+
+/** Resolve a Base Card's Gem Socket ability, scaled by how many duplicates you own (level 1 =
+ *  base, the default for callers that don't track ownership). Every one of the 5,890 catalog
+ *  cards resolves to a defined ability - bespoke table first, else the classification-bucket x
+ *  rarity formula (see gemAbility.test.ts's completeness check over the full catalog).
+ *  `undefined` only for an id that isn't a real card at all. */
+export function gemAbilityForCard(cardId: string, level = 1): GemAbility | undefined {
+  const base = baseAbilityFor(cardId)
+  if (!base || level <= 1) return base
+  return abilityFor(base.effect, base.magnitude * (1 + LEVEL_MAGNITUDE_BONUS_PER_LEVEL * (level - 1)))
 }

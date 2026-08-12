@@ -513,7 +513,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     fetchCollection(apiUrl).then(({ cards, dust: dustBalance, gemSockets }) => {
       setOwnedCards(cards)
       setDust(dustBalance)
-      session.gems.hydrate(gemSockets)
+      session.gems.hydrate(gemSockets, cards)
     })
     const packs = await fetchPendingPacks(apiUrl)
     setPendingPacks(packs)
