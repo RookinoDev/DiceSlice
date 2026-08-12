@@ -14,9 +14,10 @@ interface TalentsScreenProps {
   session: GameSession
   onToast: (text: string) => void
   onOpenSocket?: (nodeId: string) => void
+  onOpenPerks?: () => void
 }
 
-export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScreenProps) {
+export function TalentsScreen({ session: s, onToast, onOpenSocket, onOpenPerks }: TalentsScreenProps) {
   const t = s.talents
   const allDefs = Array.from({ length: t.count }, (_, i) => t.def(i))
 
@@ -66,7 +67,7 @@ export function TalentsScreen({ session: s, onToast, onOpenSocket }: TalentsScre
             <span className="branch-panel-label">ETERNAL DRIVE</span>
           </div>
           <div className="combo-row">
-            <TalentNode session={s} index={eternalDriveIndex} onToast={onToast} onOpenSocket={onOpenSocket} />
+            <TalentNode session={s} index={eternalDriveIndex} onToast={onToast} onOpenSocket={onOpenSocket} onOpenPerks={onOpenPerks} />
           </div>
         </div>
       )}

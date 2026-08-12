@@ -111,6 +111,7 @@ export function sanitizeSave(raw: unknown): SaveState | null {
   if (s.talentXp !== undefined && !isFiniteNumber(s.talentXp)) return null
   if (s.talentPoints !== undefined && !isFiniteNumber(s.talentPoints)) return null
   if (s.talentNodeLevels !== undefined && !Array.isArray(s.talentNodeLevels)) return null
+  if (s.talentPerks !== undefined && !Array.isArray(s.talentPerks)) return null
   return raw as SaveState
 }
 

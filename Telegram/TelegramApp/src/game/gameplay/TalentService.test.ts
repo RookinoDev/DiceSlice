@@ -233,4 +233,67 @@ describe('TalentService', () => {
       expect(t.unspentPoints).toBe(210) // every point is spendable again, not just whatever was left unspent
     })
   })
+
+  describe('Eternal Drive: every purchase rolls a random passive perk instead of leveling a fixed stat', () => {
+    it('buying it grants exactly one perk, emits onPerkGranted, and never runs out (unbounded)', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      const eternal = indexOf(t, 'eternal-drive')
+      const granted: unknown[] = []
+      t.onPerkGranted.on((p) => granted.push(p))
+
+      expect(t.grantedPerks.length).toBe(0)
+      expect(t.buyNode(eternal)).toBe(true)
+      expect(t.grantedPerks.length).toBe(1)
+      expect(granted.length).toBe(1)
+      expect(t.grantedPerks[0]).toEqual(granted[0])
+
+      for (let i = 0; i < 50; i++) expect(t.buyNode(eternal)).toBe(true) // never "maxed"
+      expect(t.grantedPerks.length).toBe(51)
+      expect(t.levelOf(eternal)).toBe(51) // still tracks purchase count, just not a bonus formula
+    })
+
+    it('buying a REGULAR node never grants a perk - only Eternal Drive does', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      t.buyNode(indexOf(t, 'cannon-pulse-amplifier'))
+      expect(t.grantedPerks.length).toBe(0)
+    })
+
+    it('granted perks boost the matching stat, additively across many grants (not compounding per-perk)', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      const eternal = indexOf(t, 'eternal-drive')
+      const before = t.dpsMultiplier().toNumber()
+      for (let i = 0; i < 30; i++) t.buyNode(eternal)
+
+      const after = t.dpsMultiplier().toNumber()
+      expect(after).toBeGreaterThanOrEqual(before) // some of the 30 rolls should have hit Dps or Capstone
+      // Additive, not compounding: every template caps at 5% (2.5% for Capstone-style ones), so
+      // even if ALL 30 rolls hit Dps at their max, additive stays at 1 + 30*0.05 = 2.5. 30
+      // INDEPENDENTLY MULTIPLYING rolls at the same rate would instead compound past 4x
+      // (1.05^30 ≈ 4.32) - this bound is only reachable by the additive (safe) model.
+      expect(after).toBeLessThanOrEqual(2.5 + 1e-9)
+    })
+
+    it('restorePerks round-trips exactly what was granted, without re-rolling', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      const eternal = indexOf(t, 'eternal-drive')
+      for (let i = 0; i < 5; i++) t.buyNode(eternal)
+      const saved = t.grantedPerks.map((p) => ({ ...p }))
+
+      const t2 = freshService()
+      t2.restorePerks(saved)
+      expect(t2.grantedPerks).toEqual(saved)
+      expect(t2.dpsMultiplier().toNumber()).toBeCloseTo(t.dpsMultiplier().toNumber(), 10)
+    })
+
+    it('restorePerks drops malformed entries instead of throwing', () => {
+      const t = freshService()
+      // @ts-expect-error deliberately malformed to prove it's dropped, not thrown
+      t.restorePerks([{ templateId: 'overcharged-thrusters', magnitude: 0.03 }, { templateId: 123, magnitude: 0.03 }, null, { magnitude: 'x' }])
+      expect(t.grantedPerks.length).toBe(1)
+    })
+  })
 })

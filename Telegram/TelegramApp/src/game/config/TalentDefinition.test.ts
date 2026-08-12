@@ -18,20 +18,13 @@ describe('talent tree node catalog', () => {
     expect(realCombos(defs).length).toBe(5)
   })
 
-  it('Eternal Drive has no ceiling, no unlock requirements, and grows sub-linearly', () => {
+  it('Eternal Drive has no ceiling, no unlock requirements, and no bonus of its own (see PassivePerk.ts for where its real payoff lives)', () => {
     const defs = buildDefaultTalents()
     const eternal = defs.find((d) => d.id === 'eternal-drive')!
     expect(eternal.unlockRequirements).toEqual([])
     expect(eternal.unbounded).toBe(true)
-    expect(eternal.curve).toBe('sqrt')
-    // Sub-linear: the 100th point adds far less than 100x the first point's bonus.
-    const first = talentBonusAt(eternal, 1)
-    const hundredth = talentBonusAt(eternal, 100) - talentBonusAt(eternal, 99)
-    expect(hundredth).toBeLessThan(first)
-    // A single point here is worse than a single point in any real branch node - a rational
-    // player only lands here once genuinely out of better options (see its own comment).
-    const cheapestRealNode = defs.find((d) => d.id === 'cannon-pulse-amplifier')!
-    expect(first).toBeLessThan(talentBonusAt(cheapestRealNode, 1))
+    expect(talentBonusAt(eternal, 1)).toBe(0)
+    expect(talentBonusAt(eternal, 500)).toBe(0)
   })
 
   it('every id is unique', () => {

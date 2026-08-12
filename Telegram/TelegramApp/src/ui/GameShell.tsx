@@ -29,6 +29,7 @@ import { CombatScreen } from './screens/CombatScreen'
 import { FleetScreen } from './screens/FleetScreen'
 import { ArtifactsPrestigeScreen } from './screens/ArtifactsPrestigeScreen'
 import { TalentsScreen } from './screens/TalentsScreen'
+import { PassivePerksSheet } from './screens/PassivePerksSheet'
 import { CardsScreen } from './screens/CardsScreen'
 import { PrestigeConfirmSheet } from './sheets/PrestigeConfirmSheet'
 import { MissionsSheet } from './sheets/MissionsSheet'
@@ -101,6 +102,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const [shipUnlock, setShipUnlock] = useState<ShipUnlockInfo | null>(null)
   // Which Gem Socket talent node is being edited, or null when SocketPickerSheet is closed.
   const [socketPickerNodeId, setSocketPickerNodeId] = useState<string | null>(null)
+  const [perksOpen, setPerksOpen] = useState(false)
   const [ownedCards, setOwnedCards] = useState<OwnedCard[]>([])
   const [dust, setDust] = useState(0)
   const [myShowcase, setMyShowcase] = useState<ShowcaseEntry[]>([])
@@ -455,38 +457,41 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
     ? 'news'
     : socketPickerNodeId !== null
       ? 'socketPicker'
-      : prestigeConfirmOpen
-        ? 'prestigeConfirm'
-        : missionsOpen
-          ? 'missions'
-          : achievementsOpen
-            ? 'achievements'
-            : leaderboardOpen
-              ? 'leaderboard'
-              : shopOpen
-                ? dailyOpen
-                  ? 'daily'
-                  : 'shop'
-                : settingsOpen
-                  ? 'settings'
-                  : profileOpen
-                    ? 'profile'
-                    : offlineOpen
-                      ? 'offline'
-                      : shipUnlock
-                        ? 'shipUnlock'
-                        : selectedCard
-                          ? objectViewerOpen
-                            ? 'objectViewer'
-                            : 'cardDetail'
-                          : packSheetOpen
-                            ? 'packOpen'
-                            : null
+      : perksOpen
+        ? 'perks'
+        : prestigeConfirmOpen
+          ? 'prestigeConfirm'
+          : missionsOpen
+            ? 'missions'
+            : achievementsOpen
+              ? 'achievements'
+              : leaderboardOpen
+                ? 'leaderboard'
+                : shopOpen
+                  ? dailyOpen
+                    ? 'daily'
+                    : 'shop'
+                  : settingsOpen
+                    ? 'settings'
+                    : profileOpen
+                      ? 'profile'
+                      : offlineOpen
+                        ? 'offline'
+                        : shipUnlock
+                          ? 'shipUnlock'
+                          : selectedCard
+                            ? objectViewerOpen
+                              ? 'objectViewer'
+                              : 'cardDetail'
+                            : packSheetOpen
+                              ? 'packOpen'
+                              : null
 
   useEffect(() => {
     const closers: Record<string, () => void> = {
       news: closeNews,
       socketPicker: () => setSocketPickerNodeId(null),
+      perks: () => setPerksOpen(false),
       prestigeConfirm: () => setPrestigeConfirmOpen(false),
       missions: () => setMissionsOpen(false),
       daily: () => setDailyOpen(false),
@@ -652,7 +657,9 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         {tab === 'artifacts' && (vm.showArtifacts || vm.showPrestige) && (
           <ArtifactsPrestigeScreen session={session} onToast={showToast} onPrestigeRequested={() => setPrestigeConfirmOpen(true)} prestigeReady={vm.canPrestige} />
         )}
-        {tab === 'talents' && vm.showTalents && <TalentsScreen session={session} onToast={showToast} onOpenSocket={setSocketPickerNodeId} />}
+        {tab === 'talents' && vm.showTalents && (
+          <TalentsScreen session={session} onToast={showToast} onOpenSocket={setSocketPickerNodeId} onOpenPerks={() => setPerksOpen(true)} />
+        )}
         {tab === 'cards' && showCards && (
           <CardsScreen
             ownedCards={ownedCards}
@@ -716,6 +723,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         onClose={() => setSocketPickerNodeId(null)}
         onToast={showToast}
       />
+      <PassivePerksSheet session={session} open={perksOpen} onClose={() => setPerksOpen(false)} />
       <AchievementsSheet session={session} ownedCards={ownedCards} open={achievementsOpen} onClose={() => setAchievementsOpen(false)} />
       <LeaderboardSheet
         open={leaderboardOpen}

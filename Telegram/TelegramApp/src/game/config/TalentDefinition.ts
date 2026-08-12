@@ -84,11 +84,6 @@ export interface TalentDefinition {
   /** True only for the 5 branch capstones (Nova Lance, Hive Carrier, ...) - the UI gives these a
    *  bigger, distinct treatment, same idea as the old single Grand Nexus card. */
   isCapstone: boolean
-  /** 'sqrt' = firstLevelBonus + bonusPerLevel * sqrt(level - 1) instead of the normal linear
-   *  formula - undefined/omitted means linear (every existing node). Only used by Eternal Drive
-   *  (see below): a node with no real maxLevel needs sub-linear growth, or a player who dumps
-   *  every future point into just this one node would eventually dwarf the rest of the tree. */
-  curve?: 'sqrt'
   /** True only for Eternal Drive - maxLevel is a large placeholder, not a real ceiling; the UI
    *  hides the "/maxLevel" fraction and never shows it as maxed. */
   unbounded?: boolean
@@ -530,23 +525,21 @@ function buildCombo(spec: ComboSpec): TalentDefinition {
 }
 
 /** The tree's only node with no real ceiling - see the doc comment on buildDefaultTalents for
- *  why it exists. Always unlocked (no requirements), tagged Capstone so it stacks into the same
- *  5 stats the Core branch's universal-boost nodes do. Sub-linear (curve: 'sqrt') growth keeps a
- *  player who dumps everything here from ever dwarfing the rest of the tree: the first point
- *  alone (+2%) is worse than any real branch node's first point, so a rational player only turns
- *  here once genuinely out of better places to spend - exactly the "overflow sink" it's for. */
+ *  why it exists. Always unlocked (no requirements). Carries no bonus of its own (firstLevelBonus/
+ *  bonusPerLevel are both 0) - every purchase instead rolls a random passive perk from
+ *  PassivePerk.ts's pool and adds it to the player's own growing collection (see
+ *  TalentService.grantedPerks/buyNode) rather than leveling up one fixed stat forever. */
 const ETERNAL_DRIVE: TalentDefinition = {
   id: 'eternal-drive',
   branch: 'combo',
   unlockRequirements: [],
   effect: TalentEffect.Capstone,
   displayName: 'Eternal Drive',
-  description: 'Keeps compounding forever, growing slower with every rank - the place Talent Points go once every branch and combo is fully mastered.',
-  firstLevelBonus: 0.02,
-  bonusPerLevel: 0.015,
+  description: 'Every point spent here grants a random passive perk, forever - the place Talent Points go once every branch and combo is fully mastered. Long-press to see everything it\'s granted so far.',
+  firstLevelBonus: 0,
+  bonusPerLevel: 0,
   maxLevel: Number.MAX_SAFE_INTEGER,
   isCapstone: false,
-  curve: 'sqrt',
   unbounded: true,
 }
 
@@ -573,12 +566,9 @@ export function buildDefaultTalents(): TalentDefinition[] {
   return [...BRANCH_ORDER.flatMap((b) => buildBranch(BRANCH_SPECS[b])), ...COMBOS.map(buildCombo), ETERNAL_DRIVE]
 }
 
-/** Fractional bonus at a given level (0 for level <= 0) - same formula as artifactBonusAt, plus
- *  an optional sub-linear curve for Eternal Drive (see its own comment for why). */
+/** Fractional bonus at a given level (0 for level <= 0) - same formula as artifactBonusAt. */
 export function talentBonusAt(def: TalentDefinition, level: number): number {
-  if (level <= 0) return 0
-  if (def.curve === 'sqrt') return def.firstLevelBonus + def.bonusPerLevel * Math.sqrt(level - 1)
-  return def.firstLevelBonus + (level - 1) * def.bonusPerLevel
+  return level <= 0 ? 0 : def.firstLevelBonus + (level - 1) * def.bonusPerLevel
 }
 
 /** Total points (summed levels) spent on nodes tagged with `branch` - the sole unlock currency

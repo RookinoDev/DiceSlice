@@ -16,6 +16,9 @@ import { branchIcon } from './talentTreeMeta'
 /** How long the one-shot purchase flash (.talent-node--celebrate) plays before clearing itself -
  *  must match @keyframes talent-node-celebrate's duration in ui.css. */
 const CELEBRATE_MS = 700
+/** Hold duration before a press on Eternal Drive (the only unbounded node) opens the granted-
+ *  perks list instead of buying another one - standard mobile long-press timing. */
+const LONG_PRESS_MS = 500
 
 interface TalentNodeProps {
   session: GameSession
@@ -24,9 +27,12 @@ interface TalentNodeProps {
   /** Opens SocketPickerSheet for this node's id - only ever called for an already-unlocked gem
    *  node (buying the slot itself still goes through the normal Talent Point purchase below). */
   onOpenSocket?: (nodeId: string) => void
+  /** Opens PassivePerksSheet - only ever called for Eternal Drive (def.unbounded), via a
+   *  long-press. A normal tap still spends a point and rolls another perk, same as any purchase. */
+  onOpenPerks?: () => void
 }
 
-export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentNodeProps) {
+export function TalentNode({ session: s, index, onToast, onOpenSocket, onOpenPerks }: TalentNodeProps) {
   const t = s.talents
   const def = t.def(index)
   const lvl = t.levelOf(index)
@@ -48,12 +54,33 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
   const celebrateTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => () => clearTimeout(celebrateTimer.current), [])
 
+  // Long-press (Eternal Drive only, def.unbounded) opens the granted-perks list instead of
+  // buying another one. longPressFiredRef suppresses the click that follows the eventual
+  // pointerup - a fired long-press should never ALSO count as a tap-to-buy.
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const longPressFiredRef = useRef(false)
+  useEffect(() => () => clearTimeout(longPressTimer.current), [])
+  const onPointerDown = () => {
+    longPressFiredRef.current = false
+    clearTimeout(longPressTimer.current)
+    longPressTimer.current = setTimeout(() => {
+      longPressFiredRef.current = true
+      hapticTap()
+      onOpenPerks?.()
+    }, LONG_PRESS_MS)
+  }
+  const cancelLongPress = () => clearTimeout(longPressTimer.current)
+
   // "Tap this next" - unlocked, not maxed, and there's a point to spend. Gem Sockets read as
   // affordable only while the slot itself is still unpurchased; once bought, an empty slot gets
   // its own distinct "come fill me" treatment (.talent-node--gem, not this one).
   const affordable = unlocked && !maxed && t.unspentPoints > 0
 
   const handleTap = () => {
+    if (longPressFiredRef.current) {
+      longPressFiredRef.current = false
+      return // the long press already opened the perks list - don't ALSO buy
+    }
     if (!unlocked) {
       onToast(talentUnlockLabel(Array.from({ length: t.count }, (_, i) => t.def(i)), index).toUpperCase())
       return
@@ -84,14 +111,18 @@ export function TalentNode({ session: s, index, onToast, onOpenSocket }: TalentN
     <button
       className={`talent-node ${def.isCapstone ? 'talent-node--capstone' : ''} ${!unlocked ? 'is-locked' : ''} ${maxed ? 'is-maxed' : ''} ${lvl > 0 ? 'is-owned' : ''} ${isGem ? 'talent-node--gem' : ''} ${isGem && socketed ? 'talent-node--gem-filled' : ''} ${affordable ? 'talent-node--affordable' : ''} ${celebrate ? 'talent-node--celebrate' : ''}`}
       onClick={handleTap}
+      onPointerDown={def.unbounded ? onPointerDown : undefined}
+      onPointerUp={def.unbounded ? cancelLongPress : undefined}
+      onPointerLeave={def.unbounded ? cancelLongPress : undefined}
       style={{ '--talent-color': color } as CSSProperties}
     >
       <div key={popKey} className="talent-node-icon row-icon-pop">
         {!unlocked ? <LockIcon /> : isGem ? <GemIcon filled={!!socketed} /> : branchIcon(def.branch)}
       </div>
       <div className="talent-node-level">{def.unbounded ? lvl : `${lvl}/${def.maxLevel}`}</div>
-      <div className="talent-node-name">{EFFECT_LABEL[def.effect]}</div>
-      {lvl > 0 && !isGem && <div className="talent-node-bonus">+{pct}%</div>}
+      <div className="talent-node-name">{def.unbounded ? 'PASSIVE PERKS' : EFFECT_LABEL[def.effect]}</div>
+      {lvl > 0 && !isGem && !def.unbounded && <div className="talent-node-bonus">+{pct}%</div>}
+      {def.unbounded && lvl > 0 && <div className="talent-node-bonus">{t.grantedPerks.length} GRANTED · HOLD TO VIEW</div>}
       {isGem && lvl > 0 && <div className="talent-node-bonus talent-node-gem-fill">{socketedCard ? socketedCard.name : 'EMPTY'}</div>}
     </button>
   )

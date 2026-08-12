@@ -32,6 +32,7 @@ export function captureSave(s: GameSession): SaveState {
     talentXp: s.talents.xp,
     talentPoints: s.talents.unspentPoints,
     talentNodeLevels: captureTalentLevels(s),
+    talentPerks: s.talents.grantedPerks.map((p) => ({ templateId: p.templateId, magnitude: p.magnitude })),
   }
 }
 
@@ -49,6 +50,7 @@ export function applySave(s: GameSession, st: SaveState): void {
   for (const id of st.tutorialSeen ?? []) s.tutorialSeen.add(id)
   s.talents.restoreLevels(st.talentNodeLevels)
   s.talents.restoreProgress(st.talentLevel ?? 1, st.talentXp ?? 0)
+  s.talents.restorePerks(st.talentPerks)
   if (st.lastDailyClaimUnixSeconds > 0) {
     s.daily.restore(Math.floor(st.lastDailyClaimUnixSeconds / DailyRewardService.SECONDS_PER_DAY), st.dailyStreak)
   }

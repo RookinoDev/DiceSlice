@@ -42,9 +42,14 @@ export interface SaveState {
   tutorialSeen?: string[]
 
   /** Talent tree (see gameplay/TalentService.ts). Persists through Prestige, same as Relics/
-   *  artifactLevels - absent on saves from before this feature (defaults to a fresh level 1). */
+   *  artifactLevels - absent on saves from before this feature (defaults to a fresh level 1).
+   *  talentPoints is written for backward-compat/inspection only - unspentPoints is derived, not
+   *  restored from it (see TalentService.unspentPoints's own comment for why). */
   talentLevel?: number
   talentXp?: number
   talentPoints?: number
   talentNodeLevels?: number[]
+  /** Every passive perk Eternal Drive has ever granted (see config/PassivePerk.ts) - absent on
+   *  saves from before that node existed. */
+  talentPerks?: Array<{ templateId: string; magnitude: number }>
 }
