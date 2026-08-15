@@ -4,14 +4,14 @@
 // entry, so there's no move/reorder here, just fill/replace/remove.
 import { useMemo, useState } from 'react'
 import type { GameSession } from '../../game/gameplay/GameSession'
-import type { CardDefinition } from '../../game/cards/catalog'
+import type { CardDefinition, CardRarity } from '../../game/cards/catalog'
 import { cardById } from '../../game/cards/generatedCards'
 import { summarizeCollection } from '../../game/cards/collectionSummary'
 import type { OwnedCard } from '../../game/cards/cardsApi'
 import { saveGemSockets } from '../../game/cards/cardsApi'
 import { gemAbilityForCard } from '../../game/cards/gemAbility'
 import type { CardVariant } from '../../game/cards/variants'
-import { RARITY_COLOR } from './cardTheme'
+import { RARITY_COLOR, RARITY_FILTERS } from './cardTheme'
 import { CardArt } from './CardArt'
 import { audio } from '../../game/audio/AudioManager'
 import { hapticAction, hapticTap } from '../../telegram'
@@ -29,6 +29,7 @@ interface SocketPickerSheetProps {
 
 export function SocketPickerSheet({ session: s, apiBaseUrl, ownedCards, nodeId, onClose, onToast }: SocketPickerSheetProps) {
   const [query, setQuery] = useState('')
+  const [rarity, setRarity] = useState<CardRarity | 'all'>('all')
   const summary = useMemo(() => summarizeCollection(ownedCards), [ownedCards])
 
   const defs = Array.from({ length: s.talents.count }, (_, i) => s.talents.def(i))
@@ -54,11 +55,12 @@ export function SocketPickerSheet({ session: s, apiBaseUrl, ownedCards, nodeId, 
       const card = cardById(cardId)
       if (!card) continue
       if (q && !card.name.toLowerCase().includes(q)) continue
+      if (rarity !== 'all' && card.rarity !== rarity) continue
       out.push({ card, variant: sum.bestVariant, level: sum.level })
       if (out.length >= 40) break
     }
     return out
-  }, [nodeId, query, summary, assignedElsewhere])
+  }, [nodeId, query, rarity, summary, assignedElsewhere])
 
   const pick = (card: CardDefinition, variant: CardVariant) => {
     if (!nodeId) return
@@ -105,16 +107,26 @@ export function SocketPickerSheet({ session: s, apiBaseUrl, ownedCards, nodeId, 
         )}
 
         <input className="cards-search" type="search" placeholder="Search owned cards..." value={query} onChange={(e) => setQuery(e.target.value)} autoFocus={!current} />
+        <div className="cards-filter-row">
+          {RARITY_FILTERS.map((r) => (
+            <button key={r} className={`cards-filter-chip ${rarity === r ? 'cards-filter-chip--active' : ''}`} onClick={() => setRarity(r)}>
+              {r === 'all' ? 'ALL' : r.toUpperCase()}
+            </button>
+          ))}
+        </div>
         <div className="socket-picker-list">
           {pickResults.length === 0 && <div className="cards-empty">No owned cards match.</div>}
           {pickResults.map(({ card, variant, level }) => {
             const ability = gemAbilityForCard(card.id, level)
             return (
               <button key={card.id} className="socket-picker-item" onClick={() => pick(card, variant)}>
-                <span className="socket-picker-item-name" style={{ color: RARITY_COLOR[card.rarity] }}>
-                  {card.name}
+                <CardArt cardName={card.name} mode="grid" className="socket-picker-item-art" />
+                <span className="socket-picker-item-body">
+                  <span className="socket-picker-item-name" style={{ color: RARITY_COLOR[card.rarity] }}>
+                    {card.name}
+                  </span>
+                  <span className="socket-picker-item-ability">{ability?.label ?? ''}</span>
                 </span>
-                <span className="socket-picker-item-ability">{ability?.label ?? ''}</span>
               </button>
             )
           })}

@@ -5994,14 +5994,26 @@
 }
 .socket-picker-item {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+  padding: 6px 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
+  text-align: left;
+}
+.socket-picker-item-art {
+  width: 32px;
+  height: 44px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.socket-picker-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
 .socket-picker-item-name {
   font-family: var(--font-display);
@@ -6011,7 +6023,6 @@
 .socket-picker-item-ability {
   font-size: 9px;
   color: #d6a8ff;
-  white-space: nowrap;
 }
 
 /* -- Pack opening reveal -- */

@@ -18,6 +18,10 @@ export const RARITY_COLOR: Record<CardRarity, string> = {
   ultra: '#fff2c9',
 }
 
+/** Shared rarity filter-chip options, low-to-high plus 'all' - was duplicated in CardsScreen.tsx
+ *  before; SocketPickerSheet.tsx now reuses it too. */
+export const RARITY_FILTERS: Array<CardRarity | 'all'> = ['all', 'common', 'uncommon', 'rare', 'epic', 'legendary', 'ultra']
+
 /** Faceted gem silhouette per tier (docs/CARD_SYSTEM_PLAN.md §2 "Rarity gems") - the collection-number line icon. Shape carries the tier read; color stays the art's own iridescent look rather than being tinted, so it doesn't fight RARITY_COLOR's border/glow use elsewhere. */
 export const RARITY_GEM: Record<CardRarity, string> = {
   common: gemCommon,

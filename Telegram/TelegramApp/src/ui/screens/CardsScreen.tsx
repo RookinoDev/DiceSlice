@@ -17,14 +17,13 @@ import { summarizeCollection, type OwnedSummary } from '../../game/cards/collect
 import { loadFavorites, loadRecentViews } from '../../game/cards/cardPrefs'
 import { CardGridItem } from '../cards/CardGridItem'
 import { StarMapView } from '../cards/StarMapView'
+import { RARITY_FILTERS } from '../cards/cardTheme'
 import { registerLandmark } from '../combatFx/landmarks'
 
 const COLUMNS = 3
 /** Must match .card-grid-row height (cell + gap) in ui.css. */
 const ROW_HEIGHT_PX = 148
 const OVERSCAN_ROWS = 3
-
-const RARITY_FILTERS: Array<CardRarity | 'all'> = ['all', 'common', 'uncommon', 'rare', 'epic', 'legendary', 'ultra']
 
 type SortMode = 'number' | 'rarity' | 'newest' | 'name' | 'count' | 'recent'
 const SORT_LABEL: Record<SortMode, string> = { number: 'Nº', rarity: 'RARITY', newest: 'NEWEST', name: 'A-Z', count: 'DUPES', recent: 'RECENT' }
