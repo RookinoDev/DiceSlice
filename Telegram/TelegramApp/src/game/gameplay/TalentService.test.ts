@@ -235,6 +235,68 @@ describe('TalentService', () => {
     })
   })
 
+  describe('The 4 other branches: real sub-identities, not one flat stat repeated on every node', () => {
+    it('Vanguard Cannon: tapCritDamageMultiplier only moves on TapCritDamage nodes, not TapDamage/TapCritChance', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(t.tapCritDamageMultiplier().toNumber()).toBeCloseTo(1, 6)
+      t.buyNode(indexOf(t, 'cannon-pulse-amplifier')) // TapDamage
+      t.buyNode(indexOf(t, 'cannon-precision-optics')) // TapCritChance
+      expect(t.tapCritDamageMultiplier().toNumber()).toBeCloseTo(1, 6) // untouched by either
+      // Maxes tier 1 to exactly the tier-2 threshold - unlocks armor-fracture untouched.
+      grantBranchPoints(t, 'cannon', 5)
+      t.buyNode(indexOf(t, 'cannon-armor-fracture')) // TapCritDamage, tier 2
+      expect(t.tapCritDamageMultiplier().toNumber()).toBeGreaterThan(1)
+    })
+
+    it('Autonomous Fleet: shipCritChance/shipCritDamageMultiplier only move on their own tagged nodes', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(t.shipCritChance()).toBe(0)
+      expect(t.shipCritDamageMultiplier().toNumber()).toBeCloseTo(1, 6)
+      t.buyNode(indexOf(t, 'fleet-autonomous-turrets')) // Dps, neither
+      expect(t.shipCritChance()).toBe(0)
+      expect(t.shipCritDamageMultiplier().toNumber()).toBeCloseTo(1, 6)
+      t.buyNode(indexOf(t, 'fleet-drone-hangar')) // ShipCritChance
+      expect(t.shipCritChance()).toBeGreaterThan(0)
+      expect(t.shipCritDamageMultiplier().toNumber()).toBeCloseTo(1, 6) // still untouched
+      // Maxes tier 1 to exactly the tier-2 threshold - unlocks replicator-nanites untouched.
+      grantBranchPoints(t, 'fleet', 5)
+      t.buyNode(indexOf(t, 'fleet-replicator-nanites')) // ShipCritDamage, tier 2
+      expect(t.shipCritDamageMultiplier().toNumber()).toBeGreaterThan(1)
+    })
+
+    it('Galactic Salvage: upgradeCostReduction sums every UpgradeCostReduction node, unaffected by Gold nodes', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(t.upgradeCostReduction()).toBe(0)
+      t.buyNode(indexOf(t, 'salvage-salvage-lasers')) // Gold, not a discount
+      expect(t.upgradeCostReduction()).toBe(0)
+      // Maxes tier 1 to exactly the tier-2 threshold - unlocks rare-signal-scanner untouched.
+      grantBranchPoints(t, 'salvage', 5)
+      t.buyNode(indexOf(t, 'salvage-rare-signal-scanner')) // UpgradeCostReduction, tier 2
+      const afterOne = t.upgradeCostReduction()
+      expect(afterOne).toBeGreaterThan(0)
+      // Maxes through tier 2 to exactly the tier-3 threshold - unlocks recycling-forge untouched.
+      grantBranchPoints(t, 'salvage', 12)
+      t.buyNode(indexOf(t, 'salvage-recycling-forge')) // UpgradeCostReduction, tier 3
+      expect(t.upgradeCostReduction()).toBeGreaterThan(afterOne) // a second node adds, isn't ignored
+    })
+
+    it('Warp Command: bossTimerMultiplier only moves on BossTimerBonus nodes, not RelicGain/Dps', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(t.bossTimerMultiplier().toNumber()).toBeCloseTo(1, 6)
+      t.buyNode(indexOf(t, 'warp-warp-navigation')) // RelicGain
+      t.buyNode(indexOf(t, 'warp-first-strike-protocol')) // Dps
+      expect(t.bossTimerMultiplier().toNumber()).toBeCloseTo(1, 6) // untouched by either
+      // Maxes tier 1 to exactly the tier-2 threshold - unlocks gravity-snare untouched.
+      grantBranchPoints(t, 'warp', 5)
+      t.buyNode(indexOf(t, 'warp-gravity-snare')) // BossTimerBonus
+      expect(t.bossTimerMultiplier().toNumber()).toBeGreaterThan(1)
+    })
+  })
+
   describe('unspentPoints is derived, not stored (regression: a real reported bug)', () => {
     // A player's talent tree got reset (Eternal Drive shipped: 60 nodes -> 61, restoreLevels's
     // own "tree redesigned" rule wipes node allocation - see its comment) but their points never

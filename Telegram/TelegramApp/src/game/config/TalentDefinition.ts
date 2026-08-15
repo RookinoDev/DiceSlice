@@ -1,16 +1,16 @@
 // Talent tree node catalog. Mirrors ArtifactDefinition.ts's def+formula shape: static data here,
 // level-tracking + spending logic lives in gameplay/TalentService.ts.
 //
-// Phase 1 of a larger design (see the "Stellar Breaker talent tree" design doc): 5 named,
-// creatively-flavored branches (Cannon, Fleet, Core, Salvage, Warp) each with real identity, plus
-// 5 cross-branch combo talents. Every talent's flavor/mechanic description matches the full
-// design, but only the ones that map cleanly onto stats this game already tracks (tap damage,
-// fleet DPS, gold, offline reward, crit chance, relic gain) carry a real numeric bonus in this
-// phase - Core's whole branch (an energy-for-active-skills resource that doesn't exist yet) uses
-// the Capstone sentinel as an honest "boosts a bit of everything for now" placeholder until that
-// system is built. Combat Rhythm's real combo-counter, Armor Fracture's real debuff, Ricochet's
-// real bounce, etc. are the same story: the node exists, is buyable, and does something useful
-// today, but the bespoke mechanic in its description is a later phase.
+// 5 named branches (Cannon, Fleet, Core, Salvage, Warp), each with 2-3 REAL, mechanically
+// distinct sub-identities rather than one flat stat repeated across every node - the tap/ship
+// crit-damage multipliers, upgrade cost discount, and boss timer bonus below were all previously
+// unused or hardcoded-flat hooks already sitting in the combat/economy code (TapController.ts's
+// TAP_CRIT_DAMAGE_MULTIPLIER, ShipService.ts's SHIP_CRIT_DAMAGE_MULTIPLIER, StageManager.ts's
+// flat bossTimerSeconds, and no cost-reduction hook at all before this), the same "find what's
+// already there and wire it up" approach Core Engine's own redesign used. Combat Rhythm's real
+// combo-counter, Armor Fracture's real debuff, Ricochet's real bounce, etc. are still a later
+// phase - the node exists, is buyable, and does something useful today, but the bespoke mechanic
+// named in its description is future work, same as before.
 export const TalentEffect = {
   Dps: 0,
   Gold: 1,
@@ -47,6 +47,20 @@ export const TalentEffect = {
    *  SkillDuration, AND SkillPower at once, mirroring Capstone/CAPSTONE_EFFECTS but scoped to
    *  just this branch's own 3 effects instead of the tree-wide 5. */
   CoreCapstone: 13,
+  /** Multiplies TapController's TAP_CRIT_DAMAGE_MULTIPLIER, previously a hardcoded flat 2x with
+   *  no talent hook at all - Vanguard Cannon's 2nd sub-identity alongside TapDamage/TapCritChance. */
+  TapCritDamage: 14,
+  /** Multiplies ShipService's SHIP_CRIT_DAMAGE_MULTIPLIER, same idea as TapCritDamage but for
+   *  fleet hits - Autonomous Fleet's 2nd sub-identity alongside Dps. */
+  ShipCritDamage: 15,
+  /** Additive discount on every Tap Damage and Ship upgrade's Stardust cost (TapDamageUpgrade.ts/
+   *  ShipService.ts's setCostMultiplier) - Galactic Salvage's 2nd sub-identity alongside Gold.
+   *  Aggregated by SUM like SkillCooldown, not the usual multiplicative stack - a discount
+   *  fraction isn't a growth multiplier. */
+  UpgradeCostReduction: 16,
+  /** Multiplies the boss fight timer (StageManager.ts's setBossTimerMultiplier, previously a flat
+   *  bossTimerSeconds with no talent hook) - Warp Command's 2nd sub-identity alongside RelicGain. */
+  BossTimerBonus: 17,
 } as const
 
 export type TalentEffect = (typeof TalentEffect)[keyof typeof TalentEffect]
@@ -142,6 +156,10 @@ export const EFFECT_LABEL: Record<TalentEffect, string> = {
   [TalentEffect.SkillDuration]: 'Skill Duration',
   [TalentEffect.SkillPower]: 'Skill Power',
   [TalentEffect.CoreCapstone]: 'Skill Mastery',
+  [TalentEffect.TapCritDamage]: 'Tap Crit Damage',
+  [TalentEffect.ShipCritDamage]: 'Ship Crit Damage',
+  [TalentEffect.UpgradeCostReduction]: 'Upgrade Discount',
+  [TalentEffect.BossTimerBonus]: 'Boss Timer',
 }
 
 interface TalentSpec {
@@ -207,12 +225,15 @@ function buildBranch(spec: BranchSpec): TalentDefinition[] {
   return defs
 }
 
+/** Vanguard Cannon's real identity: raw tap damage, tap crit chance (existing), and now tap crit
+ *  DAMAGE too - TapController.ts's TAP_CRIT_DAMAGE_MULTIPLIER was a hardcoded flat 2x with no
+ *  talent hook at all until this redesign. */
 const CANNON: BranchSpec = {
   id: 'cannon',
   tiers: [
     [
       { localId: 'pulse-amplifier', displayName: 'Pulse Amplifier', description: 'Increases tap damage per rank.', effect: TalentEffect.TapDamage, role: 'regular' },
-      { localId: 'precision-optics', displayName: 'Precision Optics', description: 'Increases tap crit chance and crit damage per rank.', effect: TalentEffect.TapCritChance, role: 'regular' },
+      { localId: 'precision-optics', displayName: 'Precision Optics', description: 'Increases tap crit chance per rank.', effect: TalentEffect.TapCritChance, role: 'regular' },
     ],
     [
       {
@@ -225,8 +246,8 @@ const CANNON: BranchSpec = {
       {
         localId: 'armor-fracture',
         displayName: 'Armor Fracture',
-        description: "Every 15 taps, cracks the target's armor for 5s (Phase 2: real armor debuff) - for now, boosts tap damage.",
-        effect: TalentEffect.TapDamage,
+        description: 'Increases the damage multiplier on every critical tap per rank.',
+        effect: TalentEffect.TapCritDamage,
         role: 'regular',
       },
     ],
@@ -241,8 +262,8 @@ const CANNON: BranchSpec = {
       {
         localId: 'core-lock',
         displayName: 'Core Lock',
-        description: "5 crits in 3s exposes the enemy's core for 4s, boosting tap damage (Phase 2: real core-lock window).",
-        effect: TalentEffect.TapDamage,
+        description: 'Further increases the damage multiplier on every critical tap per rank.',
+        effect: TalentEffect.TapCritDamage,
         role: 'regular',
       },
     ],
@@ -257,8 +278,8 @@ const CANNON: BranchSpec = {
       {
         localId: 'execution-beam',
         displayName: 'Execution Beam',
-        description: 'Tap damage against targets under 25% HP is increased.',
-        effect: TalentEffect.TapDamage,
+        description: 'Further increases the damage multiplier on every critical tap per rank.',
+        effect: TalentEffect.TapCritDamage,
         role: 'regular',
       },
     ],
@@ -272,12 +293,15 @@ const CANNON: BranchSpec = {
   },
 }
 
+/** Autonomous Fleet's real identity: fleet DPS, plus ship crit chance AND ship crit damage
+ *  (ShipService.ts's SHIP_CRIT_DAMAGE_MULTIPLIER was a hardcoded flat 2x, same as tap's own -
+ *  ShipCritChance itself already existed as an effect but no branch node used it until now). */
 const FLEET: BranchSpec = {
   id: 'fleet',
   tiers: [
     [
       { localId: 'autonomous-turrets', displayName: 'Autonomous Turrets', description: "Increases the fleet's automatic damage per rank.", effect: TalentEffect.Dps, role: 'regular' },
-      { localId: 'drone-hangar', displayName: 'Drone Hangar', description: 'Increases drone damage per rank; adds a drone at ranks 3 and 5 (Phase 2: real drone count).', effect: TalentEffect.Dps, role: 'regular' },
+      { localId: 'drone-hangar', displayName: 'Drone Hangar', description: 'Increases the chance for every fleet hit to critically strike, per rank.', effect: TalentEffect.ShipCritChance, role: 'regular' },
     ],
     [
       {
@@ -290,13 +314,19 @@ const FLEET: BranchSpec = {
       {
         localId: 'replicator-nanites',
         displayName: 'Replicator Nanites',
-        description: 'Chance to spawn a temporary drone on kill (Phase 2: real temp drones) - for now, boosts fleet DPS.',
-        effect: TalentEffect.Dps,
+        description: 'Increases the damage multiplier on every critical fleet hit per rank.',
+        effect: TalentEffect.ShipCritDamage,
         role: 'special',
       },
     ],
     [
-      { localId: 'priority-targeting', displayName: 'Priority Targeting', description: 'Drones deal bonus damage to bosses and elites.', effect: TalentEffect.Dps, role: 'regular' },
+      {
+        localId: 'priority-targeting',
+        displayName: 'Priority Targeting',
+        description: 'Further increases the chance for every fleet hit to critically strike, per rank.',
+        effect: TalentEffect.ShipCritChance,
+        role: 'regular',
+      },
       {
         localId: 'echo-command',
         displayName: 'Echo Command',
@@ -309,8 +339,8 @@ const FLEET: BranchSpec = {
       {
         localId: 'adaptive-formation',
         displayName: 'Adaptive Formation',
-        description: 'Choose a drone formation - Aggressive, Siege, or Patrol (Phase 2: real formation choice). For now, a flat fleet power boost.',
-        effect: TalentEffect.Dps,
+        description: 'Further increases the damage multiplier on every critical fleet hit.',
+        effect: TalentEffect.ShipCritDamage,
         role: 'keystone',
       },
       { localId: 'deep-space-patrol', displayName: 'Deep-Space Patrol', description: 'Increases offline earning duration and offline damage efficiency per rank.', effect: TalentEffect.OfflineReward, role: 'regular' },
@@ -382,6 +412,9 @@ const CORE: BranchSpec = {
   },
 }
 
+/** Galactic Salvage's real identity: Stardust income, plus an upgrade cost discount on Tap
+ *  Damage and every ship's next level (TapDamageUpgrade.ts/ShipService.ts's setCostMultiplier -
+ *  there was no cost-reduction hook anywhere in the economy before this). */
 const SALVAGE: BranchSpec = {
   id: 'salvage',
   tiers: [
@@ -390,7 +423,7 @@ const SALVAGE: BranchSpec = {
       { localId: 'tractor-array', displayName: 'Tractor Array', description: 'Auto-collects Stardust; chaining pickups increases their value (Phase 2: real loot chain).', effect: TalentEffect.Gold, role: 'regular' },
     ],
     [
-      { localId: 'rare-signal-scanner', displayName: 'Rare Signal Scanner', description: 'Increases rare drop chance and value per rank (Phase 2: real loot rarity).', effect: TalentEffect.Gold, role: 'regular' },
+      { localId: 'rare-signal-scanner', displayName: 'Rare Signal Scanner', description: 'Discounts every Tap Damage and ship upgrade\'s Stardust cost per rank.', effect: TalentEffect.UpgradeCostReduction, role: 'regular' },
       {
         localId: 'bounty-matrix',
         displayName: 'Bounty Matrix',
@@ -400,8 +433,8 @@ const SALVAGE: BranchSpec = {
       },
     ],
     [
-      { localId: 'recycling-forge', displayName: 'Recycling Forge', description: 'Duplicate parts convert to more Scrap; module upgrades cost less (Phase 2: real crafting economy).', effect: TalentEffect.Gold, role: 'regular' },
-      { localId: 'efficient-assembly', displayName: 'Efficient Assembly', description: 'Reduces ship/module upgrade costs per rank (Phase 2: real upgrade discount).', effect: TalentEffect.Gold, role: 'regular' },
+      { localId: 'recycling-forge', displayName: 'Recycling Forge', description: 'Further discounts every Tap Damage and ship upgrade\'s Stardust cost per rank.', effect: TalentEffect.UpgradeCostReduction, role: 'regular' },
+      { localId: 'efficient-assembly', displayName: 'Efficient Assembly', description: 'Further discounts every Tap Damage and ship upgrade\'s Stardust cost per rank.', effect: TalentEffect.UpgradeCostReduction, role: 'regular' },
     ],
     [
       {
@@ -414,8 +447,8 @@ const SALVAGE: BranchSpec = {
       {
         localId: 'smuggler-beacon',
         displayName: 'Smuggler Beacon',
-        description: 'At the start of each Ascension, special offers appear, purchasable with that run\'s Stardust (Phase 2: real offer shop).',
-        effect: TalentEffect.Gold,
+        description: 'Further discounts every Tap Damage and ship upgrade\'s Stardust cost.',
+        effect: TalentEffect.UpgradeCostReduction,
         role: 'special',
       },
     ],
@@ -429,6 +462,9 @@ const SALVAGE: BranchSpec = {
   },
 }
 
+/** Warp Command's real identity: Relic Gain, plus a longer boss fight timer
+ *  (StageManager.ts's setBossTimerMultiplier - bossTimerSeconds was flat, no talent hook, until
+ *  this redesign) - matches what Gravity Snare's own flavor already promised. */
 const WARP: BranchSpec = {
   id: 'warp',
   tiers: [
@@ -437,7 +473,7 @@ const WARP: BranchSpec = {
       { localId: 'first-strike-protocol', displayName: 'First Strike Protocol', description: "Boosts all damage in an enemy's first 4 seconds per rank (Phase 2: real timing window) - for now, boosts fleet DPS.", effect: TalentEffect.Dps, role: 'regular' },
     ],
     [
-      { localId: 'gravity-snare', displayName: 'Gravity Snare', description: 'Increases the boss timer per rank.', effect: TalentEffect.RelicGain, role: 'regular' },
+      { localId: 'gravity-snare', displayName: 'Gravity Snare', description: 'Increases the boss timer per rank.', effect: TalentEffect.BossTimerBonus, role: 'regular' },
       {
         localId: 'hyperlane-momentum',
         displayName: 'Hyperlane Momentum',
@@ -457,8 +493,8 @@ const WARP: BranchSpec = {
       {
         localId: 'temporal-insurance',
         displayName: 'Temporal Insurance',
-        description: 'Losing to a boss retains a portion of your Warp Momentum (Phase 2: real momentum system) - for now, boosts Relic Gain.',
-        effect: TalentEffect.RelicGain,
+        description: 'Further increases the boss timer per rank.',
+        effect: TalentEffect.BossTimerBonus,
         role: 'special',
       },
     ],
@@ -514,14 +550,14 @@ const COMBOS: ComboSpec[] = [
     id: 'combo-fleet-core',
     branches: ['fleet', 'core'],
     displayName: 'Charged Swarm',
-    description: 'While energy is above 80%, drones deal bonus damage; using a skill overcharges drones for 2s (Phase 2: real energy synergy) - for now, boosts fleet DPS.',
+    description: 'Activating any skill overcharges every drone for a few seconds (Phase 2: real overcharge window) - for now, boosts fleet DPS.',
     effect: TalentEffect.Dps,
   },
   {
     id: 'combo-core-salvage',
     branches: ['core', 'salvage'],
     displayName: 'Energy Arbitrage',
-    description: 'After a boss kill, unused energy converts to Stardust, boosting the boss reward (Phase 2: real energy-to-gold conversion) - for now, boosts Stardust.',
+    description: "A skill's leftover cooldown reduction converts into a Stardust bonus on the boss kill that follows (Phase 2: real cooldown-to-gold conversion) - for now, boosts Stardust.",
     effect: TalentEffect.Gold,
   },
   {

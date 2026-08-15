@@ -20,6 +20,10 @@ export class ShipService {
   private readonly cfg: BalanceConfig
   private readonly levels: number[]
   private readonly timers: number[] // seconds accumulated toward next hit
+  /** Fed by GameSession from TalentService.upgradeCostReduction() (Galactic Salvage) - 1 = no
+   *  discount. Clamped here, not at the talent layer, same reasoning as SkillService's own
+   *  setCooldownReduction clamp. */
+  private costMultiplier = 1
 
   /** (shipIndex, newLevel) */
   readonly onShipChanged = new Emitter<{ index: number; level: number }>()
@@ -46,8 +50,16 @@ export class ShipService {
     return this.ships[i]
   }
 
+  /** discount: 0..1 fraction off every ship's next cost, clamped to a max 60% - upgrades should
+   *  get cheaper, never free. */
+  setCostMultiplier(discount: number): void {
+    this.costMultiplier = 1 - (discount < 0 ? 0 : discount > 0.6 ? 0.6 : discount)
+  }
+
   nextCost(i: number): BigNumber {
-    return upgradeCostShip(this.levels[i] + 1, this.ships[i].baseCost, this.cfg.shipCostPerLevel, this.cfg.shipCostBreakpointLevel, this.cfg.shipCostBreakpointGrowth)
+    return upgradeCostShip(this.levels[i] + 1, this.ships[i].baseCost, this.cfg.shipCostPerLevel, this.cfg.shipCostBreakpointLevel, this.cfg.shipCostBreakpointGrowth).mul(
+      new BigNumber(this.costMultiplier),
+    )
   }
 
   /** Whether ship i's NEXT purchase is actually free - see buyOrUpgrade's doc comment. The UI
@@ -138,8 +150,10 @@ export class ShipService {
 
   /** Advance all ship cooldowns by deltaSeconds; idle damage with an optional DPS multiplier
    * and an optional per-hit crit chance (Ancestral Beacon - 0 until unlocked and owned). Each
-   * hit rolls independently, same real-randomness reasoning as TapController's crit. */
-  tick(deltaSeconds: number, enemy: EnemyController, dpsMultiplier: BigNumber = BigNumber.One, critChance = 0): BigNumber {
+   * hit rolls independently, same real-randomness reasoning as TapController's crit.
+   * critDamageMultiplier stacks ON TOP of the flat SHIP_CRIT_DAMAGE_MULTIPLIER - see
+   * TalentService.shipCritDamageMultiplier(). */
+  tick(deltaSeconds: number, enemy: EnemyController, dpsMultiplier: BigNumber = BigNumber.One, critChance = 0, critDamageMultiplier: BigNumber = BigNumber.One): BigNumber {
     if (!enemy || deltaSeconds <= 0) return BigNumber.Zero
 
     let total = BigNumber.Zero
@@ -153,9 +167,8 @@ export class ShipService {
       while (this.timers[i] >= cd && hits < MAX_HITS_PER_SHIP_PER_TICK) {
         this.timers[i] -= cd
         const isCrit = Math.random() < critChance
-        const hit = this.hitDamage(i)
-          .mul(dpsMultiplier)
-          .mul(new BigNumber(isCrit ? SHIP_CRIT_DAMAGE_MULTIPLIER : 1))
+        let hit = this.hitDamage(i).mul(dpsMultiplier)
+        if (isCrit) hit = hit.mul(new BigNumber(SHIP_CRIT_DAMAGE_MULTIPLIER)).mul(critDamageMultiplier)
         if (enemy.current) enemy.applyDamage(hit)
         this.onShipHit.emit({ index: i, damage: hit, isCrit })
         total = total.add(hit)

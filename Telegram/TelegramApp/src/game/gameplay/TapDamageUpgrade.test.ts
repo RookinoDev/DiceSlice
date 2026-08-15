@@ -19,3 +19,17 @@ describe('TapDamageUpgrade: first upgrade is free', () => {
     expect(s.tapUpgrade.level).toBe(2)
   })
 })
+
+describe("TapDamageUpgrade: setCostMultiplier (Galactic Salvage's upgrade discount)", () => {
+  it('discounts nextCost and clamps to a max 60% off, never free', () => {
+    const s = createGameSession()
+    s.tapUpgrade.tryUpgrade(s.wallet) // clear the free first upgrade so nextCost is a real price
+    const fullCost = s.tapUpgrade.nextCost.toNumber()
+
+    s.tapUpgrade.setCostMultiplier(0.25)
+    expect(s.tapUpgrade.nextCost.toNumber()).toBeCloseTo(fullCost * 0.75, 6)
+
+    s.tapUpgrade.setCostMultiplier(5) // way over 1 - must clamp, never free or negative
+    expect(s.tapUpgrade.nextCost.toNumber()).toBeCloseTo(fullCost * 0.4, 6)
+  })
+})

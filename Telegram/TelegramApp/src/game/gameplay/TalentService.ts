@@ -206,6 +206,32 @@ export class TalentService {
     }
     return sum + this.perkBonusFor(TalentEffect.SkillCooldown)
   }
+  /** Multiplies TapController's TAP_CRIT_DAMAGE_MULTIPLIER - see Vanguard Cannon's own comment
+   *  in TalentDefinition.ts. */
+  tapCritDamageMultiplier(): BigNumber {
+    return this.multiplier(TalentEffect.TapCritDamage)
+  }
+  /** Multiplies ShipService's SHIP_CRIT_DAMAGE_MULTIPLIER - see Autonomous Fleet's own comment
+   *  in TalentDefinition.ts. */
+  shipCritDamageMultiplier(): BigNumber {
+    return this.multiplier(TalentEffect.ShipCritDamage)
+  }
+  /** Multiplies the boss fight timer - see Warp Command's own comment in TalentDefinition.ts. */
+  bossTimerMultiplier(): BigNumber {
+    return this.multiplier(TalentEffect.BossTimerBonus)
+  }
+  /** Fed straight into TapDamageUpgrade.setCostMultiplier()/ShipService.setCostMultiplier(),
+   *  which each clamp to a sane ceiling - sums (not compounds) every UpgradeCostReduction-tagged
+   *  node's bonus, same reasoning as skillCooldownReduction above (a discount fraction isn't a
+   *  growth multiplier). See Galactic Salvage's own comment in TalentDefinition.ts. */
+  upgradeCostReduction(): number {
+    let sum = 0
+    for (let i = 0; i < this.defs.length; i++) {
+      if (this.defs[i].effect !== TalentEffect.UpgradeCostReduction || this.levels[i] <= 0) continue
+      sum += talentBonusAt(this.defs[i], this.levels[i])
+    }
+    return sum + this.perkBonusFor(TalentEffect.UpgradeCostReduction)
+  }
   /** Crit chance is a plain probability, not a stacking multiplier - summed (not compounded)
    *  across every owned node tagged with `effect`, same shape as ArtifactService.critChanceFor. */
   private critChanceFor(effect: TalentEffect): number {

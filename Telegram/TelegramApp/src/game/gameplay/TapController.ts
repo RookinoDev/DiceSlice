@@ -23,15 +23,25 @@ export class TapController {
    * clearly-isolated multiplier is chance-based (same class as the existing Secret Rare
    * Destruction cosmetic lottery in CombatScreen.tsx). */
   private readonly critChance?: () => number
+  /** optional multiplier ON TOP of the flat TAP_CRIT_DAMAGE_MULTIPLIER (x1 if undefined) - see
+   *  TalentService.tapCritDamageMultiplier(). */
+  private readonly critDamageMultiplier?: () => BigNumber
 
   /** View hook for floating damage numbers. */
   readonly onDamageDealt = new Emitter<DamageEvent>()
 
-  constructor(enemy: EnemyController, tapDamage: TapDamageUpgrade, multiplier?: () => BigNumber, critChance?: () => number) {
+  constructor(
+    enemy: EnemyController,
+    tapDamage: TapDamageUpgrade,
+    multiplier?: () => BigNumber,
+    critChance?: () => number,
+    critDamageMultiplier?: () => BigNumber,
+  ) {
     this.enemy = enemy
     this.tapDamage = tapDamage
     this.multiplier = multiplier
     this.critChance = critChance
+    this.critDamageMultiplier = critDamageMultiplier
   }
 
   tap(): void {
@@ -40,7 +50,10 @@ export class TapController {
     let dmg = this.tapDamage.currentDamage
     if (this.multiplier) dmg = dmg.mul(this.multiplier())
     const isCrit = Math.random() < (this.critChance?.() ?? 0)
-    if (isCrit) dmg = dmg.mul(new BigNumber(TAP_CRIT_DAMAGE_MULTIPLIER))
+    if (isCrit) {
+      dmg = dmg.mul(new BigNumber(TAP_CRIT_DAMAGE_MULTIPLIER))
+      if (this.critDamageMultiplier) dmg = dmg.mul(this.critDamageMultiplier())
+    }
     this.enemy.applyDamage(dmg)
     this.onDamageDealt.emit({ amount: dmg, isCrit })
   }

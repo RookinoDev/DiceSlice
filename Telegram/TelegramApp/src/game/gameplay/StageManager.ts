@@ -16,6 +16,8 @@ export class StageManager {
   private _highestStage: number
   private _bossActive = false
   private _bossTimeLeft = 0
+  /** Fed by GameSession from TalentService.bossTimerMultiplier() (Warp Command) - 1 = no bonus. */
+  private _bossTimerMultiplier = 1
 
   readonly onStageEntered = new Emitter<number>()
   readonly onBossStarted = new Emitter<number>()
@@ -78,6 +80,11 @@ export class StageManager {
     return g
   }
 
+  /** bonus: multiplier on the boss timer, 1 = no bonus. */
+  setBossTimerMultiplier(bonus: number): void {
+    this._bossTimerMultiplier = bonus < 1 ? 1 : bonus
+  }
+
   /** Activate the current stage (starts the boss timer if it's a boss). */
   begin(): void {
     this.enterStage(this._currentStage)
@@ -90,7 +97,7 @@ export class StageManager {
 
     if (this.isBossStage(stage)) {
       this._bossActive = true
-      this._bossTimeLeft = this.cfg.bossTimerSeconds
+      this._bossTimeLeft = this.cfg.bossTimerSeconds * this._bossTimerMultiplier
       this.onBossStarted.emit(stage)
     } else {
       this._bossActive = false
@@ -128,7 +135,7 @@ export class StageManager {
   retryBoss(): void {
     if (this.isBossStage(this._currentStage) && !this._bossActive) {
       this._bossActive = true
-      this._bossTimeLeft = this.cfg.bossTimerSeconds
+      this._bossTimeLeft = this.cfg.bossTimerSeconds * this._bossTimerMultiplier
       this.onBossStarted.emit(this._currentStage)
     }
   }

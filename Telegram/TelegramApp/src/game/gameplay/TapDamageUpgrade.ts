@@ -1,5 +1,5 @@
 // Ported from Assets/PixelPlanets/StellarBreaker/Scripts/Gameplay/TapDamageUpgrade.cs
-import type { BigNumber } from '../core/BigNumber'
+import { BigNumber } from '../core/BigNumber'
 import { Emitter } from '../core/Emitter'
 import type { BalanceConfig } from '../config/BalanceConfig'
 import type { CurrencyService } from '../economy/CurrencyService'
@@ -13,6 +13,10 @@ import { upgradeCostTapDamage } from '../economy/UpgradeCost'
 export class TapDamageUpgrade {
   private readonly cfg: BalanceConfig
   private _level: number
+  /** Fed by GameSession from TalentService.upgradeCostReduction() (Galactic Salvage) - 1 = no
+   *  discount. Clamped here, not at the talent layer, same reasoning as SkillService's own
+   *  setCooldownReduction clamp. */
+  private costMultiplier = 1
 
   readonly onLevelChanged = new Emitter<number>()
 
@@ -29,8 +33,14 @@ export class TapDamageUpgrade {
     return tapDamageForLevelCfg(this._level, this.cfg)
   }
 
+  /** discount: 0..1 fraction off the next upgrade's cost, clamped to a max 60% - upgrades should
+   *  get cheaper, never free. */
+  setCostMultiplier(discount: number): void {
+    this.costMultiplier = 1 - (discount < 0 ? 0 : discount > 0.6 ? 0.6 : discount)
+  }
+
   get nextCost(): BigNumber {
-    return upgradeCostTapDamage(this._level, this.cfg)
+    return upgradeCostTapDamage(this._level, this.cfg).mul(new BigNumber(this.costMultiplier))
   }
 
   /** Whether the NEXT upgrade is actually free - see tryUpgrade's doc comment. The UI reads

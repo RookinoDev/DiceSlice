@@ -109,6 +109,7 @@ export class GameSession {
       this.tapUpgrade,
       () => this.skills.tapDamageMultiplier().mul(this.artifacts.tapDamageMultiplier()).mul(this.talents.tapDamageMultiplier()).mul(this.gems.tapDamageMultiplier()),
       () => Math.min(TOTAL_CRIT_CAP, this.artifacts.tapCritChance() + this.talents.tapCritChance() + this.gems.tapCritChance()),
+      () => this.talents.tapCritDamageMultiplier(),
     )
 
     this.enemy.onPlanetKilled.on((e) => this.handleKill(e.planet, e.overkill))
@@ -156,6 +157,13 @@ export class GameSession {
     this.skills.setCooldownReduction(this.talents.skillCooldownReduction())
     this.skills.setDurationMultiplier(this.talents.skillDurationMultiplier().toNumber())
     this.skills.setSkillPowerMultiplier(this.talents.skillPowerMultiplier().toNumber())
+    // Warp Command / Galactic Salvage's real payoffs - same reasoning: setBossTimerMultiplier
+    // only takes effect the next time a boss timer is armed, setCostMultiplier the next time a
+    // cost is quoted, neither of which necessarily happens on this exact tick.
+    this.stage.setBossTimerMultiplier(this.talents.bossTimerMultiplier().toNumber())
+    const costMultiplier = this.talents.upgradeCostReduction()
+    this.tapUpgrade.setCostMultiplier(costMultiplier)
+    this.ships.setCostMultiplier(costMultiplier)
 
     this.stage.tick(deltaSeconds)
     this.skills.tick(deltaSeconds)
@@ -180,6 +188,7 @@ export class GameSession {
       this.enemy,
       this.skills.dpsMultiplier().mul(this.artifacts.dpsMultiplier()).mul(this.talents.dpsMultiplier()).mul(this.gems.dpsMultiplier()),
       Math.min(TOTAL_CRIT_CAP, this.artifacts.shipCritChance() + this.talents.shipCritChance() + this.gems.shipCritChance()),
+      this.talents.shipCritDamageMultiplier(),
     )
   }
 
@@ -247,9 +256,11 @@ export class GameSession {
   get prestigeUnlockStage(): number {
     return this.cfg.prestigeUnlockStage
   }
-  /** Full boss-timer duration in seconds (for UI fill bars). */
+  /** Full boss-timer duration in seconds (for UI fill bars) - includes Warp Command's
+   *  bossTimerMultiplier, so the fill bar's denominator always matches what StageManager
+   *  actually armed the timer with (see setBossTimerMultiplier's own comment). */
   get bossTimerSeconds(): number {
-    return this.cfg.bossTimerSeconds
+    return this.cfg.bossTimerSeconds * this.talents.bossTimerMultiplier().toNumber()
   }
   /** Every Nth stage is a boss (read-only, for the real-planet roster lookup). */
   get bossStageInterval(): number {

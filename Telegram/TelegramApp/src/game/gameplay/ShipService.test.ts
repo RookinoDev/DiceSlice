@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { BigNumber } from '../core/BigNumber'
 import { createGameSession } from '../createGameSession'
 
 describe('ShipService: first ship is free', () => {
@@ -52,5 +53,30 @@ describe('ShipService: late-game cost curve (see BalanceConfig.shipCostBreakpoin
     // real ShipService/BalanceConfig wiring, not just the pure ShipCombat.ts formula in isolation.
     const flatContinuationOnly = 50 * (Math.pow(1.075, 99) - 1) / (1.075 - 1)
     expect(total).toBeGreaterThan(flatContinuationOnly * 100)
+  })
+})
+
+describe("ShipService: setCostMultiplier (Galactic Salvage's upgrade discount)", () => {
+  it('discounts nextCost and clamps to a max 60% off, never free', () => {
+    const s = createGameSession()
+    s.ships.buyOrUpgrade(0, s.wallet) // clear the free first purchase so nextCost is a real price
+    const fullCost = s.ships.nextCost(0).toNumber()
+
+    s.ships.setCostMultiplier(0.25)
+    expect(s.ships.nextCost(0).toNumber()).toBeCloseTo(fullCost * 0.75, 6)
+
+    s.ships.setCostMultiplier(5) // way over 1 - must clamp, never free or negative
+    expect(s.ships.nextCost(0).toNumber()).toBeCloseTo(fullCost * 0.4, 6)
+  })
+})
+
+describe("ShipService: critDamageMultiplier (Autonomous Fleet's real identity)", () => {
+  it('stacks on top of the flat SHIP_CRIT_DAMAGE_MULTIPLIER only on a crit hit', () => {
+    const s = createGameSession()
+    s.ships.buyOrUpgrade(0, s.wallet)
+    // critChance=1 forces every hit to crit, deterministically comparing the exact same tick twice.
+    const base = s.ships.tick(10, s.enemy, BigNumber.One, 1, BigNumber.One).toNumber()
+    const boosted = s.ships.tick(10, s.enemy, BigNumber.One, 1, new BigNumber(2)).toNumber()
+    expect(boosted).toBeCloseTo(base * 2, 6)
   })
 })
