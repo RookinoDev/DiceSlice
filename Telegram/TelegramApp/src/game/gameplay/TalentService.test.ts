@@ -175,29 +175,64 @@ describe('TalentService', () => {
     const t = freshService()
     t.grantXp(1_000_000)
     expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(1, 6)
-    // Seeds Core (Capstone-tagged, which DOES buff RelicGain - see CAPSTONE_EFFECTS) as owned,
-    // so the baseline to compare against is whatever Core alone contributes, not 1.
-    t.buyNode(indexOf(t, 'core-expanded-reactor'))
-    const baseline = t.relicGainMultiplier().toNumber()
-    expect(baseline).toBeGreaterThan(1) // Core's Capstone bonus alone already moved this
 
     t.buyNode(indexOf(t, 'warp-first-strike-protocol')) // Dps, same branch as the RelicGain node below
-    expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(baseline, 6) // unaffected - wrong effect
+    expect(t.relicGainMultiplier().toNumber()).toBeCloseTo(1, 6) // unaffected - wrong effect
 
     t.buyNode(indexOf(t, 'warp-warp-navigation')) // RelicGain
-    expect(t.relicGainMultiplier().toNumber()).toBeGreaterThan(baseline)
+    expect(t.relicGainMultiplier().toNumber()).toBeGreaterThan(1)
   })
 
-  it('Core branch Capstone nodes each add their own bonus to CAPSTONE_EFFECTS stats, not just one', () => {
-    const t = freshService()
-    t.grantXp(1_000_000)
-    const before = t.dpsMultiplier().toNumber()
-    t.buyNode(indexOf(t, 'core-expanded-reactor'))
-    const afterOne = t.dpsMultiplier().toNumber()
-    expect(afterOne).toBeGreaterThan(before)
-    t.buyNode(indexOf(t, 'core-flux-recharge'))
-    const afterTwo = t.dpsMultiplier().toNumber()
-    expect(afterTwo).toBeGreaterThan(afterOne) // a second Capstone node compounds, isn't ignored
+  describe('Core Engine: real identity is active-skill cooldown/duration/power, not a placeholder', () => {
+    it('skillCooldownReduction sums every SkillCooldown-tagged node, not just one', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(t.skillCooldownReduction()).toBe(0)
+      // Maxes tier 1's first node (expanded-reactor, SkillDuration) to exactly the tier-2
+      // threshold - unlocks thermal-recycling without touching either SkillCooldown node below.
+      grantBranchPoints(t, 'core', 5)
+      t.buyNode(indexOf(t, 'core-flux-recharge')) // tier 1, SkillCooldown, still fresh
+      const afterOne = t.skillCooldownReduction()
+      expect(afterOne).toBeGreaterThan(0)
+      t.buyNode(indexOf(t, 'core-thermal-recycling')) // tier 2, SkillCooldown, now unlocked
+      expect(t.skillCooldownReduction()).toBeGreaterThan(afterOne) // a second node adds, isn't ignored
+    })
+
+    it('skillDurationMultiplier and skillPowerMultiplier only move on their own tagged nodes', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(t.skillDurationMultiplier().toNumber()).toBeCloseTo(1, 6)
+      expect(t.skillPowerMultiplier().toNumber()).toBeCloseTo(1, 6)
+
+      t.buyNode(indexOf(t, 'core-flux-recharge')) // SkillCooldown, not Duration or Power
+      expect(t.skillDurationMultiplier().toNumber()).toBeCloseTo(1, 6)
+      expect(t.skillPowerMultiplier().toNumber()).toBeCloseTo(1, 6)
+
+      t.buyNode(indexOf(t, 'core-expanded-reactor')) // SkillDuration
+      expect(t.skillDurationMultiplier().toNumber()).toBeGreaterThan(1)
+      expect(t.skillPowerMultiplier().toNumber()).toBeCloseTo(1, 6) // still untouched
+
+      // Maxes expanded-reactor/flux-recharge and partially levels thermal-recycling to exactly
+      // the tier-3 threshold - unlocks chain-reaction (SkillPower) without touching it.
+      grantBranchPoints(t, 'core', 12)
+      t.buyNode(indexOf(t, 'core-chain-reaction')) // SkillPower, still fresh
+      expect(t.skillPowerMultiplier().toNumber()).toBeGreaterThan(1)
+    })
+
+    it("Infinite Core (CoreCapstone) tops up all three at once, same shape as the tree-wide Capstone sentinel", () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      grantBranchPoints(t, 'core', 35) // Infinite Core's unlock threshold
+      const cooldownBefore = t.skillCooldownReduction()
+      const durationBefore = t.skillDurationMultiplier().toNumber()
+      const powerBefore = t.skillPowerMultiplier().toNumber()
+
+      t.buyNode(indexOf(t, 'core-infinite-core'))
+
+      expect(t.skillCooldownReduction()).toBeGreaterThan(cooldownBefore)
+      expect(t.skillDurationMultiplier().toNumber()).toBeGreaterThan(durationBefore)
+      expect(t.skillPowerMultiplier().toNumber()).toBeGreaterThan(powerBefore)
+    })
   })
 
   describe('unspentPoints is derived, not stored (regression: a real reported bug)', () => {

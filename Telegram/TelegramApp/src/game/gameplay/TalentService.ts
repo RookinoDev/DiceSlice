@@ -5,7 +5,7 @@
 import { BigNumber } from '../core/BigNumber'
 import { Emitter } from '../core/Emitter'
 import type { BalanceConfig } from '../config/BalanceConfig'
-import { CAPSTONE_EFFECTS, TalentEffect, talentBonusAt, isTalentNodeUnlocked, type TalentDefinition } from '../config/TalentDefinition'
+import { CAPSTONE_EFFECTS, CORE_CAPSTONE_EFFECTS, TalentEffect, talentBonusAt, isTalentNodeUnlocked, type TalentDefinition } from '../config/TalentDefinition'
 import { xpToNextLevel } from '../economy/TalentXp'
 import { rollRandomPerk, passivePerkTemplate, type GrantedPerk } from '../config/PassivePerk'
 
@@ -148,13 +148,19 @@ export class TalentService {
    *  with `effect`, PLUS every owned Capstone-tagged node if this stat is one of CAPSTONE_EFFECTS
    *  (the shared trunk/wings and the Grand Nexus all carry the Capstone sentinel, not a specific
    *  stat tag, so they're summed here rather than by the main per-effect check above - multiple
-   *  Capstone nodes all count, not just one), THEN the combined Eternal Drive perk bonus applied
-   *  once as a single extra factor. Same shape as ArtifactService.multiplier(). */
+   *  Capstone nodes all count, not just one) and likewise every CoreCapstone-tagged node (just
+   *  Infinite Core today) if this stat is one of CORE_CAPSTONE_EFFECTS, THEN the combined Eternal
+   *  Drive perk bonus applied once as a single extra factor. Same shape as
+   *  ArtifactService.multiplier(). */
   multiplier(effect: TalentEffect): BigNumber {
     let mult = BigNumber.One
     const alsoCapstone = CAPSTONE_EFFECTS.includes(effect)
+    const alsoCoreCapstone = CORE_CAPSTONE_EFFECTS.includes(effect)
     for (let i = 0; i < this.defs.length; i++) {
-      const matches = this.defs[i].effect === effect || (alsoCapstone && this.defs[i].effect === TalentEffect.Capstone)
+      const matches =
+        this.defs[i].effect === effect ||
+        (alsoCapstone && this.defs[i].effect === TalentEffect.Capstone) ||
+        (alsoCoreCapstone && this.defs[i].effect === TalentEffect.CoreCapstone)
       if (!matches || this.levels[i] <= 0) continue
       mult = mult.mul(new BigNumber(1 + talentBonusAt(this.defs[i], this.levels[i])))
     }
@@ -178,6 +184,27 @@ export class TalentService {
   /** Multiplies the Relics gained on a Stellar Ascension - see PrestigeService.prestige(). */
   relicGainMultiplier(): BigNumber {
     return this.multiplier(TalentEffect.RelicGain)
+  }
+  /** Multiplies every timed active skill's active-buff duration - see SkillService.activate(). */
+  skillDurationMultiplier(): BigNumber {
+    return this.multiplier(TalentEffect.SkillDuration)
+  }
+  /** Multiplies every active skill's own effect magnitude - see SkillService.effectValue(). */
+  skillPowerMultiplier(): BigNumber {
+    return this.multiplier(TalentEffect.SkillPower)
+  }
+  /** Fed straight into SkillService.setCooldownReduction(), which itself clamps to a sane
+   *  ceiling (0..0.9) - so this sums (not compounds) every SkillCooldown/CoreCapstone-tagged
+   *  node's bonus, same shape as critChanceFor below, rather than the (1+bonus) compounding
+   *  every other multiplier() consumer uses. A reduction fraction isn't a growth multiplier -
+   *  compounding it the usual way would make no sense (and could exceed 100% on its own). */
+  skillCooldownReduction(): number {
+    let sum = 0
+    for (let i = 0; i < this.defs.length; i++) {
+      const matches = this.defs[i].effect === TalentEffect.SkillCooldown || this.defs[i].effect === TalentEffect.CoreCapstone
+      if (matches && this.levels[i] > 0) sum += talentBonusAt(this.defs[i], this.levels[i])
+    }
+    return sum + this.perkBonusFor(TalentEffect.SkillCooldown)
   }
   /** Crit chance is a plain probability, not a stacking multiplier - summed (not compounded)
    *  across every owned node tagged with `effect`, same shape as ArtifactService.critChanceFor. */

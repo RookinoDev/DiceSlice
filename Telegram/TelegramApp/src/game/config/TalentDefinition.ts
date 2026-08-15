@@ -22,14 +22,31 @@ export const TalentEffect = {
   ShipCritChance: 6,
   /** Multiplies the Relics gained on a Stellar Ascension - see PrestigeService.prestige(). */
   RelicGain: 7,
-  /** Sentinel for a small "boosts nearly everything" node - used here for the whole Core Engine
-   *  branch, whose real payoff (an energy resource for active skills) doesn't exist yet: never
-   *  matched by the per-stat aggregation loop directly, but summed into every one of
-   *  CAPSTONE_EFFECTS by TalentService.multiplier(). */
+  /** Sentinel for a small "boosts nearly everything" node - not matched by the per-stat
+   *  aggregation loop directly, but summed into every one of CAPSTONE_EFFECTS by
+   *  TalentService.multiplier(). Still used by 3 of Eternal Drive's random perks (see
+   *  PassivePerk.ts) even though no branch node carries it anymore. */
   Capstone: 8,
   /** Sentinel for a Gem Socket slot: carries no bonus of its own (the socketed card's ability
    *  does, via GemSocketService) - this only exists so the aggregation loop skips it. */
   GemSocket: 9,
+  /** Core Engine's real identity: reduces every active skill's cooldown (see
+   *  SkillService.setCooldownReduction, a hook that already existed but was never wired to
+   *  anything). Aggregated by SUM, not the usual multiplicative stack - see
+   *  TalentService.skillCooldownReduction()'s own comment for why. */
+  SkillCooldown: 10,
+  /** Multiplies every timed active skill's active-buff duration (SkillService.activate()). Has
+   *  no effect on Meteor Call - it's instant, never enters the active-buff state this scales. */
+  SkillDuration: 11,
+  /** Multiplies every active skill's own effect magnitude - Overdrive's tap-damage %, Fleet
+   *  Surge's DPS %, Golden Horizon's gold %, Drone Swarm's taps/sec, Meteor Call's instant
+   *  damage - via SkillService.effectValue()/activate(), the one shared computation point every
+   *  skill already runs through. */
+  SkillPower: 12,
+  /** Sentinel for Infinite Core (Core Engine's capstone) only: counts toward SkillCooldown,
+   *  SkillDuration, AND SkillPower at once, mirroring Capstone/CAPSTONE_EFFECTS but scoped to
+   *  just this branch's own 3 effects instead of the tree-wide 5. */
+  CoreCapstone: 13,
 } as const
 
 export type TalentEffect = (typeof TalentEffect)[keyof typeof TalentEffect]
@@ -38,6 +55,10 @@ export type TalentEffect = (typeof TalentEffect)[keyof typeof TalentEffect]
  *  flat "+5% to everything" reads oddly against a percentage-point crit stat, and XpGain has
  *  always been excluded). */
 export const CAPSTONE_EFFECTS: TalentEffect[] = [TalentEffect.Dps, TalentEffect.Gold, TalentEffect.TapDamage, TalentEffect.OfflineReward, TalentEffect.RelicGain]
+
+/** Which of Core Engine's own effects a CoreCapstone-tagged node's bonus applies to - see
+ *  TalentEffect.CoreCapstone's own comment. */
+export const CORE_CAPSTONE_EFFECTS: TalentEffect[] = [TalentEffect.SkillCooldown, TalentEffect.SkillDuration, TalentEffect.SkillPower]
 
 /** The tree's 5 named branches - real identity here, unlike the previous uncategorized design:
  *  each is a distinct playstyle (see the design doc), shown to the player as a labeled section. */
@@ -117,6 +138,10 @@ export const EFFECT_LABEL: Record<TalentEffect, string> = {
   [TalentEffect.RelicGain]: 'Relic Gain',
   [TalentEffect.Capstone]: 'Core Systems',
   [TalentEffect.GemSocket]: 'Gem Socket',
+  [TalentEffect.SkillCooldown]: 'Skill Cooldown',
+  [TalentEffect.SkillDuration]: 'Skill Duration',
+  [TalentEffect.SkillPower]: 'Skill Power',
+  [TalentEffect.CoreCapstone]: 'Skill Mastery',
 }
 
 interface TalentSpec {
@@ -300,30 +325,34 @@ const FLEET: BranchSpec = {
   },
 }
 
+/** Core Engine's real identity: your 5 active skills (Overdrive Barrage, Fleet Surge, Meteor
+ *  Call, Drone Swarm, Golden Horizon) come back faster, last longer, and hit harder. Every
+ *  node's bonus is real and load-bearing today (see SkillService.ts) - no "Phase 2" placeholder
+ *  language left in this branch. */
 const CORE: BranchSpec = {
   id: 'core',
   tiers: [
     [
-      { localId: 'expanded-reactor', displayName: 'Expanded Reactor', description: 'Increases max energy per rank (Phase 2: real energy pool).', effect: TalentEffect.Capstone, role: 'regular' },
-      { localId: 'flux-recharge', displayName: 'Flux Recharge', description: 'Increases energy regen speed per rank (Phase 2: real energy pool).', effect: TalentEffect.Capstone, role: 'regular' },
+      { localId: 'expanded-reactor', displayName: 'Expanded Reactor', description: 'Increases the active duration of every timed skill per rank.', effect: TalentEffect.SkillDuration, role: 'regular' },
+      { localId: 'flux-recharge', displayName: 'Flux Recharge', description: 'Reduces the cooldown of every active skill per rank.', effect: TalentEffect.SkillCooldown, role: 'regular' },
     ],
     [
-      { localId: 'thermal-recycling', displayName: 'Thermal Recycling', description: 'Reduces active skill cooldowns per rank.', effect: TalentEffect.Capstone, role: 'regular' },
-      { localId: 'sustained-overdrive', displayName: 'Sustained Overdrive', description: 'Increases active skill duration per rank.', effect: TalentEffect.Capstone, role: 'regular' },
+      { localId: 'thermal-recycling', displayName: 'Thermal Recycling', description: 'Further reduces active skill cooldowns per rank.', effect: TalentEffect.SkillCooldown, role: 'regular' },
+      { localId: 'sustained-overdrive', displayName: 'Sustained Overdrive', description: 'Further increases active skill duration per rank.', effect: TalentEffect.SkillDuration, role: 'regular' },
     ],
     [
       {
         localId: 'chain-reaction',
         displayName: 'Chain Reaction',
-        description: 'Using two different skills within 4s empowers the second (Phase 2: real chain bonus) - for now, a small universal boost.',
-        effect: TalentEffect.Capstone,
+        description: 'Strengthens the effect of every active skill per rank.',
+        effect: TalentEffect.SkillPower,
         role: 'regular',
       },
       {
         localId: 'emergency-cell',
         displayName: 'Emergency Cell',
-        description: 'First time energy drops below 10% in a boss fight, refunds some energy (Phase 2: real energy pool) - for now, a small universal boost.',
-        effect: TalentEffect.Capstone,
+        description: 'Further reduces active skill cooldowns per rank.',
+        effect: TalentEffect.SkillCooldown,
         role: 'special',
       },
     ],
@@ -331,15 +360,15 @@ const CORE: BranchSpec = {
       {
         localId: 'superconductive-grid',
         displayName: 'Superconductive Grid',
-        description: 'Each active skill used after the first strengthens all skills (Phase 2: real chain scaling) - for now, a small universal boost.',
-        effect: TalentEffect.Capstone,
+        description: 'Further strengthens the effect of every active skill per rank.',
+        effect: TalentEffect.SkillPower,
         role: 'regular',
       },
       {
         localId: 'time-lock',
         displayName: 'Time Lock',
-        description: 'The first skill used in a boss fight briefly holds the boss timer (Phase 2: real time lock) - for now, a small universal boost.',
-        effect: TalentEffect.Capstone,
+        description: 'Further increases active skill duration per rank.',
+        effect: TalentEffect.SkillDuration,
         role: 'special',
       },
     ],
@@ -347,8 +376,8 @@ const CORE: BranchSpec = {
   capstone: {
     localId: 'infinite-core',
     displayName: 'Infinite Core',
-    description: "If energy holds at 100% for 3s, triggers an 8s Infinite Core burst: free skill casts, 3x faster cooldowns, +25% skill power, once per 90s (Phase 2: real energy pool). For now, a permanent universal boost.",
-    effect: TalentEffect.Capstone,
+    description: 'A permanent surge: reduces cooldowns, extends duration, and strengthens the effect of every active skill at once.',
+    effect: TalentEffect.CoreCapstone,
     role: 'keystone',
   },
 }

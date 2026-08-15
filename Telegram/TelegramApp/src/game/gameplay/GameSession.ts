@@ -150,6 +150,13 @@ export class GameSession {
 
   /** Advance boss timer, skill timers, and idle damage (DPS skill-buffed). */
   tick(deltaSeconds: number): BigNumber {
+    // Core Engine's real payoff (cooldown/duration/power for all 5 active skills) - pushed into
+    // SkillService each tick rather than read fresh per-call like the other multipliers, since
+    // cooldown/duration only take effect the next time a skill is actually activated/ticked.
+    this.skills.setCooldownReduction(this.talents.skillCooldownReduction())
+    this.skills.setDurationMultiplier(this.talents.skillDurationMultiplier().toNumber())
+    this.skills.setSkillPowerMultiplier(this.talents.skillPowerMultiplier().toNumber())
+
     this.stage.tick(deltaSeconds)
     this.skills.tick(deltaSeconds)
 

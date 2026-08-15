@@ -18,6 +18,10 @@ export class SkillService {
   private readonly state = new Map<SkillType, SkillState>()
   private readonly playerLevel: () => number
   private cooldownReduction = 0 // 0..1
+  /** Fed by GameSession from TalentService.skillDurationMultiplier()/skillPowerMultiplier()
+   *  (Core Engine's real payoff) - plain multipliers, 1 = no bonus. */
+  private durationMultiplier = 1
+  private skillPowerMultiplier = 1
 
   readonly onActivated = new Emitter<SkillType>()
   readonly onExpired = new Emitter<SkillType>()
@@ -93,12 +97,19 @@ export class SkillService {
   setCooldownReduction(fraction: number): void {
     this.cooldownReduction = fraction < 0 ? 0 : fraction > 0.9 ? 0.9 : fraction
   }
+  setDurationMultiplier(multiplier: number): void {
+    this.durationMultiplier = multiplier
+  }
+  setSkillPowerMultiplier(multiplier: number): void {
+    this.skillPowerMultiplier = multiplier
+  }
 
-  /** Raw effect value: a*lvl + b (NOT used for Meteor's instant damage). */
+  /** Raw effect value: (a*lvl + b) * Core Engine's skill-power multiplier (NOT used for
+   *  Meteor's instant damage, which applies the same multiplier inline in activate() below). */
   effectValue(t: SkillType): number {
     const d = this.def(t)
     const lvl = this.st(t).level
-    return d.coeffPerLevel * lvl + d.coeffBase
+    return (d.coeffPerLevel * lvl + d.coeffBase) * this.skillPowerMultiplier
   }
 
   /** Activate a skill. Returns Meteor's instant damage (Zero for others). */
@@ -111,11 +122,11 @@ export class SkillService {
 
     if (d.isInstant) {
       // Meteor Strike: 70*(1+lvl)*tapDamage
-      if (t === SkillType.MeteorStrike) return new BigNumber(d.coeffPerLevel * (1 + s.level)).mul(tapDamage)
+      if (t === SkillType.MeteorStrike) return new BigNumber(d.coeffPerLevel * (1 + s.level) * this.skillPowerMultiplier).mul(tapDamage)
       return BigNumber.Zero
     }
 
-    s.active = d.duration
+    s.active = d.duration * this.durationMultiplier
     return BigNumber.Zero
   }
 
