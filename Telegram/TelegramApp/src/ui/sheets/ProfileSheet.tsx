@@ -24,7 +24,9 @@ interface ProfileSheetProps {
   ownedCards: OwnedCard[]
   showcase: ShowcaseEntry[]
   onShowcaseChange: (next: ShowcaseEntry[]) => void
-  onInspectCard: (card: CardDefinition) => void
+  /** `entry` is set when the card comes from a showcase (own or visited) - see ShowcaseEditor's
+   *  InspectHandler doc for why that matters for a visited profile's cards. */
+  onInspectCard: (card: CardDefinition, entry?: ShowcaseEntry) => void
   onToast: (text: string) => void
 }
 

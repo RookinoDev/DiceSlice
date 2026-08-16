@@ -5,9 +5,10 @@
 // tell the player when the server save fails.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { ShowcaseEditor } from './ShowcaseEditor'
+import { ShowcaseEditor, ShowcaseView } from './ShowcaseEditor'
 import { FULL_CATALOG } from '../../game/cards/generatedCards'
 import type { OwnedCard } from '../../game/cards/cardsApi'
+import type { ShowcaseEntry } from '../../game/profileApi'
 
 const saveShowcaseMock = vi.fn()
 vi.mock('../../game/cards/cardsApi', () => ({ saveShowcase: (...args: unknown[]) => saveShowcaseMock(...args) }))
@@ -56,5 +57,16 @@ describe('ShowcaseEditor: server save failures roll back instead of silently sti
     await vi.waitFor(() => expect(onChange).toHaveBeenCalledTimes(2))
     expect(onChange).toHaveBeenNthCalledWith(2, []) // rolled back to the pre-edit showcase
     expect(onToast).toHaveBeenCalledOnce()
+  })
+})
+
+describe('ShowcaseView: visited-profile inspect passes the showcase entry through', () => {
+  it('calls onInspect with the entry, not just the card, so a visitor can see it unlocked', () => {
+    const onInspect = vi.fn()
+    const entry: ShowcaseEntry = { cardId: card.id, variant: 'standard' }
+    render(<ShowcaseView showcase={[entry]} onInspect={onInspect} />)
+
+    fireEvent.click(screen.getByRole('button'))
+    expect(onInspect).toHaveBeenCalledWith(card, entry)
   })
 })

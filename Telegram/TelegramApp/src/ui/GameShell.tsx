@@ -10,7 +10,7 @@ import { audio } from '../game/audio/AudioManager'
 import { bindTelegramBackButton, getSharedProfileUserId, getTelegramUser, hapticAction, hapticSuccess } from '../telegram'
 import { fetchPublicProfile, type PublicProfile, type ShowcaseEntry } from '../game/profileApi'
 import { fetchCollection, fetchPendingPacks, type OpenPackResult, type OwnedCard, type PendingPack } from '../game/cards/cardsApi'
-import { summarizeCollection } from '../game/cards/collectionSummary'
+import { summarizeCollection, showcasedOwnedSummary, type OwnedSummary } from '../game/cards/collectionSummary'
 import type { CardDefinition } from '../game/cards/catalog'
 import { useScreenShake } from './useScreenShake'
 import { useParticles } from './combatFx/useParticles'
@@ -119,6 +119,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   // The filtered/sorted list CardsScreen was showing when the card was opened - lets the
   // detail sheet's NEXT button browse without needing to re-derive filters up here.
   const [selectedCardList, setSelectedCardList] = useState<CardDefinition[]>([])
+  // Set only when the open card came from a showcase (own or a visited profile's) - overrides
+  // the viewer's own-collection lookup below so a visited profile's showcased cards always
+  // render unlocked, even if the local viewer hasn't found that card themselves. See
+  // ShowcaseEditor's InspectHandler doc.
+  const [selectedCardForcedOwned, setSelectedCardForcedOwned] = useState<OwnedSummary | null>(null)
   // Bumped when the card detail sheet closes - the only moment favorites/recent-views can
   // have changed; CardsScreen (memo'd, see its perf notes) refreshes its prefs off this.
   const [prefsVersion, setPrefsVersion] = useState(0)
@@ -565,6 +570,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
   const handleSelectCard = useCallback((card: CardDefinition, list: CardDefinition[]) => {
     setSelectedCard(card)
     setSelectedCardList(list)
+    setSelectedCardForcedOwned(null)
   }, [])
   const handleOpenPacks = useCallback(() => setPackSheetOpen(true), [])
   const handleClosePackSheet = useCallback(() => setPackSheetOpen(false), [])
@@ -706,9 +712,10 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         showcase={myShowcase}
         onShowcaseChange={setMyShowcase}
         onToast={showToast}
-        onInspectCard={(card) => {
+        onInspectCard={(card, entry) => {
           setSelectedCard(card)
           setSelectedCardList([])
+          setSelectedCardForcedOwned(entry ? showcasedOwnedSummary(entry.variant) : null)
         }}
         onClose={() => {
           setProfileOpen(false)
@@ -754,10 +761,11 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
       <ShipUnlockToast unlock={shipUnlock} onClose={() => setShipUnlock(null)} onViewFleet={() => setTab('fleet')} />
       <CardDetailSheet
         card={selectedCard}
-        owned={selectedCard ? (cardOwnedSummary.get(selectedCard.id) ?? null) : null}
+        owned={selectedCard ? (selectedCardForcedOwned ?? cardOwnedSummary.get(selectedCard.id) ?? null) : null}
         open={selectedCard !== null}
         onClose={() => {
           setSelectedCard(null)
+          setSelectedCardForcedOwned(null)
           setPrefsVersion((v) => v + 1)
         }}
         onExplore={() => setObjectViewerOpen(true)}

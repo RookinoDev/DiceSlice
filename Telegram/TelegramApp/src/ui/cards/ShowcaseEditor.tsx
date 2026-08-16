@@ -18,12 +18,21 @@ import type { CSSProperties } from 'react'
 
 export const SHOWCASE_SLOTS = 5
 
+/**
+ * `entry` is passed only by the read-only ShowcaseView (a visited profile) - it tells the
+ * inspector "this card is confirmed owned by the profile owner via this variant" so it can be
+ * shown unlocked even if the local viewer hasn't found it themselves. The editor omits it since
+ * it already only lets you showcase your OWN owned cards - the normal viewer-collection lookup
+ * is already correct there.
+ */
+type InspectHandler = (card: CardDefinition, entry?: ShowcaseEntry) => void
+
 interface ShowcaseEditorProps {
   apiBaseUrl: string | undefined
   ownedCards: OwnedCard[]
   showcase: ShowcaseEntry[]
   onChange: (next: ShowcaseEntry[]) => void
-  onInspect: (card: CardDefinition) => void
+  onInspect: InspectHandler
   onToast: (text: string) => void
 }
 
@@ -175,7 +184,7 @@ export function ShowcaseEditor({ apiBaseUrl, ownedCards, showcase, onChange, onI
 }
 
 /** Read-only showcase for visited profiles. */
-export function ShowcaseView({ showcase, onInspect }: { showcase: ShowcaseEntry[]; onInspect: (card: CardDefinition) => void }) {
+export function ShowcaseView({ showcase, onInspect }: { showcase: ShowcaseEntry[]; onInspect: InspectHandler }) {
   if (showcase.length === 0) return null
   return (
     <div className="showcase">
@@ -185,7 +194,7 @@ export function ShowcaseView({ showcase, onInspect }: { showcase: ShowcaseEntry[
           const card = cardById(entry.cardId)
           if (!card) return null
           return (
-            <button key={i} className={`showcase-slot cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties} onClick={() => onInspect(card)}>
+            <button key={i} className={`showcase-slot cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties} onClick={() => onInspect(card, entry)}>
               <CardArt cardName={card.name} mode="grid" className="showcase-slot-art" />
               {entry.variant !== 'standard' && <div className="showcase-slot-variant">{VARIANT_LABEL[entry.variant]}</div>}
             </button>

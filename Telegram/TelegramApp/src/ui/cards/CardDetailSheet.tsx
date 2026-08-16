@@ -390,7 +390,7 @@ export function CardDetailSheet({ card, owned, open, onClose, onExplore, onNext,
                   </div>
                 )}
 
-                {owned && (
+                {owned && owned.bestSerial > 0 && (
                   <div className="card-detail-edition-row">
                     <div>
                       <div className="card-detail-edition-label">MINT Nº</div>

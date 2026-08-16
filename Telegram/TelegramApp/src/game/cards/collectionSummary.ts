@@ -20,6 +20,17 @@ export interface OwnedSummary {
   level: number
 }
 
+/**
+ * Minimal OwnedSummary for a card shown in a VISITED profile's showcase. The showcase entry
+ * only carries cardId+variant (server-validated ownership, see cardsApi.saveShowcase) - we don't
+ * know the profile owner's real serial/count/level, so those get honest "unknown" placeholders.
+ * bestSerial 0 is never a real serial (the server mints starting at 1, see TelegramBot/db.mjs),
+ * so callers can use it as a sentinel to hide serial-dependent UI (e.g. the mint-number row).
+ */
+export function showcasedOwnedSummary(variant: CardVariant): OwnedSummary {
+  return { count: 1, variants: { [variant]: 1 }, bestVariant: variant, bestSerial: 0, newestMintedAtMs: 0, level: 1 }
+}
+
 export function summarizeCollection(ownedCards: OwnedCard[]): Map<string, OwnedSummary> {
   const map = new Map<string, OwnedSummary>()
   for (const c of ownedCards) {
