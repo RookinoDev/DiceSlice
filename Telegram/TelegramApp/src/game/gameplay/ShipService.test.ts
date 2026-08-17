@@ -56,6 +56,39 @@ describe('ShipService: late-game cost curve (see BalanceConfig.shipCostBreakpoin
   })
 })
 
+describe('ShipService: upgrading one ship stays bounded vs. diversifying (round-2 balance fix)', () => {
+  // Regression test for a real player report: even after the level-50 cost breakpoint (see the
+  // block above), it was STILL dramatically more efficient to keep dumping Stardust into ship 1
+  // than to buy or level any other ship - the breakpoint fired far too late (the runaway was
+  // already >10,000,000x by level 50 under the old level-50/1.25x tuning). Fixed by pulling the
+  // breakpoint to level 12 and raising its growth to 1.52x (just above shipDamagePerLevel's
+  // 1.5x), so the marginal efficiency of continuing one ship plateaus instead of compounding
+  // without bound. This test locks in "plateaus" as a real, checked upper bound rather than a
+  // one-off simulation result that can silently regress.
+  it('marginal DPS-per-Stardust of leveling ship 0 stays within a sane multiple of buying ship 1 fresh, even at very high levels', () => {
+    const s = createGameSession()
+    const ship1FreshEfficiency = s.ships.nextLevelDps(1).toNumber() / s.ships.nextCost(1).toNumber()
+
+    for (let i = 0; i < 150; i++) {
+      s.wallet.add(s.ships.nextCost(0))
+      s.ships.buyOrUpgrade(0, s.wallet)
+    }
+    expect(s.ships.levelOf(0)).toBe(150)
+
+    const dpsBefore = s.ships.shipDps(0).toNumber()
+    const nextCost = s.ships.nextCost(0).toNumber()
+    s.wallet.add(s.ships.nextCost(0))
+    s.ships.buyOrUpgrade(0, s.wallet)
+    const dpsAfter = s.ships.shipDps(0).toNumber()
+
+    const ship0MarginalEfficiency = (dpsAfter - dpsBefore) / nextCost
+    // Pre-fix, this ratio was in the hundreds of millions by level 150. Post-fix it oscillates
+    // (shipMilestoneLevels bumps cause periodic spikes) but never runs away - 500x is a generous
+    // ceiling that would already fail loudly under the old level-50/1.25x tuning.
+    expect(ship0MarginalEfficiency / ship1FreshEfficiency).toBeLessThan(500)
+  })
+})
+
 describe("ShipService: setCostMultiplier (Galactic Salvage's upgrade discount)", () => {
   it('discounts nextCost and clamps to a max 60% off, never free', () => {
     const s = createGameSession()

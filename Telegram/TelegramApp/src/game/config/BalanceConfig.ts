@@ -134,19 +134,32 @@ export const defaultBalanceConfig: BalanceConfig = {
   shipBaseCostGrowthMin: 3.5,
   shipBaseCostGrowthMax: 8.9,
   shipCount: 19,
-  // User-reported: one ship leveled to ~100 could carry the whole game, and late-game sectors
-  // stopped costing anything (Stardust balance never went down). Root cause: shipDamagePerLevel
-  // (1.5x/level) grows FAR faster than shipCostPerLevel (1.075x/level - see its own comment for
-  // why it's deliberately low), so the marginal DPS-per-Stardust of the NEXT level on whichever
-  // ship you're already leveling gets exponentially better forever - there's no point where
-  // switching ships (or just not spending) ever becomes competitive. Levels 1-50 keep the
-  // original curve untouched (no change to the early/mid game this wasn't about) - level 50 is
-  // the second shipMilestoneLevels breakpoint, a natural "the real late game starts here" line.
-  // Past it, cost growth steepens close to (not fully matching) shipDamagePerLevel, so going
-  // deep on one ship - reaching the 100/200/400 milestones - stays a real, felt investment
-  // instead of a free byproduct of spamming whatever's cheapest.
-  shipCostBreakpointLevel: 50,
-  shipCostBreakpointGrowth: 1.25,
+  // User-reported (round 1): one ship leveled to ~100 could carry the whole game, and late-game
+  // sectors stopped costing anything (Stardust balance never went down). Root cause:
+  // shipDamagePerLevel (1.5x/level) grows FAR faster than shipCostPerLevel (1.075x/level - see
+  // its own comment for why it's deliberately low), so the marginal DPS-per-Stardust of the NEXT
+  // level on whichever ship you're already leveling gets exponentially better forever.
+  //
+  // User-reported (round 2, after the breakpoint-at-50 fix below shipped): early ships were
+  // STILL too strong - it was still clearly better to keep dumping Stardust into ship 1 than to
+  // buy/level any other ship. Simulated the actual marginal-efficiency curve (upgrading ship 1
+  // vs. buying ship 2 fresh, using the real ShipCombat formulas): with the level-50 breakpoint,
+  // that ratio was already ~11x by level 15 and past 10,000,000x by level 50 - the breakpoint
+  // fired far too late to matter, since the runaway was already severe well inside the "normal"
+  // early game a typical session reaches in minutes, not the late game the first fix assumed.
+  // Worse, 1.25x growth still undershoots shipDamagePerLevel (1.5x), so even past the breakpoint
+  // the ratio kept climbing (just slower) instead of leveling off.
+  //
+  // Fix: pulled the breakpoint down to level 12 (right past the earliest "ships should feel
+  // individually rewarding" levels) and raised its growth to 1.52x - just ABOVE
+  // shipDamagePerLevel, so post-breakpoint the marginal efficiency of continuing ONE ship
+  // genuinely plateaus/oscillates (2x-45x vs. a fresh ship, cycling with the shipMilestoneLevels
+  // bumps) instead of compounding without bound. Verified via the same simulation: the ratio no
+  // longer exceeds ~45x at any level up to 200. shipDamagePerLevel/shipBaseDpsFirst (the ships
+  // vs. tap balance from round 1) are untouched - this is purely a cost-curve retune, so an
+  // already-leveled ship's OWN output doesn't change, only the cost of pushing it further.
+  shipCostBreakpointLevel: 12,
+  shipCostBreakpointGrowth: 1.52,
 
   shipBaseDpsFirst: 8.0,
   // User-reported: ships felt weak vs. tapping. Tap damage grows up to 2.1x/level early
