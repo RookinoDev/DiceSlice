@@ -51,9 +51,10 @@ export class MissionService {
     return Math.min(1, Math.max(0, frac))
   }
 
-  /** Reward for claiming mission i right now, given the caller's current one-kill-gold value. */
-  rewardFor(i: number, oneKillGold: BigNumber): BigNumber {
-    return oneKillGold.mul(new BigNumber(this.defs[i].rewardMult))
+  /** Fixed Stardust reward for mission i - baked into the definition, never live-computed
+   *  (see MissionDefinition.reward's doc for why). */
+  rewardFor(i: number): BigNumber {
+    return fromBigNumberData(this.defs[i].reward)
   }
 
   /** For each mission type present, the index of its lowest-level unclaimed mission (the one
@@ -72,11 +73,11 @@ export class MissionService {
     return out
   }
 
-  claim(i: number, oneKillGold: BigNumber): boolean {
+  claim(i: number): boolean {
     if (i < 0 || i >= this.defs.length) return false
     if (this.claimed[i] || !this.isComplete(i)) return false
     this.claimed[i] = true
-    const reward = this.rewardFor(i, oneKillGold)
+    const reward = this.rewardFor(i)
     this.wallet.add(reward)
     this.onClaimed.emit({ index: i, gold: reward })
     return true

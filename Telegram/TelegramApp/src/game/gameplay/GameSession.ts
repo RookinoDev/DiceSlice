@@ -226,7 +226,7 @@ export class GameSession {
 
   /** Claim a completed mission's Gold reward. False if not complete or already claimed. */
   claimMission(i: number): boolean {
-    return this.missions.claim(i, this.oneKillGold)
+    return this.missions.claim(i)
   }
 
   // -- Buy Max (spend everything affordable; never overspends) --

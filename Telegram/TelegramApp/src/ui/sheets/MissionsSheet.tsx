@@ -31,7 +31,7 @@ export function MissionsSheet({ session: s, open, onClose, onClaimed }: Missions
           const complete = m.isComplete(i)
           const claimed = m.isClaimed(i)
           const pct = m.progress01(i) * 100
-          const reward = m.rewardFor(i, s.oneKillGold)
+          const reward = m.rewardFor(i)
           return (
             <div key={i} className="mission-row">
               <div className="mission-name">{def.displayName}</div>
