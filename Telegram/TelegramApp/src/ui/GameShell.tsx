@@ -778,7 +778,7 @@ export function GameShell({ session, offline, claimedGrants, cloudRestores, sync
         }}
       />
       <ObjectViewer card={selectedCard} open={objectViewerOpen} onClose={() => setObjectViewerOpen(false)} />
-      <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} onOpened={handlePackOpened} open={packSheetOpen} onClose={handleClosePackSheet} />
+      <PackOpeningOverlay apiBaseUrl={import.meta.env.VITE_API_URL} pendingPacks={pendingPacks} ownedCards={ownedCards} onOpened={handlePackOpened} open={packSheetOpen} onClose={handleClosePackSheet} />
       {/* Hidden (not just non-interactive) while any other sheet/overlay is open - `openSheet`
           is the same "what's currently on top" signal the hardware BackButton uses above, reused
           here since it's already exhaustive: without this, e.g. the pack-opening ceremony

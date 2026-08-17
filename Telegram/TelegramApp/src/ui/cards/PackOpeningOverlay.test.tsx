@@ -44,7 +44,7 @@ const packs: PendingPack[] = [
 describe('PackOpeningOverlay ceremony', () => {
   it('runs the whole ceremony: tear -> burst -> deal -> flips -> recap -> next pack', async () => {
     const onOpened = vi.fn()
-    const { container } = render(<PackOpeningOverlay apiBaseUrl={undefined} pendingPacks={packs} onOpened={onOpened} open={true} onClose={() => {}} />)
+    const { container } = render(<PackOpeningOverlay apiBaseUrl={undefined} pendingPacks={packs} ownedCards={[]} onOpened={onOpened} open={true} onClose={() => {}} />)
 
     // Phase: pack. The wrapper floats, hint invites the hold.
     expect(container.querySelector('.pack-wrapper')).toBeTruthy()
@@ -102,7 +102,7 @@ describe('PackOpeningOverlay ceremony', () => {
   })
 
   it('reveals variant, NEW, and serial details on flipped cards', async () => {
-    const { container } = render(<PackOpeningOverlay apiBaseUrl={undefined} pendingPacks={packs} onOpened={() => {}} open={true} onClose={() => {}} />)
+    const { container } = render(<PackOpeningOverlay apiBaseUrl={undefined} pendingPacks={packs} ownedCards={[]} onOpened={() => {}} open={true} onClose={() => {}} />)
     fireEvent.pointerDown(container.querySelector('.pack-wrapper')!)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000)

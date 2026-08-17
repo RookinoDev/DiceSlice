@@ -6124,6 +6124,19 @@
   font-weight: 700;
   letter-spacing: 0.1em;
 }
+/* Distinct from NEW (green "first copy") - gold reads as "existing card got stronger",
+   matching the LV badge's own tone in the collection grid (see .card-grid-count). */
+.pack-reveal-levelup {
+  margin-top: 2px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--palette-gold);
+  color: #201400;
+  font-family: var(--font-display);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
 .pack-reveal-serial {
   font-size: 8.5px;
   color: var(--palette-text-dim);

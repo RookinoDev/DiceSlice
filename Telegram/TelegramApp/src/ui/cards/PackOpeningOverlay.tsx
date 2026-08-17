@@ -17,14 +17,38 @@ import { hapticAction, hapticSuccess, hapticTap } from '../../telegram'
 import { RARITY_LABEL, type CardRarity } from '../../game/cards/catalog'
 import { cardById } from '../../game/cards/generatedCards'
 import { VARIANT_LABEL } from '../../game/cards/variants'
-import { openPackRequest, PACK_LABEL, type PackType, type MintedCard, type OpenPackResult, type PendingPack } from '../../game/cards/cardsApi'
+import { openPackRequest, PACK_LABEL, type PackType, type MintedCard, type OpenPackResult, type PendingPack, type OwnedCard } from '../../game/cards/cardsApi'
+import { cardLevelForCount } from '../../game/cards/cardLevel'
 
 interface PackOpeningOverlayProps {
   apiBaseUrl: string | undefined
   pendingPacks: PendingPack[]
+  /** Snapshot read at tear time (not live-tracked mid-ceremony) to compute which pulled
+   *  duplicates push a card's Level up - see completeTear's own comment. */
+  ownedCards: OwnedCard[]
   onOpened: (packId: number, result: OpenPackResult) => void
   open: boolean
   onClose: () => void
+}
+
+/** cardId -> true for every card in `cards` whose duplicate count crosses a cardLevelForCount
+ *  threshold as a RESULT of this pull, given what was already owned beforehand. Walks the pack
+ *  in order so two copies of the same card in one pack are still counted correctly against each
+ *  other. Excludes isNew pulls (level 0->1 is "you got it", already covered by the NEW badge). */
+export function computeLeveledUp(cards: MintedCard[], before: OwnedCard[]): Set<string> {
+  const countSoFar = new Map<string, number>()
+  for (const o of before) countSoFar.set(o.cardId, (countSoFar.get(o.cardId) ?? 0) + 1)
+
+  const leveled = new Set<string>()
+  for (const c of cards) {
+    const priorCount = countSoFar.get(c.cardId) ?? 0
+    const newCount = priorCount + 1
+    countSoFar.set(c.cardId, newCount)
+    if (!c.isNew && cardLevelForCount(newCount) > cardLevelForCount(priorCount)) {
+      leveled.add(`${c.cardId}-${c.serial}`)
+    }
+  }
+  return leveled
 }
 
 const RARITY_RANK: Record<CardRarity, number> = { common: 0, uncommon: 1, rare: 2, epic: 3, legendary: 4, ultra: 5 }
@@ -53,8 +77,11 @@ type Phase =
 // memo()d: GameShell re-renders every animation frame for the game loop; while a ceremony is
 // playing (all-CSS animations + its own phase state) none of those re-renders concern this
 // overlay, so with stable props it skips them entirely.
-export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl, pendingPacks, onOpened, open, onClose }: PackOpeningOverlayProps) {
+export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl, pendingPacks, ownedCards, onOpened, open, onClose }: PackOpeningOverlayProps) {
   const [phase, setPhase] = useState<Phase>({ kind: 'pack' })
+  // `${cardId}-${serial}` keys for this ceremony's pulls that leveled up their base card -
+  // computed once per tear (see completeTear), read by OverlayCard/RecapBest/RecapMini.
+  const [leveledUp, setLeveledUp] = useState<Set<string>>(new Set())
   const [tearing, setTearing] = useState(false)
   const [tearProgress, setTearProgress] = useState(0)
   // Screen shake as a class toggle cleared on animationend - the old `key={shake}` remount
@@ -87,6 +114,7 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
       setPhase({ kind: 'pack' })
       setTearing(false)
       setTearProgress(0)
+      setLeveledUp(new Set())
       busy.current = false
       activeTearId.current = null
     }
@@ -166,6 +194,10 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
       setTearProgress(0)
     }
     if (r) {
+      // Read the "before" collection right before onOpened() hands the new cards to GameShell
+      // (whose setOwnedCards would otherwise mix pre/post-pull counts together by the time this
+      // component re-renders with the updated ownedCards prop) - see computeLeveledUp's own doc.
+      if (stillActive) setLeveledUp(computeLeveledUp(r.cards, ownedCards))
       onOpened(packId, r) // pack is genuinely opened server-side either way - always credit it
       if (stillActive) {
         // Let the burst flash breathe for a beat even on a fast server.
@@ -302,6 +334,7 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
                   revealed={revealed}
                   isTop={isTop}
                   lifting={lifting}
+                  leveledUp={leveledUp.has(`${c.cardId}-${c.serial}`)}
                 />
               )
             })}
@@ -312,12 +345,12 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
 
       {phase.kind === 'recap' && bestPull && (
         <div className="pack-overlay-stage pack-overlay-stage--recap">
-          <RecapBest card={bestPull} />
+          <RecapBest card={bestPull} leveledUp={leveledUp.has(`${bestPull.cardId}-${bestPull.serial}`)} />
           <div className="pack-recap-row">
             {phase.result.cards
               .filter((c) => c !== bestPull)
               .map((c, i) => (
-                <RecapMini key={`${c.cardId}-${c.serial}`} card={c} index={i} />
+                <RecapMini key={`${c.cardId}-${c.serial}`} card={c} index={i} leveledUp={leveledUp.has(`${c.cardId}-${c.serial}`)} />
               ))}
           </div>
           <button className="sheet-button-primary pack-overlay-continue" onClick={continueAfterRecap}>
@@ -329,7 +362,25 @@ export const PackOpeningOverlay = memo(function PackOpeningOverlay({ apiBaseUrl,
   )
 })
 
-function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: { card: MintedCard; index: number; total: number; dealing: boolean; revealed: boolean; isTop: boolean; lifting: boolean }) {
+function OverlayCard({
+  card,
+  index,
+  total,
+  dealing,
+  revealed,
+  isTop,
+  lifting,
+  leveledUp,
+}: {
+  card: MintedCard
+  index: number
+  total: number
+  dealing: boolean
+  revealed: boolean
+  isTop: boolean
+  lifting: boolean
+  leveledUp: boolean
+}) {
   const def = cardById(card.cardId)
   const color = RARITY_COLOR[card.rarity]
   // Face-down pile: slight per-card offset + rotation so it reads as a hand-thrown stack.
@@ -366,6 +417,7 @@ function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: 
           <div className="pack-reveal-name">{def?.name ?? card.cardId}</div>
           {card.variant !== 'standard' && <div className={`pack-reveal-variant pack-reveal-variant--${card.variant}`}>{VARIANT_LABEL[card.variant].toUpperCase()}</div>}
           {card.isNew && <div className="pack-reveal-new">NEW</div>}
+          {leveledUp && <div className="pack-reveal-levelup">LEVEL UP</div>}
           <div className="pack-reveal-serial">#{String(card.serial).padStart(4, '0')}</div>
         </div>
       </div>
@@ -373,7 +425,7 @@ function OverlayCard({ card, index, total, dealing, revealed, isTop, lifting }: 
   )
 }
 
-function RecapBest({ card }: { card: MintedCard }) {
+function RecapBest({ card, leveledUp }: { card: MintedCard; leveledUp: boolean }) {
   const def = cardById(card.cardId)
   return (
     <div className={`pack-recap-best cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity] } as CSSProperties}>
@@ -385,17 +437,19 @@ function RecapBest({ card }: { card: MintedCard }) {
         {card.variant !== 'standard' ? ` · ${VARIANT_LABEL[card.variant].toUpperCase()}` : ''}
       </div>
       {card.isNew && <div className="pack-reveal-new">NEW</div>}
+      {leveledUp && <div className="pack-reveal-levelup">LEVEL UP</div>}
     </div>
   )
 }
 
-function RecapMini({ card, index }: { card: MintedCard; index: number }) {
+function RecapMini({ card, index, leveledUp }: { card: MintedCard; index: number; leveledUp: boolean }) {
   const def = cardById(card.cardId)
   return (
     <div className={`pack-recap-mini cf-${card.rarity}`} style={{ '--rarity-color': RARITY_COLOR[card.rarity], '--pop-delay': `${index * 90}ms` } as CSSProperties}>
       <CardArt cardName={def?.name ?? card.cardId} mode="grid" className="pack-reveal-art" />
       <div className="pack-recap-mini-name">{def?.name ?? card.cardId}</div>
       {card.isNew && <div className="pack-reveal-new">NEW</div>}
+      {leveledUp && <div className="pack-reveal-levelup">LEVEL UP</div>}
     </div>
   )
 }
