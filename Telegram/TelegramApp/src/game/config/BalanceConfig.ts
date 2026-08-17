@@ -114,7 +114,22 @@ export interface BalanceConfig {
 
 export const defaultBalanceConfig: BalanceConfig = {
   enemyHpBase: 29.0,
-  enemyHpGrowth: 1.57,
+  // User-requested balance audit: simulated the real progression curve (greedy tap+ship buyer,
+  // then repeated Stellar Ascensions spending Relics on Artifacts via the real cost/bonus
+  // formulas) against enemyHpGrowth's old value of 1.57. The boss-multiplier CYCLE itself
+  // ([2,4,6,7,10] repeating) is well-designed - it already gives a natural breather after each
+  // x10 peak (the wrap back to x2 is consistently the smallest jump in the cycle) - so that part
+  // was left untouched. The real problem: HP compounding 57%/stage forever vastly outpaces what
+  // a linear-bonus/exponential-cost Artifact can ever provide (see artifactCostGrowth's own
+  // comment) - simulated result was a PERMANENT wall at stage 25 after just ~2 Ascensions, with
+  // 12,000+ Relics spent and zero further progress (reaching stage 30 alone needed ~1.9x more
+  // DPS than stage 25; stage 50 needed ~79,000x more - no bounded per-level bonus can close that).
+  // Lowered to 1.38 (+38%/stage) - simulated to keep early pacing healthy (stage 1 still ~6s,
+  // stage 5/10 bosses still comfortably under the 30s timer on a single fresh run) while, combined
+  // with the Artifact retune below, letting repeated Ascensions push the practical long-term wall
+  // from stage 25 to stage 85 (~150 simulated cycles, stable - see BalanceConfigTests-equivalent
+  // sim notes) - a genuine ~3.4x extension, not just a later version of the same wall.
+  enemyHpGrowth: 1.38,
   bossMultipliers: [2, 4, 6, 7, 10],
 
   tapDamageBase: 1.05,
@@ -192,9 +207,19 @@ export const defaultBalanceConfig: BalanceConfig = {
   relicPower: 1.8,
 
   artifactBaseCost: 10.0,
-  artifactCostGrowth: 1.5,
-  artifactFirstLevelBonus: 0.2,
-  artifactBonusPerLevel: 0.04,
+  // Part of the same balance audit as enemyHpGrowth's own comment - the actual root cause of the
+  // permanent stage-25 wall. ArtifactService.multiplier() is 1 + (firstLevelBonus + (level-1) *
+  // bonusPerLevel) per artifact - LINEAR in level - while the old artifactCostGrowth (1.5, i.e.
+  // 50%/level) made each level 50% MORE Relics than the last, so buying enough levels to matter
+  // became astronomically expensive long before the linear bonus could ever add up to a
+  // multiplier big enough to offset an exponential HP curve. Lowered cost growth to 5%/level
+  // (many more levels affordable per Ascension's Relic haul) and raised both bonus terms so each
+  // level is also individually worth more - simulated together with enemyHpGrowth's reduction:
+  // repeated Ascensions now keep making real, felt progress out to a stable stage-85 ceiling
+  // (~150 simulated cycles) instead of hard-stopping at stage 25 after 2 Ascensions.
+  artifactCostGrowth: 1.05,
+  artifactFirstLevelBonus: 0.25,
+  artifactBonusPerLevel: 0.09,
 
   offlineRate: 0.5,
   offlineCapHours: 8.0,

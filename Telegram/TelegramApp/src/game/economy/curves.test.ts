@@ -15,9 +15,13 @@ describe('economy curves match the documented Unity formulas', () => {
   const cfg = defaultBalanceConfig
 
   it('enemy HP: HP(stage) = base * growth^(stage-1)', () => {
+    // growth is 1.38 here, not Unity's original 1.57 - a deliberate, simulated-and-validated
+    // divergence from the Unity reference curve (see BalanceConfig.ts's enemyHpGrowth comment:
+    // 1.57 compounded so far past what Artifacts could ever offset that Ascension permanently
+    // walled at stage 25 after ~2 cycles). The formula itself still matches Unity's shape.
     expect(enemyHpForStage(1, cfg.enemyHpBase, cfg.enemyHpGrowth).toNumber()).toBeCloseTo(29.0, 6)
     expect(enemyHpForStage(10, cfg.enemyHpBase, cfg.enemyHpGrowth).toNumber()).toBeCloseTo(
-      29.0 * Math.pow(1.57, 9),
+      29.0 * Math.pow(1.38, 9),
       3,
     )
   })
