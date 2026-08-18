@@ -27,6 +27,19 @@ const AUTOSAVE_SECONDS = 15
  * net; the worst case if the app is killed without a pagehide is losing at most 2 minutes of
  * otherwise-unsynced idle progress, still backed by the 15s LOCAL autosave regardless. */
 const CLOUD_PUSH_SECONDS = 120
+// Second half of the same incident: visibilitychange fires on every single app-background/
+// foreground cycle (very common on mobile Telegram - switching to a chat, a notification, back
+// again), completely independent of the periodic heartbeat above. Each cycle was triggering a
+// full syncSave on hide AND a cloud reconcile + purchase check on the next foreground,
+// unconditionally, regardless of how recently any of those had already run.
+/** Minimum gap since the last successful cloud push before a background-triggered fullSync()
+ *  bothers pushing again - skips a redundant write when something else (the periodic heartbeat,
+ *  a boss-kill/purchase/prestige sync, reconcile's own push) already pushed moments ago. */
+const MIN_BACKGROUND_SYNC_GAP_MS = 20_000
+/** How often a regained-foreground event bothers re-checking the cloud save / pending Star
+ *  purchases. A real cross-device conflict or an out-of-band purchase doesn't need sub-minute
+ *  freshness - rapid app-switching would otherwise re-check on every single tap back in. */
+const FOREGROUND_CHECK_THROTTLE_MS = 60_000
 /** Clamp a single frame's delta so a throttled/backgrounded tab can't apply one giant tick. */
 const MAX_FRAME_DELTA = 0.25
 /** How often React is told to re-render off the game loop (the sim itself ticks per frame). */
@@ -121,13 +134,25 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
   // it was written before this device claimed them).
   const claimedGrantsRef = useRef<PurchaseGrant[]>([])
 
+  // -- Throttle bookkeeping for the visibilitychange fix (see MIN_BACKGROUND_SYNC_GAP_MS /
+  // FOREGROUND_CHECK_THROTTLE_MS above). lastCloudPushAtRef is shared across every push path
+  // (this hook's own syncNow, the periodic heartbeat, reconcile's push branch) so a
+  // background-triggered fullSync can tell "did ANYTHING just sync" regardless of which
+  // mechanism did it - not just its own call history.
+  const lastCloudPushAtRef = useRef(0)
+  const lastReconcileCheckAtRef = useRef(0)
+  const lastRefreshPurchasesCheckAtRef = useRef(0)
+
   /** Write localStorage now and, once cloud sync is up, mirror the same snapshot there. Resolves
    *  once the cloud push settles (or immediately if cloud sync isn't ready) - callers that need
    *  to know "the server has seen this" (e.g. refetching pack grants right after) can await it. */
   const syncNow = async (keepalive = false): Promise<void> => {
     const state = captureSave(activeSessionRef.current)
     writeSave(state)
-    if (cloudReadyRef.current) await pushCloudSave(import.meta.env.VITE_API_URL, state, keepalive)
+    if (cloudReadyRef.current) {
+      const pushed = await pushCloudSave(import.meta.env.VITE_API_URL, state, keepalive)
+      if (pushed) lastCloudPushAtRef.current = Date.now()
+    }
   }
 
   /** Settings > "Reset Save". Writing a fresh save to storage/cloud isn't enough on its own -
@@ -207,7 +232,9 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
           setBoot(newBoot)
           setCloudRestores((n) => n + 1)
         } else {
-          pushCloudSave(import.meta.env.VITE_API_URL, local)
+          pushCloudSave(import.meta.env.VITE_API_URL, local).then((pushed) => {
+            if (pushed) lastCloudPushAtRef.current = Date.now()
+          })
         }
       } finally {
         reconcileInFlightRef.current = false
@@ -215,8 +242,17 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
     }
 
     reconcile()
+    lastReconcileCheckAtRef.current = Date.now()
     const onVisibilityChange = () => {
-      if (!document.hidden) reconcile()
+      if (document.hidden) return
+      // Throttled (see FOREGROUND_CHECK_THROTTLE_MS) - note reconcile() is already a no-op
+      // once cloudReadyRef is set (its own top-line guard), so in steady state this only ever
+      // does real work again during a connection retry window; the throttle mainly caps how
+      // often rapid app-switching can add extra attempts on top of the 10s retry timer.
+      const now = Date.now()
+      if (now - lastReconcileCheckAtRef.current < FOREGROUND_CHECK_THROTTLE_MS) return
+      lastReconcileCheckAtRef.current = now
+      reconcile()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => {
@@ -228,11 +264,19 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
 
   useEffect(() => {
     refreshPurchases()
+    lastRefreshPurchasesCheckAtRef.current = Date.now()
 
     // Re-check when the Mini App regains foreground - a purchase may have completed
-    // in the bot chat while this tab was backgrounded.
+    // in the bot chat while this tab was backgrounded. Throttled (see
+    // FOREGROUND_CHECK_THROTTLE_MS) - rapid app-switching shouldn't re-check on every tap back
+    // in; the Shop sheet also calls refreshPurchases directly right after its own purchase
+    // completes, which is the path that actually needs to be immediate.
     const onVisibilityChange = () => {
-      if (!document.hidden) refreshPurchases()
+      if (document.hidden) return
+      const now = Date.now()
+      if (now - lastRefreshPurchasesCheckAtRef.current < FOREGROUND_CHECK_THROTTLE_MS) return
+      lastRefreshPurchasesCheckAtRef.current = now
+      refreshPurchases()
     }
     document.addEventListener('visibilitychange', onVisibilityChange)
     return () => document.removeEventListener('visibilitychange', onVisibilityChange)
@@ -279,7 +323,9 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
       if (cloudAccum >= CLOUD_PUSH_SECONDS) {
         cloudAccum = 0
         if (cloudReadyRef.current && session === activeSessionRef.current) {
-          pushCloudSave(import.meta.env.VITE_API_URL, captureSave(session), false)
+          pushCloudSave(import.meta.env.VITE_API_URL, captureSave(session), false).then((pushed) => {
+            if (pushed) lastCloudPushAtRef.current = Date.now()
+          })
         }
       }
 
@@ -289,6 +335,11 @@ export function useGameSession(cfg: BalanceConfig = defaultBalanceConfig) {
 
     const fullSync = () => {
       if (session !== activeSessionRef.current) return
+      // Throttled (see MIN_BACKGROUND_SYNC_GAP_MS): skip if the periodic heartbeat, an
+      // immediate per-event sync, or an earlier backgrounding already pushed moments ago -
+      // backgrounding fires on every single app-switch on mobile, not just a real "about to
+      // close" moment.
+      if (Date.now() - lastCloudPushAtRef.current < MIN_BACKGROUND_SYNC_GAP_MS) return
       syncNow(true)
     }
     const onVisibilityChange = () => {
