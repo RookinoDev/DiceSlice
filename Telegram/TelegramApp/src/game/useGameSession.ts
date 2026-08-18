@@ -15,10 +15,18 @@ import { resetCollection } from './cards/cardsApi'
 
 const AUTOSAVE_SECONDS = 15
 /** Safety-net periodic cloud push while playing (on top of the immediate per-event syncNow()
- *  calls - boss kills, purchases, prestige) - catches anything else worth not losing. Lowered
- *  from 60s so a delayed/failed immediate sync (e.g. a boss kill that raced a transient network
- *  blip) doesn't leave a just-earned pack invisible for a full minute. */
-const CLOUD_PUSH_SECONDS = 20
+ *  calls - boss kills, purchases, prestige) - catches anything else worth not losing.
+ *
+ * Was 20s, which hit Cloudflare's daily D1/Workers limits with only a handful of active players:
+ * every push fans out into ~4 unconditional D1 writes inside PlayerDO.syncSave
+ * (upsertProfileIdentity/syncLeaderboardStats/syncVipExpiry/recordEvent('session')), so one
+ * player leaving the app open for an hour was already ~180 pushes x 4 writes = ~720 D1 rows -
+ * a handful of such sessions in one day was enough to exhaust the free-tier daily cap. Raised to
+ * 120s (6x fewer heartbeats) - the immediate per-event syncs already cover every moment that
+ * actually matters (boss kill, purchase, prestige), so this is purely a passive-progress safety
+ * net; the worst case if the app is killed without a pagehide is losing at most 2 minutes of
+ * otherwise-unsynced idle progress, still backed by the 15s LOCAL autosave regardless. */
+const CLOUD_PUSH_SECONDS = 120
 /** Clamp a single frame's delta so a throttled/backgrounded tab can't apply one giant tick. */
 const MAX_FRAME_DELTA = 0.25
 /** How often React is told to re-render off the game loop (the sim itself ticks per frame). */
