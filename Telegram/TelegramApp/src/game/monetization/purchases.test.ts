@@ -35,6 +35,22 @@ describe('applyGrants', () => {
     expect(session.boosts.vipExpiresUnixSeconds).toBeLessThanOrEqual(nowSeconds() + THIRTY_DAYS + 2)
   })
 
+  it('talent_reset refunds spent Talent Points via TalentService.resetNodeLevels', () => {
+    const session = createGameSession()
+    session.talents.grantXp(1_000_000)
+    let nodeIndex = -1
+    for (let i = 0; i < session.talents.count; i++) {
+      if (session.talents.def(i).id === 'cannon-pulse-amplifier') nodeIndex = i
+    }
+    session.talents.buyNode(nodeIndex)
+    expect(session.talents.levelOf(nodeIndex)).toBe(1)
+
+    applyGrants(session, [{ item: 'talent_reset' }])
+
+    expect(session.talents.levelOf(nodeIndex)).toBe(0)
+    expect(session.talents.unspentPoints).toBe(session.talents.level - 1)
+  })
+
   it('unknown grant items are ignored without throwing', () => {
     const session = createGameSession()
     expect(() => applyGrants(session, [{ item: 'not_a_real_item' }])).not.toThrow()

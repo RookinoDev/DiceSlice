@@ -37,6 +37,9 @@ const GRANT_EFFECTS: Record<string, (session: GameSession) => void> = {
     const base = Math.max(nowSeconds, session.boosts.vipExpiresUnixSeconds)
     session.boosts.vipExpiresUnixSeconds = base + THIRTY_DAYS_SECONDS
   },
+  // Refunds every real stat node's Talent Points as unspent - see TalentService.resetNodeLevels's
+  // own comment for why Eternal Drive is deliberately excluded from the refund.
+  talent_reset: (session) => session.talents.resetNodeLevels(),
   // Not a Stars purchase - granted server-side via the same purchases/claim pipeline (see
   // rewardReferrerIfDue and the /start handler in TelegramBot/worker.mjs). Symmetric amounts:
   // both sides of a referral get the same welcome.

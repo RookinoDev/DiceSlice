@@ -9,7 +9,7 @@ import { audio } from '../../game/audio/AudioManager'
 import { PACK_CARD_COUNT_LABEL, type PackType } from '../../game/cards/cardsApi'
 import { RARITY_COLOR, PACK_TIER_RARITY } from '../cards/cardTheme'
 import { PACK_ICON } from '../cards/packIcons'
-import { CrownIcon, DailyGiftIcon, GoldIcon, HourglassIcon, PackCrateIcon } from '../icons'
+import { CrownIcon, DailyGiftIcon, GoldIcon, HourglassIcon, NavTalentsIcon, PackCrateIcon } from '../icons'
 import { Sheet } from '../Sheet'
 
 interface ShopSheetProps {
@@ -59,6 +59,7 @@ function packTypeOf(item: ShopItem): PackType | null {
 function iconForItem(item: ShopItem): ReactNode {
   if (item.id === 'starter_pack') return <DailyGiftIcon color="#FFD873" size={28} />
   if (item.id === 'offline_cap_boost') return <HourglassIcon size={28} />
+  if (item.id === 'talent_reset') return <NavTalentsIcon color="#B07CFF" size={26} />
   if (item.id === 'vip_pass_30d') return <CrownIcon size={28} />
   return <GoldIcon size={26} />
 }
@@ -126,9 +127,10 @@ export function ShopSheet({ open, onClose, apiBaseUrl, refreshPurchases, refresh
     const buying = buyingId === item.id
     const justBought = justBoughtId === item.id
     const bonus = STARDUST_BONUS_PERCENT[item.id]
-    // Every remaining row category (starter, stardust bundles, VIP) reads gold; only the cyan
-    // offline-cap boost differs - card packs no longer route through here at all (see renderPackTile).
-    const glow = item.id === 'offline_cap_boost' ? '#43DDEE' : '#FFB238'
+    // Every remaining row category (starter, stardust bundles, VIP) reads gold; the cyan
+    // offline-cap boost and the purple talent reset (matches Core Engine's branch color) differ -
+    // card packs no longer route through here at all (see renderPackTile).
+    const glow = item.id === 'offline_cap_boost' ? '#43DDEE' : item.id === 'talent_reset' ? '#B07CFF' : '#FFB238'
     return (
       <div
         key={item.id}

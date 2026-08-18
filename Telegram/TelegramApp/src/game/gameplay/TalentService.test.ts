@@ -393,4 +393,58 @@ describe('TalentService', () => {
       expect(t.grantedPerks.length).toBe(1)
     })
   })
+
+  describe('resetNodeLevels (Talent Reset shop item)', () => {
+    it('zeroes every real node, refunding every point spent as unspent - level/xp untouched', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      t.buyNode(indexOf(t, 'cannon-pulse-amplifier'))
+      t.buyNode(indexOf(t, 'fleet-autonomous-turrets'))
+      t.buyNode(indexOf(t, 'fleet-autonomous-turrets'))
+      const level = t.level
+      const xp = t.xp
+      const spentBefore = t.unspentPoints
+
+      t.resetNodeLevels()
+
+      expect(t.levelOf(indexOf(t, 'cannon-pulse-amplifier'))).toBe(0)
+      expect(t.levelOf(indexOf(t, 'fleet-autonomous-turrets'))).toBe(0)
+      expect(t.unspentPoints).toBeGreaterThan(spentBefore) // every spent point came back
+      expect(t.level).toBe(level) // earning progress is not a respec target
+      expect(t.xp).toBe(xp)
+    })
+
+    it('re-locks tier-2+ nodes that depended on the refunded points', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      grantBranchPoints(t, 'cannon', 5) // unlocks tier 2
+      const tier2 = indexOf(t, 'cannon-combat-rhythm')
+      expect(t.isUnlocked(tier2)).toBe(true)
+
+      t.resetNodeLevels()
+      expect(t.isUnlocked(tier2)).toBe(false)
+    })
+
+    it('does NOT touch Eternal Drive - level and every rolled perk survive intact', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      const eternal = indexOf(t, 'eternal-drive')
+      for (let i = 0; i < 10; i++) t.buyNode(eternal)
+      const perksBefore = t.grantedPerks.map((p) => ({ ...p }))
+      t.buyNode(indexOf(t, 'cannon-pulse-amplifier')) // a real node too, to prove it alone gets refunded
+
+      t.resetNodeLevels()
+
+      expect(t.levelOf(eternal)).toBe(10) // untouched - refunding it would be a free re-roll exploit
+      expect(t.grantedPerks).toEqual(perksBefore)
+      expect(t.levelOf(indexOf(t, 'cannon-pulse-amplifier'))).toBe(0)
+    })
+
+    it('a fresh tree with nothing spent is a harmless no-op', () => {
+      const t = freshService()
+      t.grantXp(1_000_000)
+      expect(() => t.resetNodeLevels()).not.toThrow()
+      expect(t.unspentPoints).toBe(t.level - 1)
+    })
+  })
 })

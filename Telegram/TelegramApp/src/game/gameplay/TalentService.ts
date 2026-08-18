@@ -107,6 +107,22 @@ export class TalentService {
     return true
   }
 
+  /** Talent Reset (Shop item, see purchases.ts's talent_reset grant): zeroes every REAL stat
+   *  node's level, refunding those points as unspent (level/xp - how many points were ever
+   *  earned - is untouched, only allocation resets) so the player can redistribute from
+   *  scratch. Locked nodes re-lock naturally (isUnlocked is always derived live from levels).
+   *  Eternal Drive is deliberately excluded - its level and every already-rolled perk stay
+   *  exactly as-is (see ETERNAL_DRIVE_ID's own "never removed, never re-rolled" comment on
+   *  grantedPerks); refunding it would both claw back perks already granted AND let a repeat
+   *  purchase re-roll them for free, which isn't a respec, it's a farming exploit. */
+  resetNodeLevels(): void {
+    for (let i = 0; i < this.levels.length; i++) {
+      if (this.defs[i].id === ETERNAL_DRIVE_ID || this.levels[i] === 0) continue
+      this.levels[i] = 0
+      this.onTalentChanged.emit({ index: i, level: 0 })
+    }
+  }
+
   /** Restore node levels from a save. A length mismatch means the tree itself was redesigned
    *  since this save was written (e.g. 25 nodes -> 79) - unlike Artifacts' simple clamp, applying
    *  old values index-by-index here would silently misapply them onto UNRELATED new nodes (same

@@ -130,6 +130,20 @@ export const SHOP_ITEMS = [
     kind: 'vip',
     oneTime: false,
   },
+  // Refunds every point spent on a real stat node as unspent, so the player can rebuild their
+  // tree from scratch - Talent Level/XP (how many points were ever earned) is untouched, only
+  // allocation resets. Repeatable (oneTime: false) - a player may want to re-plan more than
+  // once as new branches/combos open up. Eternal Drive's level and every perk it has ever
+  // rolled are explicitly NOT refunded (see TalentService.resetNodeLevels's own comment) -
+  // resetting it would let repeat purchases re-roll perks for free, which isn't a respec.
+  {
+    id: 'talent_reset',
+    title: 'Talent Reset',
+    description: 'Refunds every Talent Point you have spent so you can rebuild your tree from scratch. Eternal Drive perks are kept.',
+    priceStars: 60,
+    kind: 'boost',
+    oneTime: false,
+  },
 ]
 
 export function getShopItem(id) {

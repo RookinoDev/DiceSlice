@@ -60,6 +60,7 @@ export function mockShopCatalog(): ShopCatalog {
       { id: 'buy_pack_singularity', title: 'Singularity Pack', description: '5 cards. At least one legendary or better.', priceStars: 200, kind: 'cards', oneTime: false },
       { id: 'buy_pack_legendarycache', title: 'Legendary Cache', description: '4 cards: 1 guaranteed legendary, the rest epic or better. The rarest offer in the shop.', priceStars: 260, kind: 'cards', oneTime: false, tag: 'NEW' },
       { id: 'offline_cap_boost', title: 'Offline Cap Extender', description: 'Permanently raises the offline earnings cap from 8h to 24h.', priceStars: 45, kind: 'boost', oneTime: true },
+      { id: 'talent_reset', title: 'Talent Reset', description: 'Refunds every Talent Point you have spent so you can rebuild your tree from scratch. Eternal Drive perks are kept.', priceStars: 60, kind: 'boost', oneTime: false },
       { id: 'vip_pass_30d', title: 'VIP Pass (30 days)', description: '+25% Stardust from every kill for 30 days. Repurchasing extends your remaining time.', priceStars: 99, kind: 'vip', oneTime: false },
     ],
     purchased: [],
